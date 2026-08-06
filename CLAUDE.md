@@ -4,7 +4,8 @@
 
 ## Status and scope
 
-NeroEconomy 0.1.0 is the first playable, feature-complete release candidate. It provides the
+NeroEconomy is the first playable, feature-complete release candidate: the 0.1.0 feature set,
+shipping as `0.0.1-alpha.1` (`mod_version` in `gradle.properties`) until release. It provides the
 persistent credits provider for Neroland Core, privacy-aware ledger, bank and trading terminals,
 owned offline shops, escrowed market offers, contracts, deliveries, bounties, auctions, credit chips,
 public pricing APIs, and a Core Link module. Faction wallets remain deferred.

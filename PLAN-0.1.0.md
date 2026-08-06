@@ -1,6 +1,8 @@
 # NeroEconomy 0.1.0 completion plan
 
-All implementation stages are complete; runtime verification remains owner-operated.
+All implementation stages are complete; runtime verification remains owner-operated. The 0.1.0
+feature set ships as `0.0.1-alpha.1` (`mod_version` in `gradle.properties`) until release; "0.1.0"
+below names the scope, not the published version string.
 
 - [x] Stage 0: audit Core currency ownership, recovery, networking, platform seams, init order,
   configuration, telemetry, manifests, and dupe surfaces. See `AUDIT.md`.

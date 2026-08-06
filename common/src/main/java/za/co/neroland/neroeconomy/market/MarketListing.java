@@ -2,9 +2,11 @@ package za.co.neroland.neroeconomy.market;
 
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.Identifier;
+import net.minecraft.tags.TagKey;
 import net.minecraft.world.item.ItemStack;
 
 import za.co.neroland.neroeconomy.api.MarketListingView;
@@ -19,7 +21,18 @@ public record MarketListing(UUID listingId, UUID seller, ListingSource source, I
         stock = stock.copy();
     }
     @Override public Identifier itemId() { return BuiltInRegistries.ITEM.getKey(stock.getItem()); }
-    @Override public Set<Identifier> tags() { return Set.of(); }
+    /**
+     * Item tags resolved from the registry holder, so tag-scoped market shocks can match. Holders
+     * only carry tags once the registry has bound them; before that (or for a direct holder) the
+     * listing simply has no tags and pricing falls back to the item-scoped shocks.
+     */
+    @Override public Set<Identifier> tags() {
+        try {
+            return stock.typeHolder().tags().map(TagKey::location).collect(Collectors.toUnmodifiableSet());
+        } catch (RuntimeException unbound) {
+            return Set.of();
+        }
+    }
     @Override public int availableQuantity() { return stock.getCount(); }
     public MarketListing withStock(ItemStack next) {
         return new MarketListing(listingId, seller, source, next, baseUnitPrice, expiresAt, location);

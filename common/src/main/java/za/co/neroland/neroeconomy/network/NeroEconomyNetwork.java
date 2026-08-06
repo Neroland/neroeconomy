@@ -39,6 +39,7 @@ public final class NeroEconomyNetwork {
         serverbound(MarketBuyOfferPayload.TYPE, MarketBuyOfferPayload.STREAM_CODEC, MarketBuyOfferPayload::handle);
         serverbound(MarketFillBuyOfferPayload.TYPE, MarketFillBuyOfferPayload.STREAM_CODEC,
                 MarketFillBuyOfferPayload::handle);
+        serverbound(ShopBuyPayload.TYPE, ShopBuyPayload.STREAM_CODEC, ShopBuyPayload::handle);
     }
 
     public static <T extends CustomPacketPayload> void clientbound(CustomPacketPayload.Type<T> type,

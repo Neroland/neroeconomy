@@ -7,11 +7,11 @@ name: Multiloader Build
 # fails the whole workflow. All six loader x version cells are verified buildable
 # from public artifacts:
 #   - neoforge @ 26.1.2  -> NeoForge 26.1.2.76
-#   - neoforge @ 26.2    -> NeoForge 26.2.0.6-beta (now on the public NeoForged Maven)
+#   - neoforge @ 26.2    -> NeoForge 26.2.0.7-beta (now on the public NeoForged Maven)
 #   - forge    @ 26.1.2  -> Forge 26.1.2-64.0.10
-#   - forge    @ 26.2    -> Forge 26.2-65.0.0
-#   - fabric   @ 26.2    -> Fabric Loom 1.17 + fabric-api 0.152.1+26.2 (de-obf, no mappings)
-#   - fabric   @ 26.1.2  -> Fabric Loom 1.17 + fabric-api 0.151.0+26.1.2; needs the access
+#   - forge    @ 26.2    -> Forge 26.2-65.0.1
+#   - fabric   @ 26.2    -> Fabric Loom 1.17 + fabric-api 0.153.0+26.2 (de-obf, no mappings)
+#   - fabric   @ 26.1.2  -> Fabric Loom 1.17 + fabric-api 0.153.0+26.1.2; needs the access
 #                          widener (fabric/src/main/resources/neroeconomy.accesswidener) because
 #                          vanilla MC 26.1.2 kept BlockEntityType's constructor private
 #                          (Mojang made it public in 26.2; NeoForge widens it on both).
@@ -45,19 +45,29 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        # `extra` holds any additional Gradle tasks for that cell. The Eclipse-compiler analysis
+        # (ecjCheck) is run once, on the NeoForge 26.2 cell — that classpath resolves the full
+        # vanilla + loader API and its main sourceSet already includes the shared common sources,
+        # so one run covers the whole codebase (this is the cell AGENTS.md pins too).
         include:
           - loader: neoforge
             mc: "26.1.2"
+            extra: ""
           - loader: neoforge
             mc: "26.2"
+            extra: ":neoforge:26.2:ecjCheck"
           - loader: forge
             mc: "26.1.2"
+            extra: ""
           - loader: forge
             mc: "26.2"
+            extra: ""
           - loader: fabric
             mc: "26.1.2"
+            extra: ""
           - loader: fabric
             mc: "26.2"
+            extra: ""
 
     steps:
       - name: Checkout repository
@@ -124,5 +134,5 @@ jobs:
           GITHUB_ACTOR: ${{ github.actor }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: >-
-          ./gradlew :${{ matrix.loader }}:${{ matrix.mc }}:build
+          ./gradlew :${{ matrix.loader }}:${{ matrix.mc }}:build ${{ matrix.extra }}
           --stacktrace

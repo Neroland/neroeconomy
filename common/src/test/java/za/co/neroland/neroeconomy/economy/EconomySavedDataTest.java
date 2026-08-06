@@ -13,6 +13,11 @@ import org.junit.jupiter.api.Test;
 
 import za.co.neroland.neroeconomy.NeroEconomyCommon;
 
+/*
+ * The market and obligation stores are not covered here: their behaviour is only reachable through
+ * ItemStack, Inventory, ServerPlayer, and MinecraftServer, none of which this suite can construct
+ * without a full game bootstrap. Their fixes are runtime-verified instead.
+ */
 class EconomySavedDataTest {
     private static final UUID ALICE = UUID.fromString("00000000-0000-0000-0000-000000000001");
     private static final UUID BOB = UUID.fromString("00000000-0000-0000-0000-000000000002");
@@ -39,14 +44,46 @@ class EconomySavedDataTest {
         assertTrue(data.transfer(ALICE, BOB, NeroEconomyCommon.CREDITS, 0));
     }
 
-    @Test void startingBalanceMintsOnlyOnceAndErasureIsComplete() {
+    @Test void readingABalanceNeitherOpensTheAccountNorWritesAnAuditRow() {
         EconomySavedData data = new EconomySavedData();
         assertEquals(100, data.getBalance(ALICE, NeroEconomyCommon.CREDITS));
         assertEquals(100, data.getBalance(ALICE, NeroEconomyCommon.CREDITS));
-        assertEquals(1, data.history(ALICE, 100).size());
+        assertEquals(0, data.transactionCount());
+        assertTrue(data.history(ALICE, 100).isEmpty());
+        assertTrue(data.deposit(ALICE, NeroEconomyCommon.CREDITS, 1));
+        assertEquals(101, data.getBalance(ALICE, NeroEconomyCommon.CREDITS));
+        assertEquals(2, data.transactionCount());
+    }
+
+    @Test void erasureTombstonesTheAccountSoTheStartingBalanceIsNotReminted() {
+        EconomySavedData data = new EconomySavedData();
+        assertTrue(data.deposit(ALICE, NeroEconomyCommon.CREDITS, 5));
+        assertEquals(105, data.getBalance(ALICE, NeroEconomyCommon.CREDITS));
+        assertEquals(2, data.history(ALICE, 100).size());
         data.forgetPlayer(ALICE);
         assertTrue(data.history(ALICE, 100).isEmpty());
-        assertEquals(100, data.getBalance(ALICE, NeroEconomyCommon.CREDITS));
+        assertTrue(data.tombstoned(ALICE));
+        assertEquals(0, data.getBalance(ALICE, NeroEconomyCommon.CREDITS));
+        assertTrue(data.deposit(ALICE, NeroEconomyCommon.CREDITS, 7));
+        assertEquals(7, data.getBalance(ALICE, NeroEconomyCommon.CREDITS));
+    }
+
+    @Test void tombstoneSurvivesThePersistenceRoundTrip() {
+        EconomySavedData data = new EconomySavedData();
+        assertTrue(data.deposit(ALICE, NeroEconomyCommon.CREDITS, 5));
+        data.forgetPlayer(ALICE);
+        var encoded = EconomySavedData.CODEC.encodeStart(JsonOps.INSTANCE, data).getOrThrow();
+        EconomySavedData restored = EconomySavedData.CODEC.parse(JsonOps.INSTANCE, encoded).getOrThrow();
+        assertTrue(restored.tombstoned(ALICE));
+        assertEquals(0, restored.getBalance(ALICE, NeroEconomyCommon.CREDITS));
+    }
+
+    @Test void oneSidedOptOutBlanksOnlyThatSideAndKeepsTheCounterpartyRow() {
+        EconomySavedData data = new EconomySavedData();
+        data.setLoggingOptOut(ALICE, true);
+        assertTrue(data.transfer(ALICE, BOB, NeroEconomyCommon.CREDITS, 10));
+        assertEquals(2, data.history(BOB, 100).size());
+        assertTrue(data.history(ALICE, 100).isEmpty());
     }
 
     @Test void retentionPrunesExpiredRecords() {

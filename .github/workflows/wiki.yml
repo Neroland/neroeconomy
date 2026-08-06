@@ -32,6 +32,19 @@ jobs:
         with:
           fetch-depth: 1
 
+      # The wiki is player-facing and published publicly. Nothing in wiki/ may reference the
+      # private umbrella planning repository or any internal planning/verification document —
+      # those live outside the published surface. Fail the sync rather than leak a reference.
+      - name: Guard against private references in wiki/
+        run: |
+          set -euo pipefail
+          PATTERN='neroland-mc-ecosystem|REWORK-PROMPT|PLAN-0\.1\.0|AUDIT\.md|SMOKE-TEST'
+          if grep -rniE "$PATTERN" wiki/; then
+            echo "::error::wiki/ references a private planning document or repository (pattern: $PATTERN). Remove the reference before publishing."
+            exit 1
+          fi
+          echo "wiki/ contains no private references."
+
       - name: Mirror wiki/ into the wiki repo and push
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

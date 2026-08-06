@@ -17,7 +17,7 @@ import net.minecraft.world.level.saveddata.SavedData;
 import net.minecraft.world.level.saveddata.SavedDataType;
 
 import za.co.neroland.neroeconomy.NeroEconomyCommon;
-import za.co.neroland.nerolandcore.data.SavedDataRecovery;
+import za.co.neroland.neroeconomy.data.SavedDataRecovery;
 
 /** Server-wide canonical shop ownership index, so erasure also reaches unloaded shops. */
 public final class ShopOwnershipState extends SavedData {

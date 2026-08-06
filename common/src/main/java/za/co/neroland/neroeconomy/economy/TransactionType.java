@@ -13,6 +13,7 @@ public enum TransactionType {
     MARKET_PURCHASE,
     MARKET_ESCROW,
     ESCROW_REFUND,
+    MARKET_PAYOUT,
     CONTRACT_PAYOUT,
     BOUNTY_PAYOUT,
     AUCTION_BID,

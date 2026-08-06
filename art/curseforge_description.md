@@ -2,46 +2,49 @@
 
 **Buy, sell, haul and bid — a player-driven economy that turns a Neroland server from sixteen solo grinds into one living market.**
 
-NeroEconomy is the **economy** mod of the Neroland ecosystem. It adds credits, player shops, trading terminals, market boards, contracts, delivery jobs, bounties, server-wide auctions, bank blocks and company/faction wallets — a whole retail-and-work layer that gives players a reason to specialise and trade instead of every player building every machine. A miner can sell ore to a fabricator, a logistics player can run delivery jobs, and a faction can pool credits to post bounties and bankroll a colony.
+NeroEconomy is the **economy** mod of the Neroland ecosystem. It adds credits, bank terminals, offline player shops, trading terminals, market boards, supply contracts, delivery jobs, bounties and server-wide auctions — a whole retail-and-work layer that gives players a reason to specialise and trade instead of every player building every machine. A miner can sell ore to a fabricator, a logistics player can run delivery jobs, and a trader can corner the auction house.
 
-Built on **Neroland Core**, so its currency and reputation APIs, progression gates, config framework, `c:` tags and data-erasure hook are shared with the rest of the lineup — NeroEconomy adds markets and transactions on top and never re-implements the underlying ledger. *(Planned — in design; not yet released.)*
+Built on **Neroland Core**, so its currency API, progression gates, config framework, `c:` tags and data-erasure hook are shared with the rest of the lineup — NeroEconomy is the persistent provider behind Core's credits and never re-implements a competing currency.
 
 ---
 
 ## The economy
 
-1. **Credits.** The shared currency unit, backed by Core's currency API — balances live behind Core, and NeroEconomy adds the ways credits move: sales, payouts, fees and transfers, each an atomic, server-side ledger operation with an audit event.
-2. **Player shops.** Owned block-entities that hold an inventory and per-item buy/sell prices; the owner stocks and prices them, and every trade is validated against the buyer's live balance and the shop's stock at execution. Shops expose a standard item-handler capability, so hoppers, Create funnels and AE2 buses can restock them.
-3. **Trading terminals.** Networked access-point blocks that browse and execute trades against connected shops and market boards from one spot — filtered, searchable, server-validated so listings can't be spoofed. Think an AE2 terminal, but for the economy.
-4. **Market boards.** Server-wide listing surfaces where players post standing buy and sell offers visible to everyone, accepted remotely through escrow. This is the price-discovery layer that feeds the optional supply/demand model.
-5. **Contracts, delivery jobs & bounties.** Server-tracked job objects with an escrowed payout and an open → claimed → fulfilled / expired state machine: agree to supply goods, haul a payload from origin to destination, or claim a posted reward — all settled atomically on the server.
-6. **Auctions.** Timed, server-global bidding events with escrowed bids and a synced countdown, settling the lot to the winner and credits to the seller atomically.
-7. **Banks & wallets.** Secure bank blocks (deposit, withdraw, balance, transfer) and shared company/faction wallets with role-based spend permissions, all settling through Core's currency API.
+1. **Credits.** The shared currency unit. NeroEconomy is the persistent provider behind Core's credits API: balances are keyed to abstract account identifiers, new accounts get a one-time configurable starting balance, and every movement is an atomic, server-side ledger operation.
+2. **Bank Terminal.** Check your balance, pay another player by name or offline UUID, redeem a Credit Chip, and collect proceeds and goods that are owed to you — durable, so nothing is lost if you log out mid-settlement.
+3. **Player shops.** Owned block-entities with per-item fixed pricing that keep selling while their chunk is unloaded or their owner is offline. Stock and price from the owner view; buyers get a validated, server-checked purchase.
+4. **Trading terminals.** Searchable access points that browse live server listings from one spot, with prices re-quoted at execution — a purchase is rejected if the price moved beyond the configured tolerance while you were looking at it.
+5. **Market boards.** Server-wide sell offers (goods held in escrow) and standing buy offers (credits held in escrow), with idempotent fills and automatic refunds when an offer expires.
+6. **Contracts, delivery jobs & bounties.** Server-tracked job objects with an escrowed payout and an open → claimed → fulfilled / expired state machine: agree to supply goods, haul a payload to a specific location, or claim a posted entity/player reward — all settled atomically, all durable across restarts.
+7. **Auctions.** Timed, server-global bidding with escrowed bids, outbid refunds and an anti-snipe extension window, settling the lot to the winner and credits to the seller atomically.
+8. **Credit Chips.** A craftable, redeemable chip worth a configurable number of credits — also seeded into the exotic meteor loot pool for servers running Nerospace.
 
 ## Built for shared servers
 
-- 🔥 **Trade beats self-sufficiency, sometimes** — pricing, scarcity and delivery friction are tuned so buying from another player is occasionally the smarter move.
-- 🛡️ **Anti-dupe by construction** — every credit and item movement is server-authoritative and transactional, with escrow so a crash or disconnect mid-trade can never dupe or destroy value.
-- 👥 **Group-aware from day one** — wallets, contracts and bounties work for individual players and for companies/factions alike.
-- 🎛️ **Configurable, not prescriptive** — starting credits, fees, taxes, faucets, sinks, price volatility and per-feature toggles are all config, so owners run the economy as light flavour or a hard constraint.
+- 🛡️ **Anti-dupe by construction** — every credit and item movement is server-authoritative, escrowed and idempotent, so a crash, a disconnect or a spammed click can never dupe or destroy value.
+- 🎛️ **Configurable, not prescriptive** — starting balance, retention windows, admin mutations, price-shock caps, execution tolerance, listing duration, auction anti-snipe, chip value, player bounties and remote trade are all server config.
+- 🔭 **A public pricing API** — deterministic quotes, registerable modifiers and capped, expiring market shocks that other mods can drive.
+- 📱 **Companion-app ready** — a per-player Core Link module exposes scoped balance and trend, paged transaction history, market search, validated trades and alerts to the NeroLink companion app.
 
 ## Privacy (POPIA / GDPR)
 
-NeroEconomy processes player transaction data — personal data keyed to player **UUID** (never names). It **minimises** to only what a transaction needs (UUID + balance/transaction state), never IPs, chat or location history. Transaction history and audit logs have a **configurable, finite retention window** and are purged automatically past it; players can **opt out** of non-essential logging, and detail never hits the server console at info level.
+NeroEconomy processes player economy data — keyed to player **UUID**, never names. It **minimises** to what a transaction needs, and stored transaction rows carry only a reason code, amount, currency, timestamp and **salted one-way pseudonyms** for the counterparties — no names, no UUID strings, no chat, no location history, no inventory dumps.
 
-Every feature that touches player data routes through Core's shared **data-erasure hook**, so a single erase request purges you across NeroEconomy and every other Neroland mod, with export on request supported. Any crash telemetry is anonymous and opt-out, carrying **version strings only** — never IPs, usernames, UUIDs or world data.
+History is **bounded** and has a **configurable, finite retention window**, purged at load and daily. Players can **opt out** of optional transaction logging with `/eco privacy logging true`; server operators can export a player's data with `/eco export` and erase them with `/eco erase`, which routes through Core's shared **data-erasure hook** so one request purges that player across NeroEconomy and every other Neroland mod. Transaction detail never reaches the server console at info level. Crash telemetry is anonymous, capped, scrubbed and opt-out, carrying **version strings only** — never IPs, usernames, UUIDs or world data.
 
 ## Why it fits the ecosystem
 
-- 🧩 **Built on Neroland Core** — one currency API, one reputation system, one progression arc, and shared `c:` tags. NeroEconomy ships in its own creative tab.
-- 🔌 **Interoperates, never hard-depends** — soft synergy lights up when siblings are present: **NeroLogistics** routing/drones auto-fulfil delivery jobs, **NeroFactions** backs faction wallets and contracts, **NeroEvents** nudges market prices and themes auctions, **NeroQuests** pays credit rewards, and **NeroCreatures** drops carry trade and bounty value. With them absent, features degrade gracefully.
-- 🚀 **Grows into space** — delivery jobs and auctions reach across dimensions in the space arc (Earth → orbit → alien colonies), gated behind Core milestones like `reached_orbit`, and **Nerospace** planet ores feed the market with trade value.
+- 🧩 **Built on Neroland Core** — one currency API, one progression arc, shared `c:` tags, and its own creative tab. Core is the only hard dependency.
+- 🔌 **Interoperates, never hard-depends** — siblings are detected at runtime behind string-keyed interfaces: **NeroLogistics** can post and fulfil delivery jobs, **NeroEvents** can apply capped price shocks, **NeroQuests** can pay credit rewards, and **Nerospace** meteors can drop Credit Chips. With them absent, everything degrades gracefully.
 - 🧱 **Cross-loader** — NeoForge, Forge, and Fabric on Minecraft **26.1.2** and **26.2**.
+
+### Coming later
+
+Faction and company wallets with role-based spend permissions are **deferred until NeroFactions exists** — the modifier and account seams are already public so they can slot in without a migration. Cross-server/proxy economies and simulated supply/demand are also out of scope for this release.
 
 ## Requirements & compatibility
 
-- **Requires [Neroland Core](https://modrinth.com/mod/nerolandcore)** — install it alongside NeroEconomy (it loads first). Core provides the currency and reputation APIs every balance settles through.
-- Conventional `c:` tags on materials and Core's common compat tags mean Create, AE2, Mekanism, Ad Astra and **Energized Power** (live now on MC 26.1+) interoperate with shop, bank and delivery item handling as the 26.x ecosystem fills in — no hard dependency on any of them.
+- **Requires [Neroland Core](https://modrinth.com/mod/nerolandcore)** — install it alongside NeroEconomy (it loads first). Core provides the currency API every balance settles through.
 - **Modpacks are allowed and encouraged** — any platform, no need to ask. Use the official files and credit *NeroEconomy by Neroland* with links to this page and the [GitHub repository](https://github.com/Neroland/neroeconomy). Full terms: [LICENSE](https://github.com/Neroland/neroeconomy/blob/main/LICENSE).
 
 ## Links

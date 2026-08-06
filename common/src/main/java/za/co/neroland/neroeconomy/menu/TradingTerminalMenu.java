@@ -35,11 +35,22 @@ import za.co.neroland.neroeconomy.registry.ModMenuTypes;
 public final class TradingTerminalMenu extends AbstractContainerMenu {
     private static final int DATA_COUNT = 5;
     private static final int PAGE_SIZE = 8;
+    /** One refresh per second: countdowns stay live without re-walking the store every tick. */
+    private static final int REFRESH_TICKS = 20;
     private final BlockEntity terminal;
     private final ServerPlayer serverPlayer;
+    private final boolean board;
     private final ContainerData data;
     private int revision;
     private boolean initialPageSent;
+    private int ticks;
+    /** Last query the player asked for; every action re-sends this page instead of resetting it. */
+    private String query = "";
+    private int page;
+    private OpportunityPagePayload.Tab tab = OpportunityPagePayload.Tab.CONTRACTS;
+    private boolean opportunitiesActive;
+    private int listingCountCache;
+    private int claimCountCache;
 
     public TradingTerminalMenu(int id, Inventory inventory) { this(id, inventory, null); }
     @SuppressWarnings("this-escape")
@@ -47,8 +58,8 @@ public final class TradingTerminalMenu extends AbstractContainerMenu {
         super(ModMenuTypes.TRADING_TERMINAL.get(), id);
         this.terminal = terminal;
         this.serverPlayer = inventory.player instanceof ServerPlayer value ? value : null;
-        this.data = serverPlayer == null ? new SimpleContainerData(DATA_COUNT)
-                : new TerminalData(serverPlayer, terminal instanceof MarketBoardBlockEntity);
+        this.board = terminal instanceof MarketBoardBlockEntity;
+        this.data = serverPlayer == null ? new SimpleContainerData(DATA_COUNT) : new TerminalData();
         checkContainerDataCount(data, DATA_COUNT);
         addDataSlots(data);
     }
@@ -62,22 +73,48 @@ public final class TradingTerminalMenu extends AbstractContainerMenu {
     }
     @Override public ItemStack quickMoveStack(Player player, int slot) { return ItemStack.EMPTY; }
     @Override public void broadcastChanges() {
+        if (serverPlayer != null) {
+            long now = System.currentTimeMillis();
+            if (!initialPageSent) {
+                initialPageSent = true;
+                refreshCounts(now);
+                super.broadcastChanges();
+                sendPage(query, page);
+                return;
+            }
+            if (++ticks >= REFRESH_TICKS) {
+                ticks = 0;
+                refreshCounts(now);
+                // Auctions and jobs run down against the wall clock, so the open tab is re-pushed
+                // periodically and the client renders the remaining time from it.
+                if (opportunitiesActive) sendOpportunity(tab);
+            }
+        }
         super.broadcastChanges();
-        if (!initialPageSent && serverPlayer != null) { initialPageSent = true; sendPage("", 0); }
+    }
+    /** Keeps the store mutation that {@code searchCount} performs off the per-tick gauge read path. */
+    private void refreshCounts(long now) {
+        if (serverPlayer == null) return;
+        MarketSavedData store = MarketSavedData.get(serverPlayer.level().getServer());
+        listingCountCache = store.searchCount("", now) + (board ? store.searchBuyOfferCount("", now) : 0);
+        claimCountCache = store.itemClaims(serverPlayer.getUUID()).size();
     }
     public void sendPage(String query, int page) {
         if (serverPlayer == null) return;
+        this.query = query == null ? "" : query;
+        this.page = Math.max(0, page);
+        this.opportunitiesActive = false;
         MarketSavedData store = MarketSavedData.get(serverPlayer.level().getServer());
         long now = System.currentTimeMillis();
-        List<MarketPagePayload.Line> lines = store.search(query, page, PAGE_SIZE, now).stream().map(listing -> {
+        List<MarketPagePayload.Line> lines = store.search(this.query, this.page, PAGE_SIZE, now).stream().map(listing -> {
             long quote = PricingEngine.quote(listing, serverPlayer.getUUID()).unitPrice();
             return new MarketPagePayload.Line(listing.listingId(), listing.itemId(), listing.availableQuantity(), quote, false);
         }).collect(java.util.stream.Collectors.toCollection(java.util.ArrayList::new));
-        if (isBoard()) store.searchBuyOffers(query, page, PAGE_SIZE, now).stream().map(offer ->
+        if (board) store.searchBuyOffers(this.query, this.page, PAGE_SIZE, now).stream().map(offer ->
                 new MarketPagePayload.Line(offer.offerId(), offer.itemId(), offer.remaining(), offer.unitPrice(), true))
                 .forEach(lines::add);
-        NeroEconomyNetwork.sendToPlayer(serverPlayer, new MarketPagePayload(containerId, ++revision, page,
-                store.searchCount(query, now) + (isBoard() ? store.searchBuyOfferCount(query, now) : 0), lines));
+        NeroEconomyNetwork.sendToPlayer(serverPlayer, new MarketPagePayload(containerId, ++revision, this.page,
+                store.searchCount(this.query, now) + (board ? store.searchBuyOfferCount(this.query, now) : 0), lines));
     }
     public void buy(ServerPlayer buyer, MarketBuyPayload intent) {
         var result = MarketSavedData.get(buyer.level().getServer()).purchase(buyer, intent.listingId(),
@@ -86,34 +123,33 @@ public final class TradingTerminalMenu extends AbstractContainerMenu {
                 result == za.co.neroland.neroeconomy.market.PurchaseResult.SUCCESS
                         ? "gui.neroeconomy.market.purchase_success" : "gui.neroeconomy.market.purchase_failed",
                 result.name()));
-        sendPage("", 0);
+        sendPage(query, page);
     }
     public void post(ServerPlayer seller, MarketPostPayload intent) {
-        if (!(terminal instanceof MarketBoardBlockEntity)) return;
+        if (!board) return;
         long expires = System.currentTimeMillis() + EconomyConfig.DEFAULT_LISTING_DURATION_HOURS.get() * 3_600_000L;
         var listing = MarketSavedData.get(seller.level().getServer()).postFromHand(seller, intent.quantity(),
                 intent.unitPrice(), expires, ListingSource.MARKET_BOARD,
                 seller.level().dimension().identifier() + "|" + terminal.getBlockPos().asLong(), intent.requestId());
         seller.sendSystemMessage(net.minecraft.network.chat.Component.translatable(listing == null
                 ? "gui.neroeconomy.market.post_failed" : "gui.neroeconomy.market.post_success"));
-        sendPage("", 0);
+        sendPage(query, page);
     }
     public void postBuyOffer(ServerPlayer buyer, MarketBuyOfferPayload intent) {
-        if (!(terminal instanceof MarketBoardBlockEntity)) return;
+        if (!board) return;
         long expires = System.currentTimeMillis() + EconomyConfig.DEFAULT_LISTING_DURATION_HOURS.get() * 3_600_000L;
         var offer = MarketSavedData.get(buyer.level().getServer()).postBuyOffer(buyer, intent.itemId(),
                 intent.quantity(), intent.unitPrice(), expires, intent.requestId());
         buyer.sendSystemMessage(net.minecraft.network.chat.Component.translatable(offer == null
                 ? "gui.neroeconomy.market.buy_offer_failed" : "gui.neroeconomy.market.buy_offer_success"));
-        sendPage("", 0);
+        sendPage(query, page);
     }
     public void fillBuyOffer(ServerPlayer seller, MarketFillBuyOfferPayload intent) {
-        boolean filled = terminal instanceof MarketBoardBlockEntity
-                && MarketSavedData.get(seller.level().getServer()).fillBuyOffer(seller, intent.offerId(),
-                        intent.quantity(), intent.requestId());
+        boolean filled = board && MarketSavedData.get(seller.level().getServer()).fillBuyOffer(seller,
+                intent.offerId(), intent.quantity(), intent.requestId());
         seller.sendSystemMessage(net.minecraft.network.chat.Component.translatable(filled
                 ? "gui.neroeconomy.market.fill_offer_success" : "gui.neroeconomy.market.fill_offer_failed"));
-        sendPage("", 0);
+        sendPage(query, page);
     }
     public void handleOpportunity(ServerPlayer player, OpportunityIntentPayload intent) {
         ObligationSavedData store = ObligationSavedData.get(player.level().getServer());
@@ -135,10 +171,13 @@ public final class TradingTerminalMenu extends AbstractContainerMenu {
     }
     private void sendOpportunity(OpportunityPagePayload.Tab tab) {
         if (serverPlayer == null) return;
+        this.tab = tab;
+        this.opportunitiesActive = true;
         ObligationSavedData store = ObligationSavedData.get(serverPlayer.level().getServer());
         List<OpportunityPagePayload.Line> lines;
         if (tab == OpportunityPagePayload.Tab.AUCTIONS) {
-            lines = store.auctions().stream().limit(20).map(value -> new OpportunityPagePayload.Line(value.id(),
+            // Viewer-filtered: interplanetary lots are hidden from players who have not reached orbit.
+            lines = store.auctions(serverPlayer).stream().limit(20).map(value -> new OpportunityPagePayload.Line(value.id(),
                     net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(value.lot().getItem()).toString(),
                     Math.max(value.minimumBid(), value.highestBid()), value.endsAt(), value.state().name())).toList();
         } else {
@@ -151,16 +190,14 @@ public final class TradingTerminalMenu extends AbstractContainerMenu {
         }
         NeroEconomyNetwork.sendToPlayer(serverPlayer, new OpportunityPagePayload(containerId, ++revision, tab, lines));
     }
-    private record TerminalData(ServerPlayer player, boolean board) implements ContainerData {
+    private final class TerminalData implements ContainerData {
         @Override public int get(int index) {
-            MarketSavedData market = MarketSavedData.get(player.level().getServer());
-            long balance = CurrencyApi.getBalance(player.getUUID(), NeroEconomyCommon.CREDITS);
+            long balance = CurrencyApi.getBalance(serverPlayer.getUUID(), NeroEconomyCommon.CREDITS);
             return switch (index) {
                 case 0 -> (int) balance;
                 case 1 -> (int) (balance >>> 32);
-                case 2 -> market.searchCount("", System.currentTimeMillis())
-                        + (board ? market.searchBuyOfferCount("", System.currentTimeMillis()) : 0);
-                case 3 -> market.itemClaims(player.getUUID()).size();
+                case 2 -> listingCountCache;
+                case 3 -> claimCountCache;
                 case 4 -> board ? 1 : 0;
                 default -> 0;
             };

@@ -37,20 +37,18 @@ bin/
 .DS_Store
 
 ### Minecraft Modding ###
-run/*
-# Track the gallery screenshots (the capture harness writes here) so CI/listing automation can pick
-# them up. Everything else under run/ stays ignored. (Git needs each parent dir re-included.)
-!run/screenshots/
-run/screenshots/*
-!run/screenshots/neroeconomy/
+# Nothing produced by a dev-client/server run is tracked. Gallery screenshots for the listing
+# automation are NOT taken from here: copy the shots you want into art/gallery/ (tracked) — see
+# .github/workflows/modrinth-gallery.yml.
+run/
 !**/src/**/run/
 **/src/generated/**/.cache/
 repo/
 !**/src/**/repo/
 PROJECT_PLAN.md
 /tools/__pycache__
+# Stonecutter run directories (<loader>/versions/<mc>/runs/...) — never tracked.
 runs/
-# …but DO track the capture-harness gallery screenshots under the NeoForge
 # python caches (scripts)
 __pycache__/
 *.pyc

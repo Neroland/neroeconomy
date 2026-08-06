@@ -1,8 +1,8 @@
 name: Sync Modrinth project page
 
 # Pushes the full Modrinth project page from the repo whenever the sources change —
-# Modrinth's API supports writing all of this, unlike CurseForge's (see
-# RELEASE_CHECKLIST.md §12: the CurseForge page stays a manual paste/upload):
+# Modrinth's API supports writing all of this, unlike CurseForge's (the CurseForge page stays a
+# manual paste/upload of art/curseforge_description.md):
 #   - description body            <- art/modrinth_description.md
 #   - title, summary, categories,
 #     client/server environments,
@@ -56,8 +56,8 @@ jobs:
           jq -Rs '{
             body: .,
             title: "NeroEconomy",
-            description: "Mine alien ore, power up your machines, build rockets — then terraform a dead world until it rains.",
-            categories: ["technology", "worldgen", "adventure"],
+            description: "Credits, player shops, trading terminals, market boards, contracts, delivery jobs, bounties and auctions — a server-authoritative player economy.",
+            categories: ["economy", "management", "technology"],
             client_side: "required",
             server_side: "required",
             issues_url: "https://github.com/Neroland/neroeconomy/issues",

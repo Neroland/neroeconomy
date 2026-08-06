@@ -21,13 +21,13 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraft.world.level.saveddata.SavedData;
 import net.minecraft.world.level.saveddata.SavedDataType;
 
-import za.co.neroland.nerolandcore.data.SavedDataRecovery;
 import za.co.neroland.nerolandcore.economy.Currency;
 import za.co.neroland.nerolandcore.economy.CurrencyProvider;
 import za.co.neroland.neroeconomy.NeroEconomyCommon;
 import za.co.neroland.neroeconomy.api.AccountId;
 import za.co.neroland.neroeconomy.api.PlayerAccountId;
 import za.co.neroland.neroeconomy.config.EconomyConfig;
+import za.co.neroland.neroeconomy.data.SavedDataRecovery;
 
 /** Persistent, server-thread ledger keyed by abstract account and currency identifiers. */
 public final class EconomySavedData extends SavedData implements CurrencyProvider {
@@ -36,12 +36,16 @@ public final class EconomySavedData extends SavedData implements CurrencyProvide
     public static final SavedDataType<EconomySavedData> TYPE =
             new SavedDataType<>(ID, EconomySavedData::new, CODEC, null);
     private static final long MILLIS_PER_DAY = 86_400_000L;
+    /** How far the audit list may run past its bound before an append pays for a purge. */
+    private static final int PURGE_SLACK = 256;
 
     private record LedgerKey(AccountId account, String currency) { }
 
     private final Map<LedgerKey, Long> balances = new LinkedHashMap<>();
     private final Set<AccountId> initialized = new LinkedHashSet<>();
     private final Set<AccountId> loggingOptOut = new LinkedHashSet<>();
+    /** Salted pseudonyms of erased accounts. Never a raw id, so the tombstone carries no identity. */
+    private final Set<String> erased = new LinkedHashSet<>();
     private final List<TransactionRecord> transactions = new ArrayList<>();
     private String pseudonymSalt = UUID.randomUUID().toString();
 
@@ -56,10 +60,16 @@ public final class EconomySavedData extends SavedData implements CurrencyProvide
         return getBalance(new PlayerAccountId(player), currency);
     }
 
+    /**
+     * A read never opens an account. The starting balance is reported for an account that has not
+     * been written to yet and is minted by the first write, so simply looking at a stranger's
+     * balance cannot create ledger state or an audit row for them.
+     */
     public synchronized long getBalance(AccountId account, Currency currency) {
         if (!valid(account, currency)) return 0L;
-        initialize(account, currency);
-        return balances.getOrDefault(key(account, currency), 0L);
+        Long balance = balances.get(key(account, currency));
+        if (balance != null) return balance;
+        return initialized.contains(account) || tombstoned(account) ? 0L : EconomyConfig.STARTING_BALANCE.get();
     }
 
     @Override public synchronized boolean deposit(UUID player, Currency currency, long amount) {
@@ -153,10 +163,12 @@ public final class EconomySavedData extends SavedData implements CurrencyProvide
     public synchronized List<TransactionRecord> history(UUID player, int limit) {
         if (player == null || limit <= 0) return List.of();
         AccountId account = new PlayerAccountId(player);
-        if (purgeExpired(System.currentTimeMillis())) setDirty();
+        // Reading history is not a write: expired rows are filtered out, and the sweep deletes them.
+        int days = EconomyConfig.TRANSACTION_RETENTION_DAYS.get();
+        long cutoff = days <= 0 ? Long.MAX_VALUE : System.currentTimeMillis() - days * MILLIS_PER_DAY;
         String ref = reference(account);
-        return transactions.stream().filter(row -> ref.equals(row.sourceAccount())
-                || ref.equals(row.destinationAccount()))
+        return transactions.stream().filter(row -> row.timestamp() >= cutoff)
+                .filter(row -> ref.equals(row.sourceAccount()) || ref.equals(row.destinationAccount()))
                 .sorted(Comparator.comparingLong(TransactionRecord::timestamp).reversed())
                 .limit(Math.min(limit, EconomyConfig.HISTORY_LIMIT_PER_PLAYER.get())).toList();
     }
@@ -180,6 +192,10 @@ public final class EconomySavedData extends SavedData implements CurrencyProvide
                 loggingOptOut.contains(account), history(player, EconomyConfig.HISTORY_LIMIT_PER_PLAYER.get()));
     }
 
+    /**
+     * Erasure also leaves a salted-pseudonym tombstone. Without it the very next balance read would
+     * re-open the account and mint the starting balance again, quietly undoing the erasure.
+     */
     @Override public synchronized void forgetPlayer(UUID player) {
         if (player == null) return;
         AccountId account = new PlayerAccountId(player);
@@ -189,6 +205,7 @@ public final class EconomySavedData extends SavedData implements CurrencyProvide
         changed |= loggingOptOut.remove(account);
         changed |= transactions.removeIf(row -> ref.equals(row.sourceAccount())
                 || ref.equals(row.destinationAccount()));
+        changed |= erased.add(ref);
         if (changed) setDirty();
     }
 
@@ -204,12 +221,17 @@ public final class EconomySavedData extends SavedData implements CurrencyProvide
         return before != transactions.size();
     }
 
+    /** Called from every write path; an erased account re-opens empty rather than freshly funded. */
     private void initialize(AccountId account, Currency currency) {
         if (!initialized.add(account)) return;
-        long starting = EconomyConfig.STARTING_BALANCE.get();
+        long starting = tombstoned(account) ? 0L : EconomyConfig.STARTING_BALANCE.get();
         balances.put(key(account, currency), starting);
         if (starting > 0L) append(TransactionType.STARTING_BALANCE, starting, currency, null, account);
         setDirty();
+    }
+
+    private boolean tombstoned(AccountId account) {
+        return !erased.isEmpty() && erased.contains(reference(account));
     }
 
     private boolean valid(AccountId account, Currency currency) {
@@ -222,15 +244,22 @@ public final class EconomySavedData extends SavedData implements CurrencyProvide
         return new LedgerKey(account, currency.id().toString());
     }
 
+    /**
+     * A two-party row survives one party opting out: only the opted-out side's pseudonym is blanked,
+     * so the other party keeps a complete history. Retention is swept on load and daily; an append
+     * only pays for a purge once the list has run past its bound.
+     */
     private void append(TransactionType type, long amount, Currency currency, AccountId source, AccountId target) {
-        if (amount == 0L || EconomyConfig.MAX_TRANSACTION_RECORDS.get() == 0
-                || EconomyConfig.TRANSACTION_RETENTION_DAYS.get() == 0
-                || source != null && loggingOptOut.contains(source)
-                || target != null && loggingOptOut.contains(target)) return;
+        int max = EconomyConfig.MAX_TRANSACTION_RECORDS.get();
+        if (amount == 0L || max == 0 || EconomyConfig.TRANSACTION_RETENTION_DAYS.get() == 0) return;
         long now = System.currentTimeMillis();
         transactions.add(new TransactionRecord(type, amount, currency.id().toString(), now,
-                source == null ? "" : reference(source), target == null ? "" : reference(target)));
-        purgeExpired(now);
+                pseudonym(source), pseudonym(target)));
+        if (transactions.size() > max + PURGE_SLACK) purgeExpired(now);
+    }
+
+    private String pseudonym(AccountId account) {
+        return account == null || loggingOptOut.contains(account) ? "" : reference(account);
     }
 
     private String reference(AccountId account) {
@@ -246,6 +275,7 @@ public final class EconomySavedData extends SavedData implements CurrencyProvide
     void importRecord(TransactionRecord record) { transactions.add(record); }
     void pruneForTest(long now) { purgeExpired(now); }
     int transactionCount() { return transactions.size(); }
+    boolean tombstoned(UUID player) { return tombstoned(new PlayerAccountId(player)); }
 
     private record BalanceRow(String accountKind, String account, String currency, long balance) {
         static final Codec<BalanceRow> CODEC = RecordCodecBuilder.create(instance -> instance.group(
@@ -274,7 +304,8 @@ public final class EconomySavedData extends SavedData implements CurrencyProvide
                 Codec.STRING.listOf().optionalFieldOf("initialized", List.of()).forGetter(EconomySavedData::initializedRows),
                 Codec.STRING.listOf().optionalFieldOf("logging_opt_out", List.of()).forGetter(EconomySavedData::optOutRows),
                 AuditRow.CODEC.listOf().optionalFieldOf("transactions", List.of()).forGetter(EconomySavedData::auditRows),
-                Codec.STRING.optionalFieldOf("pseudonym_salt", "").forGetter(data -> data.pseudonymSalt))
+                Codec.STRING.optionalFieldOf("pseudonym_salt", "").forGetter(data -> data.pseudonymSalt),
+                Codec.STRING.listOf().optionalFieldOf("erased", List.of()).forGetter(EconomySavedData::erasedRows))
                 .apply(instance, EconomySavedData::fromData));
     }
 
@@ -284,15 +315,18 @@ public final class EconomySavedData extends SavedData implements CurrencyProvide
     }
     private List<String> initializedRows() { return initialized.stream().map(AccountId::stableKey).toList(); }
     private List<String> optOutRows() { return loggingOptOut.stream().map(AccountId::stableKey).toList(); }
+    private List<String> erasedRows() { return List.copyOf(erased); }
     private List<AuditRow> auditRows() {
         return transactions.stream().map(row -> new AuditRow(row.type().name(), row.amount(), row.currency(),
                 row.timestamp(), row.sourceAccount(), row.destinationAccount())).toList();
     }
 
     private static EconomySavedData fromData(List<BalanceRow> balances, List<String> initialized,
-            List<String> optOut, List<AuditRow> transactions, String salt) {
+            List<String> optOut, List<AuditRow> transactions, String salt, List<String> erased) {
         EconomySavedData data = new EconomySavedData();
         if (!salt.isBlank()) data.pseudonymSalt = salt;
+        // Tombstones are stored already-hashed under this salt, so they are read back verbatim.
+        erased.stream().filter(value -> !value.isBlank()).forEach(data.erased::add);
         for (BalanceRow row : balances) {
             AccountId account = parseAccount(row.accountKind(), row.account());
             if (account != null && row.balance() >= 0L && row.currency().equals(NeroEconomyCommon.CREDITS.id().toString()))

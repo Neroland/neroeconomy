@@ -21,6 +21,7 @@ import com.mojang.brigadier.context.CommandContext;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.network.chat.Component;
+import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.storage.LevelResource;
 
@@ -28,6 +29,7 @@ import za.co.neroland.nerolandcore.data.PlayerDataErasure;
 import za.co.neroland.nerolandcore.economy.CurrencyApi;
 import za.co.neroland.neroeconomy.NeroEconomyCommon;
 import za.co.neroland.neroeconomy.config.EconomyConfig;
+import za.co.neroland.neroeconomy.data.LedgerExportFiles;
 import za.co.neroland.neroeconomy.economy.EconomySavedData;
 import za.co.neroland.neroeconomy.economy.PlayerLedgerExport;
 import za.co.neroland.neroeconomy.economy.TransactionType;
@@ -161,14 +163,14 @@ public final class EconomyCommands {
             context.getSource().sendFailure(Component.translatable("command.neroeconomy.admin_failed"));
             return 0;
         }
-        NeroEconomyCommon.LOGGER.info("[NeroEconomy] Administrative mutation completed (reason={}, amount={}).",
-                type, amount);
-        context.getSource().sendSuccess(() -> Component.translatable("command.neroeconomy.admin_success", amount), true);
+        // Neither the log nor the broadcast carries the amount, and the result stays with the caller.
+        NeroEconomyCommon.LOGGER.debug("[NeroEconomy] Administrative mutation completed (reason={}).", type);
+        context.getSource().sendSuccess(() -> Component.translatable("command.neroeconomy.admin_success"), false);
         return Command.SINGLE_SUCCESS;
     }
 
     private static int export(CommandContext<CommandSourceStack> context) {
-        UUID target = resolveAccount(context);
+        UUID target = resolveSubject(context);
         if (target == null) return 0;
         PlayerLedgerExport export = NeroEconomyCommon.CURRENCY_PROVIDER.activeData().export(target);
         JsonObject json = new JsonObject();
@@ -188,10 +190,8 @@ public final class EconomyCommands {
             transactions.add(value);
         });
         json.add("transactions", transactions);
-        Path root = context.getSource().getServer().getWorldPath(LevelResource.ROOT)
-                .resolve("neroeconomy-exports").normalize();
-        Path output = root.resolve(target + ".json").normalize();
-        if (!output.startsWith(root)) throw new IllegalStateException("Unsafe export path");
+        Path root = LedgerExportFiles.directory(context.getSource().getServer());
+        Path output = LedgerExportFiles.file(context.getSource().getServer(), target);
         try {
             Files.createDirectories(root);
             Files.writeString(output, new GsonBuilder().setPrettyPrinting().create().toJson(json),
@@ -207,7 +207,7 @@ public final class EconomyCommands {
     }
 
     private static int erase(CommandContext<CommandSourceStack> context) {
-        UUID target = resolveAccount(context);
+        UUID target = resolveSubject(context);
         if (target == null) return 0;
         PlayerDataErasure.erase(context.getSource().getServer(), target);
         context.getSource().sendSuccess(() -> Component.translatable("command.neroeconomy.erase_success"), true);
@@ -248,7 +248,10 @@ public final class EconomyCommands {
         return Commands.literal("bounty")
                 .then(Commands.literal("post").then(Commands.argument("target", StringArgumentType.word())
                         .then(Commands.argument("payout", LongArgumentType.longArg(1L))
-                                .executes(context -> postJob(context, JobType.BOUNTY, "")))))
+                                .executes(context -> postJob(context, JobType.BOUNTY, "", 1))
+                                .then(Commands.argument("quantity", IntegerArgumentType.integer(1, 2304))
+                                        .executes(context -> postJob(context, JobType.BOUNTY, "",
+                                                IntegerArgumentType.getInteger(context, "quantity")))))))
                 .then(Commands.literal("claim").then(Commands.argument("id", StringArgumentType.word())
                         .executes(EconomyCommands::claimJob)))
                 .then(Commands.literal("list").executes(context -> listJobs(context, JobType.BOUNTY)));
@@ -278,6 +281,12 @@ public final class EconomyCommands {
     }
 
     private static int postJob(CommandContext<CommandSourceStack> context, JobType type, String destination) {
+        return postJob(context, type, destination, IntegerArgumentType.getInteger(context, "quantity"));
+    }
+
+    /** A bounty's quantity is the number of proven kills it takes to settle, and defaults to one. */
+    private static int postJob(CommandContext<CommandSourceStack> context, JobType type, String destination,
+            int quantity) {
         ServerPlayer player = context.getSource().getPlayer();
         if (player == null) return playerOnly(context);
         String target = StringArgumentType.getString(context, "target");
@@ -285,7 +294,6 @@ public final class EconomyCommands {
             context.getSource().sendFailure(Component.translatable("command.neroeconomy.bounty.players_disabled"));
             return 0;
         }
-        int quantity = type == JobType.BOUNTY ? 1 : IntegerArgumentType.getInteger(context, "quantity");
         long payout = LongArgumentType.getLong(context, "payout");
         long expires = System.currentTimeMillis() + EconomyConfig.DEFAULT_LISTING_DURATION_HOURS.get() * 3_600_000L;
         var job = ObligationSavedData.get(player.level().getServer()).postJob(player, type, target, quantity,
@@ -349,7 +357,9 @@ public final class EconomyCommands {
     }
 
     private static int listAuctions(CommandContext<CommandSourceStack> context) {
-        var auctions = ObligationSavedData.get(context.getSource().getServer()).auctions();
+        // A console listing is unfiltered; a player only sees lots their progression allows.
+        var auctions = ObligationSavedData.get(context.getSource().getServer())
+                .auctions(context.getSource().getPlayer());
         context.getSource().sendSuccess(() -> Component.translatable("command.neroeconomy.auction.list", auctions.size()), false);
         auctions.stream().limit(20).forEach(auction -> context.getSource().sendSuccess(() -> Component.translatable(
                 "command.neroeconomy.auction.row", auction.id().toString(), auction.highestBid(), auction.endsAt()), false));
@@ -368,7 +378,29 @@ public final class EconomyCommands {
         return 0;
     }
 
+    /**
+     * Accepting any well-formed UUID would let {@code pay} and {@code balance} open an unlimited
+     * number of funded accounts for ids nobody has ever played as, so an offline id has to be backed
+     * by a player-data file in this world before it is treated as an account.
+     */
     private static UUID resolveAccount(CommandContext<CommandSourceStack> context) {
+        String value = StringArgumentType.getString(context, "player");
+        MinecraftServer server = context.getSource().getServer();
+        ServerPlayer online = server.getPlayerList().getPlayerByName(value);
+        if (online != null) return online.getUUID();
+        UUID id = null;
+        try { id = UUID.fromString(value); }
+        catch (IllegalArgumentException ignored) { }
+        if (id != null && (server.getPlayerList().getPlayer(id) != null || hasPlayerData(server, id))) return id;
+        context.getSource().sendFailure(Component.translatable("command.neroeconomy.player_not_found"));
+        return null;
+    }
+
+    /**
+     * Export and erasure are admin-only, never mint anything, and must still reach a data subject
+     * whose world files are already gone, so they accept any well-formed id.
+     */
+    private static UUID resolveSubject(CommandContext<CommandSourceStack> context) {
         String value = StringArgumentType.getString(context, "player");
         ServerPlayer online = context.getSource().getServer().getPlayerList().getPlayerByName(value);
         if (online != null) return online.getUUID();
@@ -377,5 +409,12 @@ public final class EconomyCommands {
             context.getSource().sendFailure(Component.translatable("command.neroeconomy.player_not_found"));
             return null;
         }
+    }
+
+    private static boolean hasPlayerData(MinecraftServer server, UUID player) {
+        try {
+            return Files.isRegularFile(server.getWorldPath(LevelResource.PLAYER_DATA_DIR)
+                    .resolve(player + ".dat"));
+        } catch (RuntimeException ignored) { return false; }
     }
 }

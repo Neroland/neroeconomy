@@ -8,6 +8,7 @@ import za.co.neroland.nerolandcore.economy.Currency;
 import za.co.neroland.nerolandcore.economy.CurrencyApi;
 import za.co.neroland.nerolandcore.economy.CoreCurrencies;
 import za.co.neroland.neroeconomy.config.EconomyConfig;
+import za.co.neroland.neroeconomy.data.LedgerExportFiles;
 import za.co.neroland.neroeconomy.economy.EconomySavedData;
 import za.co.neroland.neroeconomy.economy.ServerCurrencyProvider;
 import za.co.neroland.neroeconomy.registry.ModBlockEntities;
@@ -44,11 +45,14 @@ public final class NeroEconomyCommon {
             return;
         }
         initialized = true;
-        // 1. Privacy hooks are registered before any gameplay store can be exposed.
+        // 1. Privacy hooks are registered before any gameplay store can be exposed. Obligation
+        //    settlement runs before the market sweep, so a claim it books for the erased player's
+        //    counterparty survives while anything owed to the erased player is then dropped.
         PlayerDataErasure.register((server, player) -> EconomySavedData.get(server).forgetPlayer(player));
         PlayerDataErasure.register((server, player) -> ShopOwnershipState.get(server).forgetPlayer(player));
+        PlayerDataErasure.register((server, player) -> ObligationSavedData.get(server).forgetPlayer(server, player));
         PlayerDataErasure.register((server, player) -> MarketSavedData.get(server).forgetPlayer(player));
-        PlayerDataErasure.register((server, player) -> ObligationSavedData.get(server).forgetPlayer(player));
+        PlayerDataErasure.register(LedgerExportFiles::delete);
         // 2. Configuration and the real Core currency provider.
         EconomyConfig.init();
         NeroEconomyTelemetry.init();
@@ -57,6 +61,10 @@ public final class NeroEconomyCommon {
         Services.PLATFORM.getPlatformName();
         Services.NETWORK.getClass();
         NeroEconomyNetwork.init();
+        // Server-funded delivery jobs (soft logistics seam); without this the overload refuses jobs.
+        za.co.neroland.neroeconomy.api.DeliveryJobApi.setSystemIssuer(
+                (server, type, target, quantity, destination, payout, expiresAt) -> ObligationSavedData
+                        .get(server).postSystemJob(type, target, quantity, destination, payout, expiresAt));
         // 3. Content registrations.
         ModBlocks.init();
         ModItems.init();

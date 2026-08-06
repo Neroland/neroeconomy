@@ -23,6 +23,15 @@ def branchDir = project.parent.projectDir
 def forgeBuild = forgeVersion.toString().split('-', 2)[1]
 def forgeMajor = forgeBuild.split('\\.')[0]
 
+// Exclusive upper bound for this node's Minecraft range: the NEXT minor after `mc`
+// (26.1.2 -> 26.2, 26.2 -> 26.3). Each cell is built against exactly one MC version and the
+// access-transformer/widener split is per version, so a jar must never advertise open-ended
+// forward compatibility.
+def nextMinecraft = { String version ->
+    def parts = version.tokenize('.')
+    "${parts[0]}.${(parts[1] as int) + 1}"
+}
+
 // Distinct, descriptive jar name per cell.
 base { archivesName = "neroeconomy-forge-${mc}" }
 
@@ -49,6 +58,11 @@ tasks.named('test', Test) { useJUnitPlatform() }
 sourceSets.main.output.resourcesDir = sourceSets.main.java.classesDirectory.get().asFile
 
 minecraft {
+    // ForgeGradle only auto-detects an access transformer under THIS node's own resources, but the
+    // shared one lives in common/ (it is also wired for common and neoforge). Without it Forge 26.1.2
+    // cannot see BlockEntityType's private constructor. Point at the single shared file.
+    accessTransformers.from(rootProject.file('common/src/main/resources/META-INF/accesstransformer.cfg'))
+
     runs {
         configureEach {
             workingDir = layout.projectDirectory.dir('runs/client')
@@ -100,7 +114,7 @@ def generateModMetadata = tasks.register('generateModMetadata', ProcessResources
         mod_authors               : rootProject.mod_authors,
         mod_license               : rootProject.mod_license,
         forge_loader_version_range: "[${forgeMajor},)",
-        minecraft_version_range   : "[${mc},)",
+        minecraft_version_range   : "[${mc},${nextMinecraft(mc)})",
         nerolandcore_version_range: "[${nerolandcoreVersion},2.0)",
     ]
     inputs.properties(props)

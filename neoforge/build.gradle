@@ -19,6 +19,15 @@ def nerolandcoreVersion = project.findProperty('nerolandcore_version')
 // templates live in the BRANCH root (neoforge/). Resolve branch-root paths via the parent.
 def branchDir = project.parent.projectDir
 
+// Exclusive upper bound for this node's Minecraft range: the NEXT minor after `mc`
+// (26.1.2 -> 26.2, 26.2 -> 26.3). Each cell is built against exactly one MC version and the
+// access-transformer/widener split is per version, so a jar must never advertise open-ended
+// forward compatibility.
+def nextMinecraft = { String version ->
+    def parts = version.tokenize('.')
+    "${parts[0]}.${(parts[1] as int) + 1}"
+}
+
 // Distinct, descriptive jar name per cell (the node project is named after the MC version, so the
 // default jar would be "<mc>-<version>.jar" and COLLIDE with the fabric cell of the same version).
 base { archivesName = "neroeconomy-neoforge-${mc}" }
@@ -69,7 +78,10 @@ def generateModMetadata = tasks.register('generateModMetadata', ProcessResources
         mod_name               : rootProject.mod_name,
         mod_authors            : rootProject.mod_authors,
         mod_license            : rootProject.mod_license,
-        minecraft_version_range: "[${mc},)",
+        minecraft_version_range: "[${mc},${nextMinecraft(mc)})",
+        // Floor the NeoForge loader range at the version this cell was compiled against; an older
+        // NeoForge cannot supply the APIs this jar links to.
+        neoforge_version_range : "[${neoVersion},)",
         nerolandcore_version_range: "[${nerolandcoreVersion},2.0)",
     ]
     inputs.properties(props)

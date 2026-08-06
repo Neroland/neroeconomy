@@ -36,4 +36,37 @@ public final class NeroEconomyGameTests {
         }
         helper.succeed();
     }
+
+    /** The offer slot must be a single write-through slot backed by the live escrow, never a copy. */
+    @GameTest
+    public void playerShopOffersOneWriteThroughSlot(GameTestHelper helper) {
+        helper.setBlock(BlockPos.ZERO, ModBlocks.PLAYER_SHOP.get());
+        if (!(helper.getLevel().getBlockEntity(helper.absolutePos(BlockPos.ZERO))
+                instanceof PlayerShopBlockEntity shop)) {
+            helper.fail("Player Shop did not create its block entity");
+            return;
+        }
+        if (shop.getContainerSize() != 1) {
+            helper.fail("Player Shop advertised slots it cannot store");
+            return;
+        }
+        shop.claim(java.util.UUID.randomUUID());
+        shop.setItem(PlayerShopBlockEntity.OFFER_SLOT,
+                new net.minecraft.world.item.ItemStack(net.minecraft.world.item.Items.DIAMOND, 4));
+        if (shop.stockCount() != 4) {
+            helper.fail("Offer slot did not write through to the escrow");
+            shop.cancel();
+            return;
+        }
+        shop.getItem(PlayerShopBlockEntity.OFFER_SLOT).shrink(1);
+        shop.setChanged();
+        shop.syncOffer();
+        boolean live = shop.stockCount() == 3 && shop.getItem(PlayerShopBlockEntity.OFFER_SLOT).getCount() == 3;
+        shop.cancel();
+        if (!live) {
+            helper.fail("Offer slot handed out a detached copy of the escrow");
+            return;
+        }
+        helper.succeed();
+    }
 }

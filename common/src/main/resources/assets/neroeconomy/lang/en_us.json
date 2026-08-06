@@ -4,7 +4,7 @@
   "block.neroeconomy.player_shop": "Player Shop",
   "block.neroeconomy.trading_terminal": "Trading Terminal",
   "command.neroeconomy.admin_failed": "Balance mutation failed validation.",
-  "command.neroeconomy.admin_success": "Balance mutation completed for %s credits.",
+  "command.neroeconomy.admin_success": "Balance mutation completed.",
   "command.neroeconomy.auction.bid_failed": "Bid rejected by the live auction state.",
   "command.neroeconomy.auction.bid_placed": "Bid escrowed.",
   "command.neroeconomy.auction.create_failed": "Could not escrow that auction lot.",
@@ -40,8 +40,6 @@
   "container.neroeconomy.player_shop": "Player Shop",
   "container.neroeconomy.trading_terminal": "Trading Terminal",
   "gui.neroeconomy.balance": "Balance: %s credits",
-  "gui.neroeconomy.bank.no_nearby_player": "No other player is within 16 blocks.",
-  "gui.neroeconomy.bank.pay": "Pay %s",
   "gui.neroeconomy.bank.payment_failed": "Could not pay %s credits.",
   "gui.neroeconomy.bank.payment_sent": "Sent %s credits.",
   "gui.neroeconomy.bank.amount": "Amount",
@@ -87,10 +85,6 @@
   "gui.neroeconomy.shop.role.buyer": "Buyer view",
   "gui.neroeconomy.shop.role.owner": "Owner controls",
   "gui.neroeconomy.shop.stock": "Stock: %s",
-  "item.neroeconomy.bank_terminal": "Bank Terminal",
   "item.neroeconomy.credit_chip": "Credit Chip",
-  "item.neroeconomy.credit_chip.redeemed": "Redeemed for %s credits.",
-  "item.neroeconomy.market_board": "Market Board",
-  "item.neroeconomy.player_shop": "Player Shop",
-  "item.neroeconomy.trading_terminal": "Trading Terminal"
+  "item.neroeconomy.credit_chip.redeemed": "Redeemed for %s credits."
 }

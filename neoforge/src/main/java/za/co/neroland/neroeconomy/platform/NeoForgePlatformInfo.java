@@ -12,6 +12,11 @@ import net.neoforged.neoforge.event.server.ServerStartedEvent;
 import net.neoforged.neoforge.event.server.ServerStoppedEvent;
 import net.neoforged.neoforge.event.tick.ServerTickEvent;
 import net.neoforged.neoforge.event.entity.living.LivingDeathEvent;
+import net.neoforged.neoforge.event.level.block.BreakBlockEvent;
+
+import net.minecraft.world.level.Level;
+
+import za.co.neroland.neroeconomy.block.PlayerShopBlock;
 import za.co.neroland.neroeconomy.obligation.BountyHooks;
 
 import za.co.neroland.nerolandcore.registry.RegistrationProvider;
@@ -28,6 +33,13 @@ public final class NeoForgePlatformInfo implements PlatformInfo {
                 NeroEconomyCommon.CURRENCY_PROVIDER.tick(event.getServer()));
         NeoForge.EVENT_BUS.addListener((LivingDeathEvent event) ->
                 BountyHooks.entityKilled(event.getEntity(), event.getSource()));
+        // Shop-break protection is otherwise Fabric-only. 26.x moved the break event out of
+        // BlockEvent into event.level.block.BreakBlockEvent (ICancellableEvent).
+        NeoForge.EVENT_BUS.addListener((BreakBlockEvent event) -> {
+            if (event.getLevel() instanceof Level level && event.getPlayer() != null
+                    && !PlayerShopBlock.canBreak(level, event.getPos(), event.getPlayer()))
+                event.setCanceled(true);
+        });
     }
     @Override public String getPlatformName() { return "NeoForge"; }
     @Override public boolean isDevelopmentEnvironment() { return !FMLEnvironment.isProduction(); }

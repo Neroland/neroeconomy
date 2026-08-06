@@ -1,7 +1,8 @@
 # NeroEconomy
 
-NeroEconomy 0.1.0 is a server-authoritative economy for the Neroland Minecraft ecosystem. It targets
-Minecraft 26.1.2 and 26.2 on Fabric, Forge, and NeoForge and requires Neroland Core.
+NeroEconomy is a server-authoritative economy for the Neroland Minecraft ecosystem. This is the
+0.1.0 feature set, shipping as `0.0.1-alpha.1` until release. It targets Minecraft 26.1.2 and 26.2
+on Fabric, Forge, and NeoForge and requires Neroland Core.
 
 ## Shipped features
 
@@ -50,4 +51,5 @@ purged at load and daily. `/eco export` writes subject-access JSON under the wor
 `/eco erase` invokes Core-wide erasure. No transaction detail is info-logged. Sentry is capped,
 scrubbed, no-PII, and opt-out.
 
-See [the wiki](wiki/Home.md), [the audit](AUDIT.md), and [the runtime checklist](SMOKE-TEST.md).
+See [the wiki](wiki/Home.md), [the privacy notice](PRIVACY.md), [building against Core](USING-CORE.md),
+[the audit](AUDIT.md), and [the runtime checklist](SMOKE-TEST.md).

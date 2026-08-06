@@ -1,4 +1,4 @@
-# NeroEconomy 0.1.0 runtime smoke test
+# NeroEconomy runtime smoke test (0.1.0 feature set, shipping as 0.0.1-alpha.1)
 
 Use a disposable world with Core 1.10.0. Repeat essential block/network flows on all loaders and cover
 both Minecraft versions across the matrix. Use two players for sync and settlement.

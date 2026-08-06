@@ -21,10 +21,10 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.saveddata.SavedData;
 import net.minecraft.world.level.saveddata.SavedDataType;
 
-import za.co.neroland.nerolandcore.data.SavedDataRecovery;
 import za.co.neroland.neroeconomy.NeroEconomyCommon;
 import za.co.neroland.neroeconomy.api.PriceQuote;
 import za.co.neroland.neroeconomy.api.PricingEngine;
+import za.co.neroland.neroeconomy.data.SavedDataRecovery;
 import za.co.neroland.neroeconomy.economy.TransactionType;
 import za.co.neroland.neroeconomy.link.EconomyAlerts;
 import za.co.neroland.nerolandcore.link.LinkAlert;
@@ -198,17 +198,23 @@ public final class MarketSavedData extends SavedData {
         return PurchaseResult.SUCCESS;
     }
 
+    /**
+     * Inventory insertion is allowed to be partial, so the claim is reduced by exactly what moved.
+     * Counting a partial transfer as a full one would leave the whole claim collectable again.
+     */
     public synchronized int collectItems(ServerPlayer player) {
         List<ItemStack> claims = itemClaims.get(player.getUUID());
         if (claims == null) return 0;
         int delivered = 0;
-        for (var iterator = claims.iterator(); iterator.hasNext();) {
+        for (var iterator = claims.listIterator(); iterator.hasNext();) {
             ItemStack claim = iterator.next();
             ItemStack moving = claim.copy();
-            if (player.getInventory().add(moving) && moving.isEmpty()) {
-                delivered += claim.getCount();
-                iterator.remove();
-            }
+            player.getInventory().add(moving);
+            int moved = claim.getCount() - moving.getCount();
+            if (moved <= 0) continue;
+            delivered += moved;
+            if (moving.isEmpty()) iterator.remove();
+            else iterator.set(moving);
         }
         if (claims.isEmpty()) itemClaims.remove(player.getUUID());
         if (delivered > 0) setDirty();
@@ -219,17 +225,28 @@ public final class MarketSavedData extends SavedData {
         Long value = creditClaims.get(player);
         if (value == null || value <= 0L) return false;
         if (!NeroEconomyCommon.CURRENCY_PROVIDER.depositTyped(player, NeroEconomyCommon.CREDITS,
-                value, TransactionType.ESCROW_REFUND)) return false;
+                value, TransactionType.MARKET_PAYOUT)) return false;
         creditClaims.remove(player);
         setDirty();
         return true;
     }
 
-    public synchronized void addCreditClaim(UUID player, long amount) {
-        if (player == null || amount <= 0L) return;
-        long current = creditClaims.getOrDefault(player, 0L);
-        creditClaims.put(player, Long.MAX_VALUE - current < amount ? Long.MAX_VALUE : current + amount);
+    /**
+     * Books proceeds or a refund. Saturating at {@link Long#MAX_VALUE} would mint credits and then
+     * deadlock the claim, because collection refuses a deposit that cannot fit, so an overflowing
+     * claim is rejected outright and the caller must keep the escrow it was about to release.
+     */
+    public synchronized boolean addCreditClaim(UUID player, long amount) {
+        if (!canAcceptCreditClaim(player, amount)) return false;
+        creditClaims.put(player, creditClaims.getOrDefault(player, 0L) + amount);
         setDirty();
+        return true;
+    }
+
+    /** Pre-flight for callers that must not debit or delete anything before a claim can be booked. */
+    public synchronized boolean canAcceptCreditClaim(UUID player, long amount) {
+        if (player == null || amount <= 0L) return false;
+        return Long.MAX_VALUE - creditClaims.getOrDefault(player, 0L) >= amount;
     }
 
     public synchronized long creditClaim(UUID player) { return creditClaims.getOrDefault(player, 0L); }
@@ -264,14 +281,20 @@ public final class MarketSavedData extends SavedData {
         }
         for (var iterator = buyOffers.entrySet().iterator(); iterator.hasNext();) {
             MarketBuyOffer offer = iterator.next().getValue();
-            if (offer.expiresAt() <= now) {
-                addCreditClaim(offer.buyer(), EscrowLifecycle.expire(offer.escrow()));
-                iterator.remove(); changed = true;
-            }
+            if (offer.expiresAt() > now) continue;
+            // Only drop the offer once its escrow has actually been booked back to the buyer.
+            long refund = EscrowLifecycle.expire(offer.escrow());
+            if (refund > 0L && !addCreditClaim(offer.buyer(), refund)) continue;
+            iterator.remove(); changed = true;
         }
         if (changed) setDirty();
     }
 
+    /**
+     * Every row removed here is single-party — the erased player's own listing, offer, or claim — so
+     * removal cannot strand a counterparty. Cross-party settlement happens in the obligation store,
+     * which must therefore run its erasure hook before this one.
+     */
     public synchronized void forgetPlayer(UUID player) {
         if (player == null) return;
         boolean changed = listings.entrySet().removeIf(entry -> entry.getValue().seller().equals(player));
@@ -360,9 +383,10 @@ public final class MarketSavedData extends SavedData {
                     ListingSource.valueOf(row.source()), row.stock(), row.price(), row.expires(), row.location());
             data.listings.put(value.listingId(), value);
         } catch (IllegalArgumentException ignored) { }
+        // Must stay mutable: collection removes from, and partial delivery writes back into, this list.
         for (ClaimRow row : claims) try {
-            data.itemClaims.put(UUID.fromString(row.player()), row.items().stream().filter(item -> !item.isEmpty())
-                    .map(ItemStack::copy).toList());
+            data.itemClaims.put(UUID.fromString(row.player()), new ArrayList<>(row.items().stream()
+                    .filter(item -> !item.isEmpty()).map(ItemStack::copy).toList()));
         } catch (IllegalArgumentException ignored) { }
         for (CreditRow row : credits) try {
             if (row.amount() > 0L) data.creditClaims.put(UUID.fromString(row.player()), row.amount());

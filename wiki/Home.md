@@ -1,6 +1,7 @@
 # NeroEconomy wiki
 
-NeroEconomy 0.1.0 supplies the persistent credits economy for Neroland servers.
+NeroEconomy supplies the persistent credits economy for Neroland servers. These pages document the
+0.1.0 feature set, which ships as `0.0.1-alpha.1` until release.
 
 - [Credits, commands, privacy, export, and erasure](Credits-and-Commands.md)
 - [Bank Terminal](Bank-Terminal.md)

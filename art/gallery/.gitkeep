@@ -1,0 +1,5 @@
+# Gallery screenshots for the Modrinth project page live here as tracked PNGs.
+# Preferred (ordered) names: bank_terminal.png, player_shop.png, trading_terminal.png,
+# market_board.png — any other PNG is appended alphabetically.
+# .github/workflows/modrinth-gallery.yml mirrors this folder to the Modrinth gallery on push to
+# main; with no PNGs present it skips with a notice instead of failing.
