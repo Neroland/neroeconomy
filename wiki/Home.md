@@ -1,19 +1,16 @@
-# NeroEconomy Wiki
+# NeroEconomy wiki
 
-Player- and contributor-facing documentation for **NeroEconomy**, part of the
-[Neroland ecosystem](../../neroland-mc-ecosystem/README.md). Built on **Neroland Core**.
+NeroEconomy 0.1.0 supplies the persistent credits economy for Neroland servers.
 
-> **Status:** barebones — this mod is scaffolded (version `0.0.1-alpha.1`) but has no gameplay
-> content yet. Pages will grow as features land. Keep this wiki updated alongside code changes
-> (see [`../AGENTS.md`](../AGENTS.md) / [`../CLAUDE.md`](../CLAUDE.md)).
+- [Credits, commands, privacy, export, and erasure](Credits-and-Commands.md)
+- [Bank Terminal](Bank-Terminal.md)
+- [Player Shops](Player-Shops.md)
+- [Markets and terminals](Markets-and-Terminals.md)
+- [Contracts and delivery](Contracts-and-Delivery.md)
+- [Bounties and auctions](Bounties-and-Auctions.md)
+- [Credit Chip](Credit-Chip.md)
+- [Configuration and administration](Configuration-and-Administration.md)
+- [Public APIs and integrations](APIs-and-Integrations.md)
+- [Architecture](Architecture.md)
 
-## Contents
-
-_No feature pages yet._ Add one page per block, item, machine, or system as it is built, and link it
-here. Keep this page as the index.
-
-## See also
-
-- [Build & contributor context](../AGENTS.md)
-- [Ecosystem overview](../../neroland-mc-ecosystem/README.md)
-- [This mod's planning docs](../../neroland-mc-ecosystem/neroeconomy/)
+Faction wallets, cross-server economies, and simulated supply/demand are deferred.

@@ -1,0 +1,1 @@
+{"type":"minecraft:crafting_shaped","category":"misc","pattern":["PCP","RGR","III"],"key":{"P":"minecraft:paper","C":"minecraft:copper_ingot","R":"minecraft:redstone","G":"minecraft:glass_pane","I":"minecraft:iron_ingot"},"result":{"id":"neroeconomy:market_board"}}

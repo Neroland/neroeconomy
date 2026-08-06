@@ -11,6 +11,7 @@ plugins {
 def mc = stonecutter.current.version
 def forgeVersion = project.findProperty("forge_version_${mc}")
 def jeiVersion = project.findProperty("jei_version_${mc}")
+def nerolandcoreVersion = project.findProperty('nerolandcore_version')
 
 if (!forgeVersion) {
     throw new GradleException("Missing forge_version_${mc} in gradle.properties")
@@ -31,6 +32,16 @@ jarJar.register()
 // Pull in the shared common source + resources.
 sourceSets.main.java.srcDir rootProject.ext.commonJava
 sourceSets.main.resources.srcDir rootProject.ext.commonResources
+
+sourceSets.test.java.srcDir "${rootProject.projectDir}/common/src/test/java"
+configurations.testCompileClasspath.extendsFrom configurations.compileClasspath
+configurations.testRuntimeClasspath.extendsFrom configurations.runtimeClasspath
+dependencies {
+    testImplementation platform('org.junit:junit-bom:5.12.2')
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+tasks.named('test', Test) { useJUnitPlatform() }
 
 // Forge 26's ModLauncher builds a JPMS layer from the dev runtime classpath. If classes and
 // processed resources are separate entries, the mod's classes can be seen as module "main" while
@@ -68,6 +79,7 @@ repositories {
 
 dependencies {
     implementation minecraft.dependency("net.minecraftforge:forge:${forgeVersion}")
+    implementation "za.co.neroland.nerolandcore:nerolandcore-forge-${mc}:${nerolandcoreVersion}"
     annotationProcessor 'net.minecraftforge:eventbus-validator:7.0.5'
 
     implementation 'io.sentry:sentry:8.45.0'
@@ -89,6 +101,7 @@ def generateModMetadata = tasks.register('generateModMetadata', ProcessResources
         mod_license               : rootProject.mod_license,
         forge_loader_version_range: "[${forgeMajor},)",
         minecraft_version_range   : "[${mc},)",
+        nerolandcore_version_range: "[${nerolandcoreVersion},2.0)",
     ]
     inputs.properties(props)
     expand(props)

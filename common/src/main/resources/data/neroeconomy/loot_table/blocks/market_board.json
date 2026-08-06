@@ -1,0 +1,1 @@
+{"type":"minecraft:block","pools":[{"rolls":1.0,"bonus_rolls":0.0,"conditions":[{"condition":"minecraft:survives_explosion"}],"entries":[{"type":"minecraft:item","name":"neroeconomy:market_board"}]}],"random_sequence":"neroeconomy:blocks/market_board"}

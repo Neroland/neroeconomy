@@ -1,0 +1,28 @@
+# NeroEconomy Completion Audit
+
+Audit baseline: staged `0.1.0` first pass, checked against Neroland Core `1.10.0` and the
+completion brief.
+
+## Stage 0 findings
+
+| Area | Finding | Resolution |
+| --- | --- | --- |
+| Currency provider | NeroEconomy registered a real provider, but declared a competing `neroeconomy:credits` currency. | Use `CoreCurrencies.CREDITS` exclusively and retain NeroEconomy as the persistent provider. |
+| Saved data | Ledger and shop ownership called vanilla `computeIfAbsent` directly. Core 1.10.0 did not yet expose the required recovery guard. | Add the backward-compatible `data.SavedDataRecovery` Core seam and route every NeroEconomy store through it. |
+| Networking | The first pass had no NeroEconomy channel or network service. | Add `neroeconomy:main`, common payload declarations, and one loader implementation per cell. |
+| Platform services | A single lazily named `EconomyPlatform` combined lifecycle and commands; implementations lived in loader packages. | Replace it with eagerly resolved `Services`, `PlatformInfo`, and `NetworkPlatform` seams whose implementations retain the common package name. |
+| Init order | Erasure was registered after content and there was no guarded Link final step. | Number init phases, register erasure first, resolve services during init, and register Link last inside `try/catch`. |
+| Config | Existing keys used Core's schema correctly and were server-authoritative, but telemetry, privacy preferences, volatility, escrow, and feature controls were absent. | Expand the same Core schema; keep only `telemetryEnabled` client-local. |
+| Telemetry | Sentry dependencies were present but no telemetry implementation existed. | Add opt-out, placeholder-guarded Sentry with PII/path scrubbing and a ten-event session cap. |
+| Manifests | Core was required, but Forge/NeoForge ordering was `BEFORE`; soft sibling declarations were absent. | Change Core ordering to `AFTER` and declare runtime-detected siblings as optional/suggested. |
+| Access widening | The first pass widened the `BlockEntityType` constructor for every Fabric version. | Stonecutter-gate the widening to the 26.1.2 cell. |
+| Anti-dupe | Ledger transfer was synchronized and atomic. Shop settlement charged before delivery and used an unchecked best-effort refund; bank quick-pay lacked request idempotency. | Replace commerce with escrow/reservation stores and idempotent server-side intents. |
+| Privacy commands | Private history and erasure hooks existed, but `/eco export`, `/eco erase`, per-player audit opt-out, and daily retention were absent. | Add the missing privacy surface and scheduled purge. |
+| Feature scope | Trading terminal, market board, contracts, delivery jobs, bounties, auctions, chip, Link module, complete assets, and their tests/docs were absent. | Implement in Stages 2–12 and keep faction wallets deferred. |
+
+## Data handling
+
+Persistent stores contain gameplay account ids, balances, pseudonymous transaction references,
+escrow objects, offers, job state, and ownership. No player name, chat, free text, inventory dump, or
+transaction detail is written to application logs. Export is an explicit administrative data-subject
+operation; erasure routes through Core so every registered Nero mod participates.

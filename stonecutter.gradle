@@ -132,6 +132,11 @@ subprojects {
                 }
             }
         }
+    } else {
+        // Loader branch projects are Stonecutter containers, not compilable source sets. Keeping
+        // their Java/test tasks disabled makes the root `test` selector exercise only real nodes.
+        tasks.withType(JavaCompile).configureEach { enabled = false }
+        tasks.withType(Test).configureEach { enabled = false }
     }
 }
 
@@ -199,15 +204,12 @@ tasks.register('syncModels') {
 }
 
 // ---------------------------------------------------------------------------
-// Regenerate procedural textures + Blockbench block/item models for the MULTILOADER
-// (tools/gen_textures.py + gen_bbmodels.py with --multiloader). Both are ADDITIVE — they
-// skip any asset that already exists, so reruns only fill gaps and never overwrite
-// committed/edited art. gen_textures needs Pillow (skips gracefully without it). Run on
-// demand: `./gradlew genAssets`. Python auto-detected; override -PpythonCmd=.
+// Regenerate deterministic placeholder textures with the stdlib-only PNG generator.
+// Run on demand: `./gradlew genAssets`. Python auto-detected; override -PpythonCmd=.
 // ---------------------------------------------------------------------------
 tasks.register('genAssets') {
     group = 'neroeconomy'
-    description = 'Regenerate textures + Blockbench block/item models into common (additive).'
+    description = 'Regenerate deterministic stdlib-only NeroEconomy PNG assets.'
     def repoRoot = rootProject.projectDir
     def pythonOverride = providers.gradleProperty('pythonCmd').getOrNull()
     def isWindows = System.getProperty('os.name').toLowerCase().contains('win')
@@ -239,8 +241,8 @@ tasks.register('genAssets') {
         if (python == null) {
             throw new GradleException("genAssets: no Python found; set -PpythonCmd=<path>. pyenv root: ${pyenvRoot}")
         }
-        ['tools/gen_textures.py', 'tools/gen_bbmodels.py'].each { script ->
-            def proc = wrap(python + [script, '--multiloader']).execute(null, repoRoot)
+        ['tools/gen_textures.py'].each { script ->
+            def proc = wrap(python + [script]).execute(null, repoRoot)
             def out = new StringBuilder(); def err = new StringBuilder()
             proc.consumeProcessOutput(out, err); proc.waitFor()
             if (out.length() > 0) println out.toString().trim()

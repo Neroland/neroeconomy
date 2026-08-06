@@ -57,3 +57,6 @@ __pycache__/
 
 # node deps (e.g. tools/gradle-mcp markdownlint)
 node_modules/
+/forge/versions
+/neoforge/versions
+/fabric/versions

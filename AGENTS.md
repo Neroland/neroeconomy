@@ -1,82 +1,38 @@
-# Project context for AI coding agents — neroeconomy
+# Project context for AI coding agents — NeroEconomy
 
-> This and `CLAUDE.md` are kept identical; update both together.
+> This file and `CLAUDE.md` are byte-identical; always update both together.
 
-## The mod
+## Status and scope
 
-- **NeroEconomy** — part of the Neroland sci-fi Minecraft mod ecosystem, built on **Neroland Core**.
-  This repository is currently a **barebones multiloader skeleton** (no gameplay content yet); add
-  shared content under `common/` and wire it through each loader entry point.
-- Mod id: **`neroeconomy`** (matches the registry namespace + every loader manifest). Package root:
-  `za.co.neroland.neroeconomy`. Author: **Neroland**.
-- Version: **0.0.1-alpha.1**.
-- Targets **MC 26.1.2 AND 26.2** on **NeoForge, MinecraftForge/Forge, and Fabric** → the **"6 cells"**.
-  **Java 25.** Mappings = official Mojang names (26.x ships de-obfuscated; no Parchment).
+NeroEconomy 0.1.0 is the first playable, feature-complete release candidate. It provides the
+persistent credits provider for Neroland Core, privacy-aware ledger, bank and trading terminals,
+owned offline shops, escrowed market offers, contracts, deliveries, bounties, auctions, credit chips,
+public pricing APIs, and a Core Link module. Faction wallets remain deferred.
 
-## Working rules
+Mod id: `neroeconomy`. Package: `za.co.neroland.neroeconomy`. Java 25, Mojang mappings, Minecraft
+26.1.2 and 26.2 on Fabric, Forge, and NeoForge.
 
-- **Keep responses concise and direct** — minimal verbosity, minimal formatting.
-- **POPIA & GDPR**: keep all logging/telemetry/scripts compliant — only public version strings, never
-  personal data; minimise data, set retention limits, support export/erasure and opt-out.
-- **NEVER commit or push automatically.** Leave changes **staged**; the developer reviews and commits
-  with native git (the source of truth).
-- **Use relative paths only** — never hard-code machine-specific absolute paths in committed files.
-- **Never run commands against production databases.** Treat any DB command as illustrative.
+## Non-negotiable rules
 
-## Repo layout — flattened cross-loader build
+- Never commit or push. Save and stage work for the owner.
+- Keep `AGENTS.md` and `CLAUDE.md` byte-identical.
+- Keep gameplay server-authoritative and packet intents idempotent. Escrow goods or credits before
+  publishing obligations; settle atomically and refund on expiry.
+- Store the minimum player data. Transaction records are pseudonymous and bounded; support logging
+  opt-out, export, and Core-wide erasure. Telemetry contains no personal data and is opt-out.
+- Never run commands against production databases or live server data.
+- Keep machine-specific absolute paths out of tracked files.
+- Core is the only hard dependency. Detect Nero siblings at runtime behind string-keyed interfaces.
+- Keep loader imports out of `common/`; use the ServiceLoader platform trio.
 
-- **The build IS the repo root.** `common/` (shared source spliced into every node), `neoforge/`
-  (ModDevGradle), `forge/` (ForgeGradle), `fabric/` (Fabric Loom). Root build files: `settings.gradle`,
-  `stonecutter.gradle` (the REAL root build script — Stonecutter repoints `buildFileName` here; the root
-  `build.gradle` is inert), `gradle.properties`, `gradlew`, `gradle/`.
-- **Version/loader axis = Stonecutter.** Each loader×MC is a real node `:<loader>:<mc>`
-  (`:fabric:26.1.2 :fabric:26.2 :neoforge:26.1.2 :neoforge:26.2 :forge:26.1.2 :forge:26.2`). `common` is
-  NOT a node — its source is spliced via `rootProject.ext.commonJava` / `commonResources`. Dependency pins
-  live in `gradle.properties` as `*_version_<mc>` keys; `mc_versions=26.1.2,26.2`.
+## Build layout and verification
 
-## Build & verify
+Stonecutter's real root script is `stonecutter.gradle`. Shared code/resources live under `common/`;
+loader nodes are `:<loader>:<mc>`. Resources are hand-authored; there is no datagen.
 
-- Build the cells with the Gradle wrapper, e.g. `./gradlew :fabric:26.2:build` or all six:
-  `:neoforge:26.1.2:build :neoforge:26.2:build :forge:26.1.2:build :forge:26.2:build
-  :fabric:26.1.2:build :fabric:26.2:build`.
-- Static analysis: `./gradlew :fabric:26.2:ecjCheck` (the VS Code Problems panel, via `tools/ecj.prefs`).
-  The task only FAILS on errors.
-- A Cowork agent sandbox cannot decompile Minecraft — run builds natively (or via the local gradle MCP)
-  on the developer's machine.
-- **Verify the cells build before marking a task done.** Never sign off on an uncompiled change.
+Before handoff run:
 
-## Conventions (cross-loader)
+`./gradlew :neoforge:26.1.2:build :neoforge:26.2:build :forge:26.1.2:build :forge:26.2:build :fabric:26.1.2:build :fabric:26.2:build :neoforge:26.2:ecjCheck test`
 
-- **Resources are HAND-AUTHORED in `common/src/main/resources`** — the multiloader does not run datagen.
-  Validate JSON after edits.
-- **Platform seams via ServiceLoader (no Architectury).** Put loader-agnostic code in `common/`; ship one
-  impl per loader plus a `META-INF/services` entry. Keep `common/` free of `net.neoforged.*` /
-  `net.fabricmc.*` / `net.minecraftforge.*` imports.
-- Loader entry points: `NeroEconomyFabric` (+ `NeroEconomyFabricClient`), `NeroEconomyForge`,
-  `NeroEconomyNeoForge` — each calls `NeroEconomyCommon.init()` during construction.
-- NeoForge/Forge debug tasks use `-PneroeconomyDebug`; Fabric Loom honours Gradle `--debug-jvm`.
-
-## IDE (VS Code) run & debug
-
-- Workspace: **`neroeconomy.code-workspace`** (single-root `"."`). Import the Stonecutter nodes as **static
-  Eclipse projects**: `./gradlew eclipse` (live Buildship/Loom import is disabled —
-  `java.import.gradle.enabled=false`). Re-run `./gradlew eclipse` after dependency changes, then reload
-  VS Code. Per-node Eclipse project names are `neroeconomy-<loader>-<mc>`.
-- **Run/Debug** a cell from `tasks.json` / `launch.json`.
-
-## Wiki — keep `wiki/` updated
-
-- This mod has its own **dedicated wiki** in `wiki/` at the repo root: the player- and
-  contributor-facing docs for NeroEconomy (features, blocks/items, machines, progression, recipes, FAQ).
-- **Whenever you add, change, or remove a feature, update `wiki/` in the same change** — treat the
-  wiki as part of "done"; code without a matching wiki update is incomplete.
-- One page per topic; keep `wiki/Home.md` as the index that links every page, with relative links
-  between pages. Validate Markdown via the gradle MCP `markdown_check` (honours `.markdownlint.json`).
-- The wiki is **per-mod** — document only NeroEconomy here; cross-mod / ecosystem concepts live in the
-  umbrella docs and are referenced by relative path.
-
-## DO NOT
-
-- Commit or push automatically — leave changes staged for the developer.
-- Hard-code absolute machine paths in committed files.
-- Add loader-specific code to `common/` — use the platform seams.
+Update the player/contributor documentation in `wiki/` with every feature change. Runtime smoke
+testing is owned by the developer and follows `SMOKE-TEST.md`.

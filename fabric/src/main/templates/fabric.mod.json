@@ -6,7 +6,7 @@
   "description": "NeroEconomy - multiloader build (Fabric).",
   "authors": ["${mod_authors}"],
   "license": "${mod_license}",
-  "accessWidener": "neroeconomy.accesswidener",
+  ${access_widener}
   "environment": "*",
   "entrypoints": {
     "main": ["za.co.neroland.neroeconomy.fabric.NeroEconomyFabric"],
@@ -19,7 +19,15 @@
   "depends": {
     "fabricloader": ">=${fabric_loader_version}",
     "minecraft": ">=${minecraft_version}",
-    "java": ">=21",
-    "fabric-api": "*"
+    "java": ">=25",
+    "fabric-api": "*",
+    "nerolandcore": ">=${nerolandcore_version} <2.0.0"
+  },
+  "suggests": {
+    "nerologistics": "*",
+    "nerofactions": "*",
+    "neroevents": "*",
+    "neroquests": "*",
+    "nerocreatures": "*"
   }
 }

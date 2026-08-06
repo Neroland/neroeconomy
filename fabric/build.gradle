@@ -10,6 +10,7 @@ plugins {
 def mc = stonecutter.current.version
 def fabricApi = project.findProperty("fabric_api_version_${mc}")
 def jeiVersion = project.findProperty("jei_version_${mc}")
+def nerolandcoreVersion = project.findProperty('nerolandcore_version')
 
 // This node's projectDir is <loader>/versions/<v>; the authoritative loader source +
 // resources live in the BRANCH root (fabric/). Resolve branch-root paths via the parent.
@@ -23,6 +24,17 @@ base { archivesName = "neroeconomy-fabric-${mc}" }
 sourceSets.main.java.srcDir rootProject.ext.commonJava
 sourceSets.main.resources.srcDir rootProject.ext.commonResources
 
+sourceSets.test.java.srcDir "${rootProject.projectDir}/common/src/test/java"
+configurations.testCompileClasspath.extendsFrom configurations.compileClasspath
+configurations.testRuntimeClasspath.extendsFrom configurations.runtimeClasspath
+
+dependencies {
+    testImplementation platform('org.junit:junit-bom:5.12.2')
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+tasks.named('test', Test) { useJUnitPlatform() }
+
 dependencies {
     minecraft "com.mojang:minecraft:${mc}"
     // NOTE: no `mappings` — de-obfuscated 26.x needs none (Fabric Loom 1.17+).
@@ -30,6 +42,7 @@ dependencies {
     if (fabricApi != null) {
         implementation "net.fabricmc.fabric-api:fabric-api:${fabricApi}"
     }
+    implementation "za.co.neroland.nerolandcore:nerolandcore-fabric-${mc}:${nerolandcoreVersion}"
 
     // Sentry SDK (telemetry/NeroEconomyTelemetry): compile against it + embed it as a jar-in-jar so the
     // shipped Fabric jar carries it. Counterpart to the NeoForge JarJar bundling.
@@ -61,6 +74,8 @@ def generateModMetadata = tasks.register('generateModMetadata', ProcessResources
         mod_license          : rootProject.mod_license,
         fabric_loader_version: rootProject.fabric_loader_version,
         minecraft_version    : mc,
+        nerolandcore_version : nerolandcoreVersion,
+        access_widener       : mc == '26.1.2' ? '"accessWidener": "neroeconomy.accesswidener",' : '',
     ]
     inputs.properties(props)
     expand(props)
@@ -71,7 +86,11 @@ sourceSets.main.resources.srcDir generateModMetadata
 eclipse.synchronizationTasks generateModMetadata
 
 loom {
-    accessWidenerPath = file("${branchDir}/src/main/resources/neroeconomy.accesswidener")
+    // BlockEntityType's constructor is private only in 26.1.2. Keep the widening out of 26.2's
+    // manifest and Loom transform so the cell does not retain obsolete privileged access.
+    if (mc == '26.1.2') {
+        accessWidenerPath = file("${branchDir}/src/main/resources/neroeconomy.accesswidener")
+    }
 
     runs {
         client {
