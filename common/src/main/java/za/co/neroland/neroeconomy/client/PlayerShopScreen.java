@@ -1,71 +1,111 @@
 package za.co.neroland.neroeconomy.client;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Button;
-import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.Identifier;
 import net.minecraft.world.entity.player.Inventory;
 
+import za.co.neroland.neroeconomy.NeroEconomyCommon;
 import za.co.neroland.neroeconomy.menu.PlayerShopMenu;
 import za.co.neroland.neroeconomy.network.NeroEconomyNetwork;
 import za.co.neroland.neroeconomy.network.ShopBuyPayload;
 
-public final class PlayerShopScreen extends AbstractContainerScreen<PlayerShopMenu> {
-    private final java.util.List<Button> ownerButtons = new java.util.ArrayList<>();
+/**
+ * The owned offline shop: one escrowed offer slot, a buyer region and a separately framed owner
+ * region, above the player inventory.
+ *
+ * <p>Layout (panel-relative, panel 176x214; the menu's slot coordinates below match the sockets
+ * painted into {@code textures/gui/player_shop.png}):</p>
+ * <pre>
+ *   0..16     header: title (8, 6), role badge right-aligned at 166
+ *   16..76    buyer well: caption (11, 19) + wallet right-aligned at 165
+ *             offer slot (12, 32), price (36, 32), stock (36, 44), Buy (36, 56, 64x18)
+ *   78..114   owner well: caption (11, 81), price steps at y 92 (36x18 each)
+ *   120       "Inventory" caption
+ *   132/150/168 inventory rows, 190 hotbar
+ * </pre>
+ */
+public final class PlayerShopScreen extends TexturedContainerScreen<PlayerShopMenu> {
+
+    private static final Identifier TEXTURE =
+            Identifier.fromNamespaceAndPath(NeroEconomyCommon.MOD_ID, "textures/gui/player_shop.png");
+    /** Shop accent: a warmer green than the bank's, still in the credits family. */
+    private static final int ACCENT = 0xFF60E88C;
+
+    private static final int PANEL_W = 176;
+    private static final int PANEL_H = 214;
+    /** Right edge used for right-aligned readouts (panel inner margin). */
+    private static final int RIGHT = 165;
+    private static final int BUY_X = 36;
+    private static final int BUY_Y = 56;
+    private static final int BUY_W = 64;
+    private static final int BUY_H = 18;
+    private static final int STEP_Y = 92;
+    private static final int STEP_W = 36;
+    private static final int STEP_H = 18;
+
+    private final List<Button> ownerButtons = new ArrayList<>();
     private Button buyButton;
+
     public PlayerShopScreen(PlayerShopMenu menu, Inventory inventory, Component title) {
-        super(menu, inventory, title, 176, 166);
-        inventoryLabelY = 72;
+        super(menu, inventory, title, TEXTURE, ACCENT, PANEL_W, PANEL_H);
+        this.titleLabelX = 8;
+        this.titleLabelY = 6;
+        this.inventoryLabelX = 8;
+        this.inventoryLabelY = 120;
     }
 
-    @Override protected void init() {
+    @Override
+    protected void init() {
         super.init();
-        // Data slots arrive after screen construction; show both control groups and let the server
-        // enforce ownership. The role label below makes the applicable group explicit.
-        ownerButtons.add(button(2, Component.translatable("gui.neroeconomy.shop.price_down_1"), 92, 46, 28));
-        ownerButtons.add(button(1, Component.translatable("gui.neroeconomy.shop.price_up_1"), 122, 46, 28));
-        ownerButtons.add(button(4, Component.translatable("gui.neroeconomy.shop.price_down_10"), 92, 64, 28));
-        ownerButtons.add(button(3, Component.translatable("gui.neroeconomy.shop.price_up_10"), 122, 64, 28));
-        // The single offer slot sits at (8, 34), so the buy control starts clear of it.
-        buyButton = addRenderableWidget(Button.builder(Component.translatable("gui.neroeconomy.shop.buy"),
-                ignored -> NeroEconomyNetwork.sendToServer(new ShopBuyPayload(menu.containerId, UUID.randomUUID(),
-                        Math.max(1L, menu.price()))))
-                .bounds(leftPos + 30, topPos + 42, 56, 18).build());
+        this.ownerButtons.clear();
+        // Data slots arrive after screen construction, so both control groups are built and the server
+        // stays authoritative; containerTick() enables the group that applies to this viewer.
+        this.ownerButtons.add(stepButton(4, "gui.neroeconomy.shop.price_down_10", 10));
+        this.ownerButtons.add(stepButton(2, "gui.neroeconomy.shop.price_down_1", 50));
+        this.ownerButtons.add(stepButton(1, "gui.neroeconomy.shop.price_up_1", 90));
+        this.ownerButtons.add(stepButton(3, "gui.neroeconomy.shop.price_up_10", 130));
+        this.buyButton = addRenderableWidget(Button.builder(Component.translatable("gui.neroeconomy.shop.buy"),
+                        ignored -> NeroEconomyNetwork.sendToServer(new ShopBuyPayload(this.menu.containerId,
+                                UUID.randomUUID(), Math.max(1L, this.menu.price()))))
+                .bounds(this.leftPos + BUY_X, this.topPos + BUY_Y, BUY_W, BUY_H).build());
     }
 
-    private Button button(int id, Component label, int x, int y, int width) {
-        return addRenderableWidget(Button.builder(label, button -> {
-            if (minecraft != null && minecraft.gameMode != null)
-                minecraft.gameMode.handleInventoryButtonClick(menu.containerId, id);
-        }).bounds(leftPos + x, topPos + y, width, 18).build());
+    private Button stepButton(int id, String key, int dx) {
+        return addRenderableWidget(Button.builder(Component.translatable(key), ignored -> {
+            if (this.minecraft != null && this.minecraft.gameMode != null) {
+                this.minecraft.gameMode.handleInventoryButtonClick(this.menu.containerId, id);
+            }
+        }).bounds(this.leftPos + dx, this.topPos + STEP_Y, STEP_W, STEP_H).build());
     }
 
-    @Override protected void containerTick() {
+    @Override
+    protected void containerTick() {
         super.containerTick();
-        boolean owner = menu.owner();
-        ownerButtons.forEach(button -> button.active = owner);
-        if (buyButton != null) buyButton.active = !owner;
+        boolean owner = this.menu.owner();
+        this.ownerButtons.forEach(button -> button.active = owner);
+        if (this.buyButton != null) {
+            this.buyButton.active = !owner;
+        }
     }
 
-    @Override public void extractContents(GuiGraphicsExtractor g, int mouseX, int mouseY, float partialTick) {
-        g.fill(leftPos - 1, topPos - 1, leftPos + imageWidth + 1, topPos + imageHeight + 1, 0xFF304553);
-        g.fill(leftPos, topPos, leftPos + imageWidth, topPos + imageHeight, 0xFFE7EFF3);
-        g.fill(leftPos, topPos, leftPos + imageWidth, topPos + 18, 0xFF173444);
-        g.text(font, Component.translatable("gui.neroeconomy.shop.price", menu.price()), leftPos + 92, topPos + 22,
-                0xFF173444, false);
-        g.text(font, Component.translatable("gui.neroeconomy.shop.stock", menu.stock()), leftPos + 92, topPos + 34,
-                0xFF536975, false);
-        g.text(font, Component.translatable(menu.owner() ? "gui.neroeconomy.shop.role.owner"
-                : "gui.neroeconomy.shop.role.buyer"), leftPos + 8, topPos + 20, 0xFF536975, false);
-        g.text(font, Component.translatable("gui.neroeconomy.balance", menu.balance()), leftPos + 8, topPos + 62,
-                0xFF173444, false);
-        super.extractContents(g, mouseX, mouseY, partialTick);
-    }
+    @Override
+    protected void extractForeground(GuiGraphicsExtractor g) {
+        boolean owner = this.menu.owner();
+        labelRight(g, Component.translatable(owner ? "gui.neroeconomy.shop.role.owner"
+                : "gui.neroeconomy.shop.role.buyer"), RIGHT + 1, 6, SUBTLE);
 
-    @Override protected void extractLabels(GuiGraphicsExtractor g, int mouseX, int mouseY) {
-        g.text(font, title, 8, 6, 0xFFFFFFFF, false);
-        g.text(font, playerInventoryTitle, 8, inventoryLabelY, 0xFF173444, false);
+        label(g, Component.translatable("gui.neroeconomy.shop.section.buyer"), 11, 19, SUBTLE);
+        labelRight(g, Component.translatable("gui.neroeconomy.wallet", this.menu.balance()), RIGHT, 19, CREDIT);
+        label(g, trim(Component.translatable("gui.neroeconomy.shop.price", this.menu.price()), RIGHT - 36), 36, 32,
+                TITLE);
+        label(g, Component.translatable("gui.neroeconomy.shop.stock", this.menu.stock()), 36, 44, SUBTLE);
+
+        label(g, Component.translatable("gui.neroeconomy.shop.section.owner"), 11, 81, SUBTLE);
     }
 }

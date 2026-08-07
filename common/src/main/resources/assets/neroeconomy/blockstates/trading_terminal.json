@@ -1,1 +1,19 @@
-{"variants":{"":{"model":"neroeconomy:block/trading_terminal"}}}
+{
+  "variants": {
+    "facing=east": {
+      "model": "neroeconomy:block/trading_terminal",
+      "y": 90
+    },
+    "facing=north": {
+      "model": "neroeconomy:block/trading_terminal"
+    },
+    "facing=south": {
+      "model": "neroeconomy:block/trading_terminal",
+      "y": 180
+    },
+    "facing=west": {
+      "model": "neroeconomy:block/trading_terminal",
+      "y": 270
+    }
+  }
+}

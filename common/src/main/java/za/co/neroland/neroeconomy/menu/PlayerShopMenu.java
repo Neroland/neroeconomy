@@ -46,10 +46,12 @@ public final class PlayerShopMenu extends AbstractContainerMenu {
                 ? new ShopData(blockEntity, serverPlayer, owner) : new SimpleContainerData(DATA_COUNT);
         checkContainerDataCount(data, DATA_COUNT);
         addDataSlots(data);
-        addSlot(new ShopSlot(shop, PlayerShopBlockEntity.OFFER_SLOT, 8, 34, owner));
+        // Slot coordinates mirror the sockets painted into textures/gui/player_shop.png: the offer slot
+        // sits inside the buyer well, the inventory rows below the taller control stack.
+        addSlot(new ShopSlot(shop, PlayerShopBlockEntity.OFFER_SLOT, 12, 32, owner));
         for (int row = 0; row < 3; row++) for (int col = 0; col < 9; col++)
-            addSlot(new Slot(inventory, col + row * 9 + 9, 8 + col * 18, 84 + row * 18));
-        for (int col = 0; col < 9; col++) addSlot(new Slot(inventory, col, 8 + col * 18, 142));
+            addSlot(new Slot(inventory, col + row * 9 + 9, 8 + col * 18, 132 + row * 18));
+        for (int col = 0; col < 9; col++) addSlot(new Slot(inventory, col, 8 + col * 18, 190));
     }
 
     public boolean owner() { return data.get(0) != 0; }

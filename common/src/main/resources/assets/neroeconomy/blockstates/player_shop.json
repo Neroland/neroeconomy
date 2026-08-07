@@ -1,1 +1,19 @@
-{"variants":{"":{"model":"neroeconomy:block/player_shop"}}}
+{
+  "variants": {
+    "facing=east": {
+      "model": "neroeconomy:block/player_shop",
+      "y": 90
+    },
+    "facing=north": {
+      "model": "neroeconomy:block/player_shop"
+    },
+    "facing=south": {
+      "model": "neroeconomy:block/player_shop",
+      "y": 180
+    },
+    "facing=west": {
+      "model": "neroeconomy:block/player_shop",
+      "y": 270
+    }
+  }
+}

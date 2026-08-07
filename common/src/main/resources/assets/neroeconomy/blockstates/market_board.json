@@ -1,1 +1,19 @@
-{"variants":{"":{"model":"neroeconomy:block/market_board"}}}
+{
+  "variants": {
+    "facing=east": {
+      "model": "neroeconomy:block/market_board",
+      "y": 90
+    },
+    "facing=north": {
+      "model": "neroeconomy:block/market_board"
+    },
+    "facing=south": {
+      "model": "neroeconomy:block/market_board",
+      "y": 180
+    },
+    "facing=west": {
+      "model": "neroeconomy:block/market_board",
+      "y": 270
+    }
+  }
+}

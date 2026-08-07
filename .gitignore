@@ -37,9 +37,11 @@ bin/
 .DS_Store
 
 ### Minecraft Modding ###
-# Nothing produced by a dev-client/server run is tracked. Gallery screenshots for the listing
-# automation are NOT taken from here: copy the shots you want into art/gallery/ (tracked) — see
-# .github/workflows/modrinth-gallery.yml.
+# Almost nothing produced by a dev-client/server run is tracked. The ONE exception is the capture
+# harness's screenshot folder under the NeoForge 26.2 client run — that is now the primary source
+# for the listing automation (see the whitelist at the bottom of this file, and
+# .github/workflows/modrinth-gallery.yml). art/gallery/ remains as manual overflow for hand-framed
+# shots that were not produced by a `/necgallery capture` pass.
 run/
 !**/src/**/run/
 **/src/generated/**/.cache/
@@ -58,3 +60,24 @@ node_modules/
 /forge/versions
 /neoforge/versions
 /fabric/versions
+
+# …but DO track the capture-harness gallery screenshots under the NeoForge 26.2 client run, so the
+# Sync-Modrinth-gallery workflow can pick them up. Re-include each parent dir before the files — git
+# will not descend into an excluded directory, so a lone `**` is not enough. This chain has to start
+# all the way up at `neoforge/versions` because that whole tree is excluded above, and it has to be
+# the LAST word in this file because the last matching pattern wins.
+# Recipe (git docs): at each level un-ignore the dir so git descends, then re-ignore that dir's
+# OTHER contents with `/*`, so ONLY the screenshots/neroeconomy/ leaf ends up tracked — every other
+# run artifact (logs, options, saves, caches, the build dir, the rest of client/) stays ignored.
+!/neoforge/versions/
+/neoforge/versions/*
+!/neoforge/versions/26.2/
+/neoforge/versions/26.2/*
+!/neoforge/versions/26.2/runs/
+/neoforge/versions/26.2/runs/*
+!/neoforge/versions/26.2/runs/client/
+/neoforge/versions/26.2/runs/client/*
+!/neoforge/versions/26.2/runs/client/screenshots/
+/neoforge/versions/26.2/runs/client/screenshots/*
+!/neoforge/versions/26.2/runs/client/screenshots/neroeconomy/
+!/neoforge/versions/26.2/runs/client/screenshots/neroeconomy/**

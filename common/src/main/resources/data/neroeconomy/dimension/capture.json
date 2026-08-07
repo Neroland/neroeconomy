@@ -1,0 +1,18 @@
+{
+  "__comment": "Dev-only deterministic backdrop for the /necgallery capture screenshot harness. A flat, featureless plain so the gallery is shot against an identical ground every run (no seed-dependent terrain or biome tint). Reuses the vanilla overworld dimension type; the harness pins time via gamerule + disables clouds. Surface (smooth_stone) tops out at y=63, so the harness builds/stands at y=64.",
+  "type": "minecraft:overworld",
+  "generator": {
+    "type": "minecraft:flat",
+    "settings": {
+      "biome": "minecraft:plains",
+      "features": false,
+      "lakes": false,
+      "layers": [
+        { "block": "minecraft:bedrock", "height": 1 },
+        { "block": "minecraft:stone", "height": 126 },
+        { "block": "minecraft:smooth_stone", "height": 1 }
+      ],
+      "structure_overrides": []
+    }
+  }
+}

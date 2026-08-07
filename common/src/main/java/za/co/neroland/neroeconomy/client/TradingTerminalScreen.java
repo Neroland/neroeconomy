@@ -5,30 +5,75 @@ import java.util.Locale;
 import java.util.UUID;
 
 import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
-import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
+import net.minecraft.resources.Identifier;
 import net.minecraft.world.entity.player.Inventory;
 
+import za.co.neroland.neroeconomy.NeroEconomyCommon;
 import za.co.neroland.neroeconomy.menu.TradingTerminalMenu;
 import za.co.neroland.neroeconomy.network.ClientMarketPage;
+import za.co.neroland.neroeconomy.network.ClientOpportunityPage;
+import za.co.neroland.neroeconomy.network.MarketBuyOfferPayload;
 import za.co.neroland.neroeconomy.network.MarketBuyPayload;
+import za.co.neroland.neroeconomy.network.MarketClaimPayload;
+import za.co.neroland.neroeconomy.network.MarketFillBuyOfferPayload;
 import za.co.neroland.neroeconomy.network.MarketPagePayload;
+import za.co.neroland.neroeconomy.network.MarketPostPayload;
 import za.co.neroland.neroeconomy.network.MarketQueryPayload;
 import za.co.neroland.neroeconomy.network.NeroEconomyNetwork;
-import za.co.neroland.neroeconomy.network.MarketPostPayload;
-import za.co.neroland.neroeconomy.network.MarketClaimPayload;
-import za.co.neroland.neroeconomy.network.MarketBuyOfferPayload;
-import za.co.neroland.neroeconomy.network.MarketFillBuyOfferPayload;
-import net.minecraft.resources.Identifier;
-import za.co.neroland.neroeconomy.network.ClientOpportunityPage;
 import za.co.neroland.neroeconomy.network.OpportunityIntentPayload;
 import za.co.neroland.neroeconomy.network.OpportunityPagePayload;
 
-/** Paged searchable market UI. Selection and all prices are server snapshots. */
-public final class TradingTerminalScreen extends AbstractContainerScreen<TradingTerminalMenu> {
+/**
+ * Paged searchable market UI, shared by the Trading Terminal and the Market Board. Selection and all
+ * prices are server snapshots; the board only adds the posting row.
+ *
+ * <p>Layout (panel-relative, panel 256x226, no menu slots):</p>
+ * <pre>
+ *   0..16     header: title (8, 6)
+ *   20..38    search field (8, 20, 180x18) | Search (192, 20, 56x18)
+ *   42..58    status well: balance (11, 46), listing/claim counts right-aligned at 245
+ *   62..156   listing frame: 8 fixed rows of 11px from y 66, text clipped to the frame
+ *   160..178  Previous (8) | Next (70) | Select (132), page readout right-aligned at 245
+ *   182..200  Buy (8) | Collect (70) | Jobs (132) | Act (194), all 54 wide
+ *   204..222  board only: quantity (8, 52) | price (68, 52) | Post (128, 58) | Want (194, 54)
+ * </pre>
+ */
+public final class TradingTerminalScreen extends TexturedContainerScreen<TradingTerminalMenu> {
+
+    private static final Identifier TERMINAL_TEXTURE =
+            Identifier.fromNamespaceAndPath(NeroEconomyCommon.MOD_ID, "textures/gui/trading_terminal.png");
+    private static final Identifier BOARD_TEXTURE =
+            Identifier.fromNamespaceAndPath(NeroEconomyCommon.MOD_ID, "textures/gui/market_board.png");
+    /** Terminal accent: exchange teal. Board accent: a lighter notice green. */
+    private static final int TERMINAL_ACCENT = 0xFF30D6BE;
+    private static final int BOARD_ACCENT = 0xFF96EC78;
+
+    private static final int PANEL_W = 256;
+    private static final int PANEL_H = 226;
+    private static final int LEFT = 8;
+    private static final int RIGHT = 245;
+    /** Listing frame (inclusive left/top, exclusive right/bottom) and its fixed row grid. */
+    private static final int LIST_X = 9;
+    private static final int LIST_Y = 64;
+    private static final int LIST_W = 238;
+    private static final int VISIBLE_ROWS = 8;
+    private static final int ROW_H = 11;
+    private static final int ROW_TEXT_X = 12;
+    /** Rows stop short of the scroll rail so a long item id can never reach it. */
+    private static final int RAIL_X = 240;
+    private static final int RAIL_W = 4;
+    private static final int ROW_TEXT_W = RAIL_X - 3 - ROW_TEXT_X;
+    private static final int NAV_Y = 160;
+    private static final int ACTION_Y = 182;
+    private static final int POST_Y = 204;
+    private static final int BUTTON_W = 54;
+    private static final int BUTTON_H = 18;
+
     private EditBox search;
     private EditBox quantity;
     private EditBox price;
@@ -39,118 +84,195 @@ public final class TradingTerminalScreen extends AbstractContainerScreen<Trading
     private OpportunityPagePayload opportunities = new OpportunityPagePayload(0, 0,
             OpportunityPagePayload.Tab.CONTRACTS, List.of());
     private boolean opportunityTab;
+
     public TradingTerminalScreen(TradingTerminalMenu menu, Inventory inventory, Component title) {
-        super(menu, inventory, title, 220, 166);
+        super(menu, inventory, title, TERMINAL_TEXTURE, TERMINAL_ACCENT, PANEL_W, PANEL_H);
+        this.titleLabelX = 8;
+        this.titleLabelY = 6;
     }
-    @Override protected void init() {
+
+    /** The board and the terminal share this screen, so the sheet is chosen from the synced flag. */
+    @Override
+    protected Identifier background() {
+        return this.menu.isBoard() ? BOARD_TEXTURE : TERMINAL_TEXTURE;
+    }
+
+    private int activeAccent() {
+        return this.menu.isBoard() ? BOARD_ACCENT : TERMINAL_ACCENT;
+    }
+
+    @Override
+    protected void init() {
         super.init();
-        search = new EditBox(font, leftPos + 8, topPos + 22, 120, 16,
+        this.search = new EditBox(this.font, this.leftPos + LEFT, this.topPos + 20, 180, BUTTON_H,
                 Component.translatable("gui.neroeconomy.market.search"));
-        search.setMaxLength(64); search.setHint(Component.translatable("gui.neroeconomy.market.search_hint"));
-        addRenderableWidget(search);
+        this.search.setMaxLength(64);
+        this.search.setHint(Component.translatable("gui.neroeconomy.market.search_hint"));
+        addRenderableWidget(this.search);
+        button(Component.translatable("gui.neroeconomy.market.search"), 192, 20, 56, () -> query(0));
+
         // Board-only controls are built unconditionally: data slot 4 is not synced yet when init()
         // runs, so anything gated on isBoard() here would never appear. containerTick() toggles them.
-        quantity = numericBox(8, 116, 38, "1", "gui.neroeconomy.market.quantity");
-        price = numericBox(50, 116, 66, "10", "gui.neroeconomy.market.price");
-        postButton = button(Component.translatable("gui.neroeconomy.market.post"), 120, 116, this::post);
-        wantButton = button(Component.translatable("gui.neroeconomy.market.want"), 120, 96, this::postBuyOffer);
-        button(Component.translatable("gui.neroeconomy.market.search"), 132, 22, () -> query(0));
-        button(Component.translatable("gui.neroeconomy.market.previous"), 8, 136, () -> query(Math.max(0, page.page() - 1)));
-        button(Component.translatable("gui.neroeconomy.market.next"), 66, 136, () -> query(page.page() + 1));
-        button(Component.translatable("gui.neroeconomy.market.select"), 124, 136,
-                () -> { int size = opportunityTab ? opportunities.lines().size() : page.lines().size();
-                    selected = size == 0 ? 0 : (selected + 1) % size; });
-        button(Component.translatable("gui.neroeconomy.market.buy"), 174, 136, this::buy);
-        button(Component.translatable("gui.neroeconomy.market.collect"), 174, 116,
-                () -> NeroEconomyNetwork.sendToServer(new MarketClaimPayload(menu.containerId)));
-        button(Component.translatable("gui.neroeconomy.opportunity.tab"), 174, 96, this::nextTab);
-        button(Component.translatable("gui.neroeconomy.opportunity.action"), 124, 96, this::opportunityAction);
-        applyBoardVisibility(menu.isBoard());
+        this.quantity = numericBox(LEFT, POST_Y, 52, "1", "gui.neroeconomy.market.quantity");
+        this.price = numericBox(68, POST_Y, 52, "10", "gui.neroeconomy.market.price");
+        this.postButton = button(Component.translatable("gui.neroeconomy.market.post"), 128, POST_Y, 58, this::post);
+        this.wantButton = button(Component.translatable("gui.neroeconomy.market.want"), 194, POST_Y, BUTTON_W,
+                this::postBuyOffer);
+
+        button(Component.translatable("gui.neroeconomy.market.previous"), LEFT, NAV_Y, BUTTON_W,
+                () -> query(Math.max(0, this.page.page() - 1)));
+        button(Component.translatable("gui.neroeconomy.market.next"), 70, NAV_Y, BUTTON_W,
+                () -> query(this.page.page() + 1));
+        button(Component.translatable("gui.neroeconomy.market.select"), 132, NAV_Y, BUTTON_W, this::selectNext);
+
+        button(Component.translatable("gui.neroeconomy.market.buy"), LEFT, ACTION_Y, BUTTON_W, this::buy);
+        button(Component.translatable("gui.neroeconomy.market.collect"), 70, ACTION_Y, BUTTON_W,
+                () -> NeroEconomyNetwork.sendToServer(new MarketClaimPayload(this.menu.containerId)));
+        button(Component.translatable("gui.neroeconomy.opportunity.tab"), 132, ACTION_Y, BUTTON_W, this::nextTab);
+        button(Component.translatable("gui.neroeconomy.opportunity.action"), 194, ACTION_Y, BUTTON_W,
+                this::opportunityAction);
+
+        applyBoardVisibility(this.menu.isBoard());
     }
+
     private EditBox numericBox(int x, int y, int width, String value, String hint) {
-        EditBox box = new EditBox(font, leftPos + x, topPos + y, width, 16, Component.translatable(hint));
-        box.setMaxLength(19); box.setValue(value);
-        addRenderableWidget(box); return box;
+        EditBox box = new EditBox(this.font, this.leftPos + x, this.topPos + y, width, BUTTON_H,
+                Component.translatable(hint));
+        box.setMaxLength(19);
+        box.setValue(value);
+        addRenderableWidget(box);
+        return box;
     }
-    private Button button(Component text, int x, int y, Runnable action) {
+
+    private Button button(Component text, int x, int y, int width, Runnable action) {
         return addRenderableWidget(Button.builder(text, ignored -> action.run())
-                .bounds(leftPos + x, topPos + y, 46, 18).build());
+                .bounds(this.leftPos + x, this.topPos + y, width, BUTTON_H).build());
     }
+
     private void applyBoardVisibility(boolean board) {
-        for (var widget : new net.minecraft.client.gui.components.AbstractWidget[] {
-                quantity, price, postButton, wantButton }) {
-            if (widget == null) continue;
-            if (!board && widget.isFocused()) widget.setFocused(false);
+        for (AbstractWidget widget : new AbstractWidget[] { this.quantity, this.price, this.postButton,
+                this.wantButton }) {
+            if (widget == null) {
+                continue;
+            }
+            if (!board && widget.isFocused()) {
+                widget.setFocused(false);
+            }
             widget.visible = board;
             widget.active = board;
         }
     }
+
+    private void selectNext() {
+        int size = lineCount();
+        this.selected = size == 0 ? 0 : (this.selected + 1) % size;
+    }
+
+    private int lineCount() {
+        return this.opportunityTab ? this.opportunities.lines().size() : this.page.lines().size();
+    }
+
+    /** The first row drawn, scrolled just far enough to keep the selection inside the fixed frame. */
+    private int firstVisible() {
+        int size = lineCount();
+        if (size <= VISIBLE_ROWS) {
+            return 0;
+        }
+        int first = Math.min(Math.max(0, this.selected - VISIBLE_ROWS + 1), size - VISIBLE_ROWS);
+        return Math.min(first, this.selected);
+    }
+
     private void query(int targetPage) {
-        opportunityTab = false;
-        NeroEconomyNetwork.sendToServer(new MarketQueryPayload(menu.containerId, UUID.randomUUID(),
-                search == null ? "" : search.getValue(), targetPage));
+        this.opportunityTab = false;
+        NeroEconomyNetwork.sendToServer(new MarketQueryPayload(this.menu.containerId, UUID.randomUUID(),
+                this.search == null ? "" : this.search.getValue(), targetPage));
     }
+
     private void buy() {
-        if (page.lines().isEmpty()) return;
-        MarketPagePayload.Line line = page.lines().get(Math.min(selected, page.lines().size() - 1));
-        if (line.buyOffer()) NeroEconomyNetwork.sendToServer(new MarketFillBuyOfferPayload(menu.containerId,
-                UUID.randomUUID(), line.listingId(), 1));
-        else NeroEconomyNetwork.sendToServer(new MarketBuyPayload(menu.containerId, UUID.randomUUID(),
+        if (this.page.lines().isEmpty()) {
+            return;
+        }
+        MarketPagePayload.Line line = this.page.lines().get(Math.min(this.selected, this.page.lines().size() - 1));
+        if (line.buyOffer()) {
+            NeroEconomyNetwork.sendToServer(new MarketFillBuyOfferPayload(this.menu.containerId, UUID.randomUUID(),
+                    line.listingId(), 1));
+        } else {
+            NeroEconomyNetwork.sendToServer(new MarketBuyPayload(this.menu.containerId, UUID.randomUUID(),
                     line.listingId(), 1, line.unitPrice()));
+        }
     }
+
     private void post() {
-        if (quantity == null || price == null) return;
+        if (this.quantity == null || this.price == null) {
+            return;
+        }
         try {
-            int count = Integer.parseInt(quantity.getValue());
-            long unitPrice = Long.parseLong(price.getValue());
-            NeroEconomyNetwork.sendToServer(new MarketPostPayload(menu.containerId, UUID.randomUUID(), count, unitPrice));
-        } catch (NumberFormatException ignored) { }
+            int count = Integer.parseInt(this.quantity.getValue());
+            long unitPrice = Long.parseLong(this.price.getValue());
+            NeroEconomyNetwork.sendToServer(new MarketPostPayload(this.menu.containerId, UUID.randomUUID(), count,
+                    unitPrice));
+        } catch (NumberFormatException ignored) {
+            // Malformed input simply sends nothing; the server stays authoritative.
+        }
     }
+
     private void postBuyOffer() {
-        if (quantity == null || price == null) return;
+        if (this.quantity == null || this.price == null) {
+            return;
+        }
         try {
-            Identifier item = Identifier.parse(search.getValue());
-            int count = Integer.parseInt(quantity.getValue());
-            long unitPrice = Long.parseLong(price.getValue());
-            NeroEconomyNetwork.sendToServer(new MarketBuyOfferPayload(menu.containerId, UUID.randomUUID(), item,
+            Identifier item = Identifier.parse(this.search.getValue());
+            int count = Integer.parseInt(this.quantity.getValue());
+            long unitPrice = Long.parseLong(this.price.getValue());
+            NeroEconomyNetwork.sendToServer(new MarketBuyOfferPayload(this.menu.containerId, UUID.randomUUID(), item,
                     count, unitPrice));
-        } catch (IllegalArgumentException ignored) { }
+        } catch (IllegalArgumentException ignored) {
+            // Includes NumberFormatException and a malformed item id.
+        }
     }
+
     private void nextTab() {
-        opportunityTab = true;
+        this.opportunityTab = true;
         var values = OpportunityPagePayload.Tab.values();
-        var tab = values[(opportunities.tab().ordinal() + 1) % values.length];
-        NeroEconomyNetwork.sendToServer(new OpportunityIntentPayload(menu.containerId, UUID.randomUUID(), tab,
+        var tab = values[(this.opportunities.tab().ordinal() + 1) % values.length];
+        NeroEconomyNetwork.sendToServer(new OpportunityIntentPayload(this.menu.containerId, UUID.randomUUID(), tab,
                 OpportunityIntentPayload.Action.QUERY, "", 0L));
     }
+
     private void opportunityAction() {
-        if (!opportunityTab || opportunities.lines().isEmpty()) return;
-        var line = opportunities.lines().get(Math.min(selected, opportunities.lines().size() - 1));
-        var action = opportunities.tab() == OpportunityPagePayload.Tab.AUCTIONS
+        if (!this.opportunityTab || this.opportunities.lines().isEmpty()) {
+            return;
+        }
+        var line = this.opportunities.lines().get(Math.min(this.selected, this.opportunities.lines().size() - 1));
+        var action = this.opportunities.tab() == OpportunityPagePayload.Tab.AUCTIONS
                 ? OpportunityIntentPayload.Action.BID
                 : "CLAIMED".equals(line.state()) ? OpportunityIntentPayload.Action.FULFILL
                 : OpportunityIntentPayload.Action.CLAIM;
-        NeroEconomyNetwork.sendToServer(new OpportunityIntentPayload(menu.containerId, UUID.randomUUID(),
-                opportunities.tab(), action, line.id().toString(), Math.max(1L, line.amount() + 1L)));
+        NeroEconomyNetwork.sendToServer(new OpportunityIntentPayload(this.menu.containerId, UUID.randomUUID(),
+                this.opportunities.tab(), action, line.id().toString(), Math.max(1L, line.amount() + 1L)));
     }
-    @Override protected void containerTick() {
+
+    @Override
+    protected void containerTick() {
         super.containerTick();
-        applyBoardVisibility(menu.isBoard());
-        MarketPagePayload update = ClientMarketPage.poll(menu.containerId);
-        if (update != null && update.revision() > page.revision()) {
-            boolean pageChanged = update.page() != page.page();
-            page = update;
-            selected = pageChanged ? 0 : Math.min(selected, Math.max(0, page.lines().size() - 1));
+        applyBoardVisibility(this.menu.isBoard());
+        MarketPagePayload update = ClientMarketPage.poll(this.menu.containerId);
+        if (update != null && update.revision() > this.page.revision()) {
+            boolean pageChanged = update.page() != this.page.page();
+            this.page = update;
+            this.selected = pageChanged ? 0 : Math.min(this.selected, Math.max(0, this.page.lines().size() - 1));
         }
-        OpportunityPagePayload opportunityUpdate = ClientOpportunityPage.poll(menu.containerId);
-        if (opportunityUpdate != null && opportunityUpdate.revision() > opportunities.revision()) {
+        OpportunityPagePayload opportunityUpdate = ClientOpportunityPage.poll(this.menu.containerId);
+        if (opportunityUpdate != null && opportunityUpdate.revision() > this.opportunities.revision()) {
             // The server re-pushes the open tab once a second to keep countdowns live, so neither the
             // active tab nor the selection may be reset by a refresh of the same tab.
-            boolean tabChanged = opportunityUpdate.tab() != opportunities.tab();
-            opportunities = opportunityUpdate;
-            selected = tabChanged ? 0 : Math.min(selected, Math.max(0, opportunities.lines().size() - 1));
+            boolean tabChanged = opportunityUpdate.tab() != this.opportunities.tab();
+            this.opportunities = opportunityUpdate;
+            this.selected = tabChanged ? 0
+                    : Math.min(this.selected, Math.max(0, this.opportunities.lines().size() - 1));
         }
     }
+
     /** Remaining time until an auction closes or a job expires, rendered from the server timestamp. */
     private static String remaining(long endsAt) {
         long seconds = Math.max(0L, endsAt - System.currentTimeMillis()) / 1000L;
@@ -158,26 +280,64 @@ public final class TradingTerminalScreen extends AbstractContainerScreen<Trading
                 ? String.format(Locale.ROOT, "%dh%02dm", seconds / 3600L, seconds % 3600L / 60L)
                 : String.format(Locale.ROOT, "%02d:%02d", seconds / 60L, seconds % 60L);
     }
-    @Override public void extractContents(GuiGraphicsExtractor g, int mouseX, int mouseY, float partialTick) {
-        g.fill(leftPos - 1, topPos - 1, leftPos + imageWidth + 1, topPos + imageHeight + 1, 0xFF203849);
-        g.fill(leftPos, topPos, leftPos + imageWidth, topPos + imageHeight, 0xFF0D1620);
-        g.text(font, Component.translatable("gui.neroeconomy.balance", menu.balance()), leftPos + 8, topPos + 44,
-                0xFF63D7FF, false);
-        if (opportunityTab) for (int index = 0; index < opportunities.lines().size(); index++) {
-            var line = opportunities.lines().get(index); int color = index == selected ? 0xFFFFD166 : 0xFFD6ECFF;
+
+    @Override
+    protected void extractForeground(GuiGraphicsExtractor g) {
+        int tint = activeAccent();
+        label(g, Component.translatable("gui.neroeconomy.wallet", this.menu.balance()), 11, 46, CREDIT);
+        labelRight(g, Component.translatable("gui.neroeconomy.market.counts",
+                this.opportunityTab ? lineCount() : this.page.total(), this.menu.claimCount()), RIGHT, 46, SUBTLE);
+
+        int size = lineCount();
+        int first = firstVisible();
+        int rows = Math.min(VISIBLE_ROWS, Math.max(0, size - first));
+        for (int row = 0; row < rows; row++) {
+            int index = first + row;
+            int rowY = LIST_Y + 1 + row * ROW_H;
+            boolean chosen = index == this.selected;
+            if (chosen) {
+                band(g, LIST_X, rowY, LIST_W, ROW_H - 1, (tint & 0x00FFFFFF) | 0x40000000);
+                band(g, LIST_X, rowY, 2, ROW_H - 1, tint);
+            }
+            label(g, trim(lineText(index), ROW_TEXT_W), ROW_TEXT_X, rowY + 2, chosen ? SELECTED : TITLE);
+        }
+        if (size == 0) {
+            label(g, Component.translatable("gui.neroeconomy.market.empty"), ROW_TEXT_X, LIST_Y + 6, SUBTLE);
+        } else if (size > VISIBLE_ROWS) {
+            // The frame shows a fixed eight rows, so a rail marks where the window sits in the results.
+            int trackY = LIST_Y + 1;
+            int trackH = VISIBLE_ROWS * ROW_H;
+            band(g, RAIL_X, trackY, RAIL_W, trackH, TROUGH);
+            int thumbH = Math.max(6, trackH * VISIBLE_ROWS / size);
+            int thumbY = trackY + (trackH - thumbH) * first / Math.max(1, size - VISIBLE_ROWS);
+            band(g, RAIL_X, thumbY, RAIL_W, thumbH, tint);
+        }
+
+        labelRight(g, Component.translatable("gui.neroeconomy.market.page", this.page.page() + 1), RIGHT,
+                NAV_Y + 5, SUBTLE);
+        if (!this.menu.isBoard()) {
+            label(g, Component.translatable("gui.neroeconomy.market.board_only"), 11, POST_Y + 5, SUBTLE);
+        }
+    }
+
+    private Component lineText(int index) {
+        if (this.opportunityTab) {
+            var line = this.opportunities.lines().get(index);
             MutableComponent text = Component.translatable("gui.neroeconomy.opportunity.line", line.target(),
                     line.amount(), line.state());
-            if (line.endsAt() > 0L) text = text.append(Component.literal("  " + remaining(line.endsAt())));
-            g.text(font, text, leftPos + 8, topPos + 60 + index * 10, color, false);
-        } else for (int index = 0; index < page.lines().size(); index++) {
-            var line = page.lines().get(index); int color = index == selected ? 0xFFFFD166 : 0xFFD6ECFF;
-            g.text(font, Component.translatable(line.buyOffer() ? "gui.neroeconomy.market.buy_line"
-                    : "gui.neroeconomy.market.line", line.itemId().toString(), line.stock(), line.unitPrice()),
-                    leftPos + 8, topPos + 60 + index * 10, color, false);
+            if (line.endsAt() > 0L) {
+                text = text.append(Component.literal("  " + remaining(line.endsAt())));
+            }
+            return text;
         }
-        super.extractContents(g, mouseX, mouseY, partialTick);
+        var line = this.page.lines().get(index);
+        return Component.translatable(line.buyOffer() ? "gui.neroeconomy.market.buy_line"
+                : "gui.neroeconomy.market.line", line.itemId().toString(), line.stock(), line.unitPrice());
     }
-    @Override protected void extractLabels(GuiGraphicsExtractor g, int mouseX, int mouseY) {
-        g.text(font, title, 8, 6, 0xFFD6ECFF, false);
+
+    @Override
+    protected void extractLabels(GuiGraphicsExtractor g, int mouseX, int mouseY) {
+        // No player inventory on this menu, so only the title is drawn.
+        g.text(this.font, this.title, this.titleLabelX, this.titleLabelY, TITLE, false);
     }
 }

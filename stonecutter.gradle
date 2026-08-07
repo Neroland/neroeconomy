@@ -241,7 +241,7 @@ tasks.register('genAssets') {
         if (python == null) {
             throw new GradleException("genAssets: no Python found; set -PpythonCmd=<path>. pyenv root: ${pyenvRoot}")
         }
-        ['tools/gen_textures.py'].each { script ->
+        ['tools/gen_textures.py', 'tools/gen_gui.py'].each { script ->
             def proc = wrap(python + [script]).execute(null, repoRoot)
             def out = new StringBuilder(); def err = new StringBuilder()
             proc.consumeProcessOutput(out, err); proc.waitFor()
@@ -249,6 +249,61 @@ tasks.register('genAssets') {
             if (proc.exitValue() != 0) {
                 throw new GradleException("${script} failed (exit ${proc.exitValue()}):\n${err}")
             }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Cap the captured gallery screenshots to <=1920px wide and <4 MiB each, IN PLACE, so they're
+// gallery-ready (the CurseForge 1920x1080 target + under the 4 MB upload limit) and light in git.
+// The capture harness writes at the game window's native resolution, so on a big display the PNGs
+// come out 2.5k+ wide and 5-8 MB. Run this after a `/necgallery capture` pass, before committing:
+//   ./gradlew compressScreenshots
+//   ./gradlew compressScreenshots -PscreenshotArgs="--max-mb 3 --max-width 1600"
+// Needs Pillow (pip install Pillow). Python auto-detected (python/py/python3 + pyenv); override
+// -PpythonCmd=. Only ever shrinks — images already within the caps are left as-is.
+// ---------------------------------------------------------------------------
+tasks.register('compressScreenshots') {
+    group = 'neroeconomy'
+    description = 'Cap captured gallery screenshots to <=1920px / <4MB in place (tools/compress_screenshots.py).'
+    def repoRoot = rootProject.projectDir
+    def pythonOverride = providers.gradleProperty('pythonCmd').getOrNull()
+    def isWindows = System.getProperty('os.name').toLowerCase().contains('win')
+    def pyenvRoot = System.getenv('PYENV_ROOT') ?: System.getenv('PYENV')
+    if (!pyenvRoot && System.getenv('USERPROFILE')) {
+        pyenvRoot = System.getenv('USERPROFILE') + '\\.pyenv\\pyenv-win'
+    }
+    if (!pyenvRoot && System.getenv('HOME')) {
+        pyenvRoot = System.getenv('HOME') + '/.pyenv'
+    }
+    def extra = (providers.gradleProperty('screenshotArgs').getOrElse('')).split(' ').findAll { it } as List
+    doLast {
+        def wrap = { c -> isWindows ? (['cmd', '/c'] + c) : c }
+        def candidates = []
+        if (pythonOverride) candidates << [pythonOverride]
+        candidates += [['python'], ['py'], ['python3']]
+        if (pyenvRoot) {
+            def r = pyenvRoot.replaceAll(/[\\\/]+$/, '')
+            candidates << [r + (isWindows ? '\\shims\\python.bat' : '/shims/python')]
+            candidates << [r + (isWindows ? '\\bin\\python.exe' : '/bin/python')]
+        }
+        def python = null
+        for (c in candidates) {
+            try {
+                def probe = wrap(c + ['--version']).execute(null, repoRoot)
+                probe.consumeProcessOutput(new StringBuilder(), new StringBuilder()); probe.waitFor()
+                if (probe.exitValue() == 0) { python = c; break }
+            } catch (ignored) {}
+        }
+        if (python == null) {
+            throw new GradleException("compressScreenshots: no Python found; set -PpythonCmd=<path>. pyenv root: ${pyenvRoot}")
+        }
+        def proc = wrap(python + ['tools/compress_screenshots.py'] + extra).execute(null, repoRoot)
+        def out = new StringBuilder(); def err = new StringBuilder()
+        proc.consumeProcessOutput(out, err); proc.waitFor()
+        if (out.length() > 0) println out.toString().trim()
+        if (proc.exitValue() != 0) {
+            throw new GradleException("compress_screenshots.py failed (exit ${proc.exitValue()}):\n${err}")
         }
     }
 }

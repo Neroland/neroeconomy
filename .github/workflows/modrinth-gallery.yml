@@ -5,16 +5,18 @@ name: Sync Modrinth gallery
 # upload). To keep the gallery an exact mirror of the repo folder, this wipes the existing gallery
 # and re-uploads every PNG in a fixed order, featuring the first as the card.
 #
-# Source of truth: art/gallery/*.png — TRACKED files, committed by hand from the in-game capture.
-# (The old source pointed inside a run directory, which .gitignore excludes, so CI never saw a
-# single file.) The folder starts out holding only .gitkeep; with no PNGs the job exits cleanly
-# with a notice instead of failing, so the workflow is quiet until real screenshots land.
+# Source of truth: the capture harness's output folder,
+# neoforge/versions/26.2/runs/client/screenshots/neroeconomy/*.png — TRACKED files (the run tree is
+# ignored except for this one leaf; see the whitelist at the bottom of .gitignore). Produce them with
+# `/neroeconomy gallery` + `/necgallery capture`, shrink them with `./gradlew compressScreenshots`,
+# then commit. The folder starts out empty; with no PNGs the job exits cleanly with a notice instead
+# of failing, so the workflow is quiet until real screenshots land.
 # Requires the same secrets as the description sync: MODRINTH_PROJECT_ID + MODRINTH_API_TOKEN.
 on:
   push:
     branches: [main]
     paths:
-      - art/gallery/**
+      - neoforge/versions/26.2/runs/client/screenshots/neroeconomy/**
       - .github/workflows/modrinth-gallery.yml
   workflow_dispatch:
 
@@ -29,9 +31,10 @@ jobs:
       MODRINTH_PROJECT_ID: ${{ secrets.MODRINTH_PROJECT_ID }}
       MODRINTH_API_TOKEN: ${{ secrets.MODRINTH_API_TOKEN }}
       UA: "Neroland/neroeconomy-ci (dario@neroland.co.za)"
-      DIR: art/gallery
-      # Gallery order; the first present file becomes the featured card. Any PNG not listed here is
-      # appended afterwards in alphabetical order, so new shots still sync without editing this.
+      DIR: neoforge/versions/26.2/runs/client/screenshots/neroeconomy
+      # Gallery order; the first present file becomes the featured card. These are exactly the four
+      # shot names GalleryCaptureHarness.buildShots emits — keep the two in step. Any PNG not listed
+      # here is appended afterwards in alphabetical order, so new shots still sync without editing this.
       ORDER: "bank_terminal player_shop trading_terminal market_board"
     steps:
       - name: Checkout repository

@@ -1,10 +1,13 @@
 package za.co.neroland.neroeconomy.fabric;
 
 import net.fabricmc.api.ClientModInitializer;
+import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
+import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.minecraft.client.gui.screens.MenuScreens;
 
 import za.co.neroland.neroeconomy.NeroEconomyCommon;
 import za.co.neroland.neroeconomy.client.BankTerminalScreen;
+import za.co.neroland.neroeconomy.client.GalleryCaptureHarness;
 import za.co.neroland.neroeconomy.client.PlayerShopScreen;
 import za.co.neroland.neroeconomy.registry.ModMenuTypes;
 import za.co.neroland.neroeconomy.platform.Services;
@@ -20,5 +23,11 @@ public final class NeroEconomyFabricClient implements ClientModInitializer {
         MenuScreens.register(ModMenuTypes.BANK_TERMINAL.get(), BankTerminalScreen::new);
         MenuScreens.register(ModMenuTypes.PLAYER_SHOP.get(), PlayerShopScreen::new);
         MenuScreens.register(ModMenuTypes.TRADING_TERMINAL.get(), TradingTerminalScreen::new);
+        // Screenshot harness state machine — counterpart to NeoForge's ClientTickEvent.Post.
+        ClientTickEvents.END_CLIENT_TICK.register(mc -> GalleryCaptureHarness.tick());
+        // Client-side /necgallery capture command tree (drives the local camera; separate dispatcher
+        // from the server-side /neroeconomy gallery builder — a shared root would shadow it).
+        ClientCommandRegistrationCallback.EVENT.register((dispatcher, registryAccess) ->
+                GalleryCaptureHarness.registerClientCommands(dispatcher));
     }
 }

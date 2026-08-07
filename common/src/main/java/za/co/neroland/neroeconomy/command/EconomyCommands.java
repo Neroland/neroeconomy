@@ -20,19 +20,35 @@ import com.mojang.brigadier.context.CommandContext;
 
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.storage.LevelResource;
+import net.minecraft.world.phys.AABB;
 
 import za.co.neroland.nerolandcore.data.PlayerDataErasure;
 import za.co.neroland.nerolandcore.economy.CurrencyApi;
 import za.co.neroland.neroeconomy.NeroEconomyCommon;
+import za.co.neroland.neroeconomy.block.PlayerShopBlockEntity;
 import za.co.neroland.neroeconomy.config.EconomyConfig;
 import za.co.neroland.neroeconomy.data.LedgerExportFiles;
 import za.co.neroland.neroeconomy.economy.EconomySavedData;
 import za.co.neroland.neroeconomy.economy.PlayerLedgerExport;
 import za.co.neroland.neroeconomy.economy.TransactionType;
+import za.co.neroland.neroeconomy.market.ListingSource;
+import za.co.neroland.neroeconomy.market.MarketSavedData;
+import za.co.neroland.neroeconomy.registry.ModBlocks;
 import za.co.neroland.neroeconomy.telemetry.NeroEconomyTelemetry;
 import za.co.neroland.neroeconomy.obligation.JobType;
 import za.co.neroland.neroeconomy.obligation.ObligationSavedData;
@@ -44,6 +60,9 @@ public final class EconomyCommands {
     public static void register(CommandDispatcher<CommandSourceStack> dispatcher) {
         dispatcher.register(root("eco"));
         dispatcher.register(root("economy"));
+        // Third alias. The screenshot harness drives `neroeconomy gallery` / `neroeconomy gallery clear`
+        // by name, and its own client root is deliberately `necgallery` so it cannot shadow this tree.
+        dispatcher.register(root("neroeconomy"));
     }
 
     private static LiteralArgumentBuilder<CommandSourceStack> root(String name) {
@@ -74,7 +93,8 @@ public final class EconomyCommands {
                 .then(jobTree("contract", JobType.CONTRACT))
                 .then(deliveryTree())
                 .then(bountyTree())
-                .then(auctionTree());
+                .then(auctionTree())
+                .then(galleryTree());
     }
 
     private static LiteralArgumentBuilder<CommandSourceStack> adminMutation(String name, TransactionType type) {
@@ -416,5 +436,274 @@ public final class EconomyCommands {
             return Files.isRegularFile(server.getWorldPath(LevelResource.PLAYER_DATA_DIR)
                     .resolve(player + ".dat"));
         } catch (RuntimeException ignored) { return false; }
+    }
+
+    // ================================================================================================
+    // Gallery — a creative-only showcase scene for the listing screenshots.
+    //
+    // `/neroeconomy gallery` builds four demo clusters around the player, each on its own compass
+    // bearing GALLERY_RADIUS blocks out with its own backdrop wall on the far side, so a camera near
+    // the centre can shoot each one outward against a clean surface with nothing else in frame.
+    // `/neroeconomy gallery clear` wipes the footprint so a rebuild cannot stack duplicates.
+    //
+    // COORDINATE CONTRACT with client/GalleryCaptureHarness (origin O = the player's block position,
+    // oy = the pad level; display blocks sit one block above it). Tune the two files together:
+    //
+    //   shot              bearing  cluster centre        backdrop wall   pad
+    //   bank_terminal     NORTH    (ox,    oy+1, oz-24)  z = oz-26       smooth quartz, 7x5
+    //   player_shop       EAST     (ox+24, oy+1, oz)     x = ox+26       polished andesite, 5x9
+    //   trading_terminal  SOUTH    (ox,    oy+2, oz+24)  z = oz+26       smooth stone 7x5 + deepslate dais
+    //   market_board      WEST     (ox-24, oy+1, oz)     x = ox-26       polished andesite, 5x7
+    //
+    // The harness teleports to (0.5, 64, 0.5) in the flat `neroeconomy:capture` dimension before
+    // building, so in a capture run O = (0, 64, 0) and every coordinate above is absolute.
+    // ================================================================================================
+
+    /** Distance from the gallery origin to each cluster centre. Mirrors {@code GalleryCaptureHarness.CLUSTER_RADIUS}. */
+    private static final int GALLERY_RADIUS = 24;
+    /** Blocks of slack beyond the outermost backdrop wall that {@code gallery clear} sweeps. */
+    private static final int GALLERY_MARGIN = 8;
+    /** Height above the pad level that {@code gallery clear} sweeps. */
+    private static final int GALLERY_TOP = 12;
+    /** Nothing here is ever a real trade, so the demo rows carry the ordinary listing lifetime. */
+    private static long galleryExpiry() {
+        return System.currentTimeMillis() + EconomyConfig.DEFAULT_LISTING_DURATION_HOURS.get() * 3_600_000L;
+    }
+
+    private static LiteralArgumentBuilder<CommandSourceStack> galleryTree() {
+        return Commands.literal("gallery")
+                .requires(source -> source.getPlayer() != null)
+                .executes(context -> buildGallery(context.getSource()))
+                .then(Commands.literal("clear").executes(context -> clearGallery(context.getSource())));
+    }
+
+    /**
+     * Build the four demo clusters around the player. Creative-only: it places blocks outright, mints
+     * the demo stock the shops and market rows escrow, and funds the buy offers through the same
+     * audited deposit the {@code admin give} subcommand uses, so nothing here can create value that the
+     * ledger has not recorded.
+     */
+    private static int buildGallery(CommandSourceStack source) {
+        ServerPlayer player = source.getPlayer();
+        if (player == null) {
+            source.sendFailure(Component.literal("Run this as a player."));
+            return 0;
+        }
+        if (!player.getAbilities().instabuild) {
+            source.sendFailure(Component.literal("The NeroEconomy gallery is creative-only."));
+            return 0;
+        }
+        ServerLevel level = player.level();
+        BlockPos origin = player.blockPosition();
+        int ox = origin.getX();
+        int oy = origin.getY(); // pad level; display blocks sit at oy + 1
+        int oz = origin.getZ();
+        int r = GALLERY_RADIUS;
+
+        BlockState quartz = Blocks.SMOOTH_QUARTZ.defaultBlockState();
+        BlockState quartzPillar = Blocks.QUARTZ_PILLAR.defaultBlockState();
+        BlockState quartzCap = Blocks.CHISELED_QUARTZ_BLOCK.defaultBlockState();
+        BlockState stone = Blocks.SMOOTH_STONE.defaultBlockState();
+        BlockState andesite = Blocks.POLISHED_ANDESITE.defaultBlockState();
+        BlockState deepslate = Blocks.POLISHED_DEEPSLATE.defaultBlockState();
+        BlockState deepslateTrim = Blocks.CHISELED_DEEPSLATE.defaultBlockState();
+
+        // ---- NORTH: bank kiosk -----------------------------------------------------------------
+        // A quartz pad with a deepslate back wall and two capped pillars framing the Bank Terminal.
+        int bz = oz - r;
+        pad(level, ox - 3, bz - 2, ox + 3, bz + 2, oy, quartz);
+        fill(level, ox - 3, oy + 1, bz - 2, ox + 3, oy + 4, bz - 2, deepslate);
+        fill(level, ox - 2, oy + 1, bz, ox - 2, oy + 2, bz, quartzPillar);
+        fill(level, ox + 2, oy + 1, bz, ox + 2, oy + 2, bz, quartzPillar);
+        level.setBlockAndUpdate(new BlockPos(ox - 2, oy + 3, bz), quartzCap);
+        level.setBlockAndUpdate(new BlockPos(ox + 2, oy + 3, bz), quartzCap);
+        level.setBlockAndUpdate(new BlockPos(ox, oy + 1, bz),
+                ModBlocks.BANK_TERMINAL.get().defaultBlockState());
+
+        // ---- EAST: player shop row -------------------------------------------------------------
+        // Three shops in a north-south line, ALL primed (owned, priced, stocked) so the shot shows a
+        // live storefront rather than three empty blocks.
+        int px = ox + r;
+        pad(level, px - 2, oz - 4, px + 2, oz + 4, oy, andesite);
+        fill(level, px + 2, oy + 1, oz - 4, px + 2, oy + 4, oz + 4, deepslate);
+        primeShop(level, player, new BlockPos(px, oy + 1, oz - 2), new ItemStack(Items.DIAMOND, 12), 180L);
+        primeShop(level, player, new BlockPos(px, oy + 1, oz), new ItemStack(Items.GOLD_INGOT, 32), 24L);
+        primeShop(level, player, new BlockPos(px, oy + 1, oz + 2), new ItemStack(Items.IRON_INGOT, 48), 6L);
+        level.setBlockAndUpdate(new BlockPos(px, oy + 1, oz - 4), deepslateTrim);
+        level.setBlockAndUpdate(new BlockPos(px, oy + 1, oz + 4), deepslateTrim);
+
+        // ---- SOUTH: trading terminal dais ------------------------------------------------------
+        // A one-block deepslate dais lifts the Trading Terminal + Bank Terminal pair to oy+2.
+        int tz = oz + r;
+        pad(level, ox - 3, tz - 2, ox + 3, tz + 2, oy, stone);
+        fill(level, ox - 2, oy + 1, tz - 1, ox + 2, oy + 1, tz + 1, deepslate);
+        fill(level, ox - 3, oy + 1, tz + 2, ox + 3, oy + 5, tz + 2, deepslate);
+        level.setBlockAndUpdate(new BlockPos(ox - 1, oy + 2, tz),
+                ModBlocks.TRADING_TERMINAL.get().defaultBlockState());
+        level.setBlockAndUpdate(new BlockPos(ox + 1, oy + 2, tz),
+                ModBlocks.BANK_TERMINAL.get().defaultBlockState());
+        level.setBlockAndUpdate(new BlockPos(ox, oy + 2, tz), deepslateTrim);
+
+        // ---- WEST: market board wall -----------------------------------------------------------
+        int mx = ox - r;
+        pad(level, mx - 2, oz - 3, mx + 2, oz + 3, oy, andesite);
+        fill(level, mx - 2, oy + 1, oz - 3, mx - 2, oy + 5, oz + 3, deepslate);
+        BlockPos boardPos = new BlockPos(mx, oy + 1, oz - 1);
+        level.setBlockAndUpdate(boardPos, ModBlocks.MARKET_BOARD.get().defaultBlockState());
+        level.setBlockAndUpdate(new BlockPos(mx, oy + 1, oz + 1),
+                ModBlocks.MARKET_BOARD.get().defaultBlockState());
+        level.setBlockAndUpdate(new BlockPos(mx, oy + 1, oz), deepslateTrim);
+        seedMarket(level, player, boardPos);
+
+        source.sendSuccess(() -> Component.literal("Built the NeroEconomy gallery: a bank kiosk (north), "
+                + "a row of three live player shops (east), a trading-terminal dais (south) and a "
+                + "market-board wall seeded with sell listings and standing buy offers (west)."), false);
+        return Command.SINGLE_SUCCESS;
+    }
+
+    /**
+     * Wipe the gallery built at the player's feet so a rebuild (or the screenshot harness) cannot stack
+     * duplicates. Clears the whole footprint to air from the pad layer ({@code origin.y}) up, leaving
+     * the natural ground at {@code origin.y - 1} intact, and removes every non-player entity in the box.
+     *
+     * <p>Player shops are cancelled through the block entity's own teardown before their block goes, so
+     * a rerun cannot leave the market store full of listings whose shop no longer exists; the escrowed
+     * stock becomes an owner claim exactly as it would if the shop had been mined. The seeded
+     * market-board rows are deliberately left to run out their ordinary expiry — the gallery does not
+     * invent a privileged deletion path into the market store — and {@link MarketSavedData#expire} is
+     * run here so anything already lapsed is swept in the same pass.
+     */
+    private static int clearGallery(CommandSourceStack source) {
+        ServerPlayer player = source.getPlayer();
+        if (player == null) {
+            source.sendFailure(Component.literal("Run this as a player."));
+            return 0;
+        }
+        if (!player.getAbilities().instabuild) {
+            source.sendFailure(Component.literal("The NeroEconomy gallery is creative-only."));
+            return 0;
+        }
+        ServerLevel level = player.level();
+        BlockPos origin = player.blockPosition();
+        int oy = origin.getY();
+        int reach = GALLERY_RADIUS + GALLERY_MARGIN;
+        int minX = origin.getX() - reach;
+        int maxX = origin.getX() + reach;
+        int minZ = origin.getZ() - reach;
+        int maxZ = origin.getZ() + reach;
+        int topY = oy + GALLERY_TOP;
+
+        BlockState air = Blocks.AIR.defaultBlockState();
+        BlockPos.MutableBlockPos cursor = new BlockPos.MutableBlockPos();
+        int cleared = 0;
+        for (int x = minX; x <= maxX; x++) {
+            for (int z = minZ; z <= maxZ; z++) {
+                for (int y = oy; y <= topY; y++) {
+                    cursor.set(x, y, z);
+                    BlockState state = level.getBlockState(cursor);
+                    if (state.isAir()) continue;
+                    if (state.hasBlockEntity()
+                            && level.getBlockEntity(cursor) instanceof PlayerShopBlockEntity shop) {
+                        shop.cancel(); // hand the escrow back before the block disappears
+                    }
+                    level.setBlock(cursor, air, 2); // flag 2 = notify clients, skip neighbour cascade
+                    cleared++;
+                }
+            }
+        }
+
+        // Remove anything the scene (or a stray drop) left behind — everything but players.
+        AABB box = new AABB(minX, oy - 1, minZ, maxX + 1, topY + 4, maxZ + 1);
+        int removed = 0;
+        for (Entity entity : level.getEntitiesOfClass(Entity.class, box, e -> !(e instanceof Player))) {
+            entity.discard();
+            removed++;
+        }
+        MarketSavedData.get(level.getServer()).expire(System.currentTimeMillis());
+
+        int clearedBlocks = cleared;
+        int removedEntities = removed;
+        source.sendSuccess(() -> Component.literal("Cleared the NeroEconomy gallery: " + clearedBlocks
+                + " blocks → air, " + removedEntities + " entities removed."), false);
+        return Command.SINGLE_SUCCESS;
+    }
+
+    /**
+     * Place a Player Shop and bring it to life: claim it for the builder, set a price, then push the
+     * demo stock through the ordinary container path so it lands in the central escrow the same way a
+     * player's own deposit would ({@code setItem} → {@code setChanged} → {@code replaceShopStock}).
+     * Ownership has to be claimed first — an unowned shop rejects both the price and the stock.
+     */
+    private static void primeShop(ServerLevel level, ServerPlayer owner, BlockPos pos, ItemStack stock,
+            long unitPrice) {
+        level.setBlockAndUpdate(pos, ModBlocks.PLAYER_SHOP.get().defaultBlockState());
+        if (!(level.getBlockEntity(pos) instanceof PlayerShopBlockEntity shop)) return;
+        shop.claim(owner.getUUID());
+        shop.setPrice(unitPrice);
+        shop.setItem(PlayerShopBlockEntity.OFFER_SLOT, stock);
+    }
+
+    /**
+     * Give the market boards something to show: two escrowed sell listings and two standing buy offers,
+     * all owned by the builder. Both go through the store's ordinary public entry points, so the escrow
+     * accounting is exactly the same as a player-posted row.
+     */
+    private static void seedMarket(ServerLevel level, ServerPlayer player, BlockPos boardPos) {
+        String location = level.dimension().identifier() + "|" + boardPos.asLong();
+        postDemoListing(level, player, new ItemStack(Items.DIAMOND, 16), 16, 210L, location);
+        postDemoListing(level, player, new ItemStack(Items.COPPER_INGOT, 64), 64, 4L, location);
+        postDemoBuyOffer(level, player, Items.REDSTONE, 64, 3L);
+        postDemoBuyOffer(level, player, Items.EMERALD, 16, 90L);
+    }
+
+    /**
+     * {@code postFromHand} escrows out of the seller's main hand, which is the only public entry point
+     * into a sell listing. The builder's real held item is saved and restored around the call, so the
+     * only stack the listing can consume is the demo one created here — the player's inventory is
+     * never touched.
+     */
+    private static void postDemoListing(ServerLevel level, ServerPlayer player, ItemStack demo, int quantity,
+            long unitPrice, String location) {
+        ItemStack held = player.getMainHandItem().copy();
+        player.setItemInHand(InteractionHand.MAIN_HAND, demo);
+        MarketSavedData.get(level.getServer()).postFromHand(player, quantity, unitPrice, galleryExpiry(),
+                ListingSource.MARKET_BOARD, location, UUID.randomUUID());
+        player.setItemInHand(InteractionHand.MAIN_HAND, held);
+    }
+
+    /**
+     * A buy offer locks credits in escrow up front, so the offer is funded first through the same
+     * audited deposit path {@code admin give} uses. Nothing is taken from the player's own balance.
+     */
+    private static void postDemoBuyOffer(ServerLevel level, ServerPlayer player, Item item, int quantity,
+            long unitPrice) {
+        long escrow;
+        try { escrow = Math.multiplyExact((long) quantity, unitPrice); }
+        catch (ArithmeticException overflow) { return; }
+        if (!NeroEconomyCommon.CURRENCY_PROVIDER.depositTyped(player.getUUID(), NeroEconomyCommon.CREDITS,
+                escrow, TransactionType.ADMIN_GRANT)) return;
+        MarketSavedData.get(level.getServer()).postBuyOffer(player, BuiltInRegistries.ITEM.getKey(item),
+                quantity, unitPrice, galleryExpiry(), UUID.randomUUID());
+    }
+
+    /** A flat pad of {@code state} at {@code y}, inclusive of both corners. */
+    private static void pad(ServerLevel level, int x1, int z1, int x2, int z2, int y, BlockState state) {
+        for (int x = x1; x <= x2; x++) {
+            for (int z = z1; z <= z2; z++) {
+                level.setBlockAndUpdate(new BlockPos(x, y, z), state);
+            }
+        }
+    }
+
+    /** A solid box of {@code state}, inclusive of both corners. */
+    private static void fill(ServerLevel level, int x1, int y1, int z1, int x2, int y2, int z2,
+            BlockState state) {
+        for (int x = x1; x <= x2; x++) {
+            for (int y = y1; y <= y2; y++) {
+                for (int z = z1; z <= z2; z++) {
+                    level.setBlockAndUpdate(new BlockPos(x, y, z), state);
+                }
+            }
+        }
     }
 }

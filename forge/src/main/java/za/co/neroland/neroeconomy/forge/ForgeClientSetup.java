@@ -1,10 +1,13 @@
 package za.co.neroland.neroeconomy.forge;
 
 import net.minecraft.client.gui.screens.MenuScreens;
+import net.minecraftforge.client.event.RegisterClientCommandsEvent;
+import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.eventbus.api.bus.BusGroup;
 import net.minecraftforge.fml.event.lifecycle.FMLClientSetupEvent;
 
 import za.co.neroland.neroeconomy.client.BankTerminalScreen;
+import za.co.neroland.neroeconomy.client.GalleryCaptureHarness;
 import za.co.neroland.neroeconomy.client.PlayerShopScreen;
 import za.co.neroland.neroeconomy.client.TradingTerminalScreen;
 import za.co.neroland.neroeconomy.registry.ModMenuTypes;
@@ -17,5 +20,11 @@ final class ForgeClientSetup {
             MenuScreens.register(ModMenuTypes.PLAYER_SHOP.get(), PlayerShopScreen::new);
             MenuScreens.register(ModMenuTypes.TRADING_TERMINAL.get(), TradingTerminalScreen::new);
         }));
+        // Screenshot harness state machine — game-bus client tick (counterpart to Fabric's END_CLIENT_TICK).
+        TickEvent.ClientTickEvent.Post.BUS.addListener(event -> GalleryCaptureHarness.tick());
+        // Client-side /necgallery capture command tree (drives the local camera; separate dispatcher
+        // from the server-side /neroeconomy gallery builder — a shared root would shadow it).
+        RegisterClientCommandsEvent.BUS.addListener(event ->
+                GalleryCaptureHarness.registerClientCommands(event.getDispatcher()));
     }
 }
