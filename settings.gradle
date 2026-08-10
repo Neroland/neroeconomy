@@ -11,7 +11,7 @@ pluginManagement {
         id 'org.gradle.toolchains.foojay-resolver-convention' version '1.0.0'
         id 'net.neoforged.moddev' version '2.0.141'      // common (NeoForm) + neoforge
         id 'net.fabricmc.fabric-loom' version '1.17.12' // fabric — 1.17 handles de-obf 26.x (omit mappings)
-        id 'net.minecraftforge.gradle' version '7.0.30'  // forge — FG 7 handles de-obf 26.x
+        id 'net.minecraftforge.gradle' version '7.0.33'  // forge — FG 7 handles de-obf 26.x
         id 'net.minecraftforge.jarjar' version '0.2.3'   // forge Jar-in-Jar dependencies
         id 'dev.kikugie.stonecutter' version '0.9.6'     // version axis (per-MC nodes)
     }
