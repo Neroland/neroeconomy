@@ -1,7 +1,7 @@
 # NeroEconomy
 
 NeroEconomy is a server-authoritative economy for the Neroland Minecraft ecosystem. This is the
-0.1.0 feature set, shipping as `0.0.1-alpha.1` until release. It targets Minecraft 26.1.2 and 26.2
+0.1.0 feature set, shipping as `0.0.1-alpha.1` until release. It targets Minecraft 26.1.2, 26.2 and 26.3
 on Fabric, Forge, and NeoForge and requires Neroland Core.
 
 ## Shipped features

@@ -21,8 +21,10 @@ import net.minecraft.world.level.block.state.properties.EnumProperty;
 import net.minecraft.world.phys.BlockHitResult;
 import org.jetbrains.annotations.Nullable;
 
+import za.co.neroland.nerolandcore.registry.BlockCodecs;
+
 public final class MarketBoardBlock extends BaseEntityBlock {
-    public static final MapCodec<MarketBoardBlock> CODEC = simpleCodec(MarketBoardBlock::new);
+    public static final MapCodec<MarketBoardBlock> CODEC = BlockCodecs.simple(MarketBoardBlock::new);
     /** The listings board faces the placer. Visual only. */
     public static final EnumProperty<Direction> FACING = BlockStateProperties.HORIZONTAL_FACING;
 
@@ -31,7 +33,7 @@ public final class MarketBoardBlock extends BaseEntityBlock {
         this.registerDefaultState(this.stateDefinition.any().setValue(FACING, Direction.NORTH));
     }
 
-    @Override protected MapCodec<MarketBoardBlock> codec() { return CODEC; }
+    protected MapCodec<MarketBoardBlock> codec() { return CODEC; }
     @Override protected RenderShape getRenderShape(BlockState state) { return RenderShape.MODEL; }
 
     @Override

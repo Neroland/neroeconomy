@@ -11,7 +11,7 @@ owned offline shops, escrowed market offers, contracts, deliveries, bounties, au
 public pricing APIs, and a Core Link module. Faction wallets remain deferred.
 
 Mod id: `neroeconomy`. Package: `za.co.neroland.neroeconomy`. Java 25, Mojang mappings, Minecraft
-26.1.2 and 26.2 on Fabric, Forge, and NeoForge.
+26.1.2, 26.2 and 26.3 on Fabric, Forge, and NeoForge.
 
 ## Non-negotiable rules
 
@@ -28,12 +28,14 @@ Mod id: `neroeconomy`. Package: `za.co.neroland.neroeconomy`. Java 25, Mojang ma
 
 ## Build layout and verification
 
+- **Version-specific code in `common/`.** Non-active nodes run `common/` through Stonecutter (`stonecutterProcessCommon`), so shared code uses the same `//? if >=26.3 {` blocks as the loader `src/` trees. Keep the files in the vcsVersion state, and never put a `*/` inside a disabled block. Datapack files whose format differs by version go in `common/src/main/resources-<mc>/`, which is merged over `common/src/main/resources` for every node at or above `<mc>` (`mergeCommonResources`).
+
 Stonecutter's real root script is `stonecutter.gradle`. Shared code/resources live under `common/`;
 loader nodes are `:<loader>:<mc>`. Resources are hand-authored; there is no datagen.
 
 Before handoff run:
 
-`./gradlew :neoforge:26.1.2:build :neoforge:26.2:build :forge:26.1.2:build :forge:26.2:build :fabric:26.1.2:build :fabric:26.2:build :neoforge:26.2:ecjCheck test`
+`./gradlew :neoforge:26.1.2:build :neoforge:26.2:build :neoforge:26.3:build :forge:26.1.2:build :forge:26.2:build :forge:26.3:build :fabric:26.1.2:build :fabric:26.2:build :fabric:26.3:build :neoforge:26.2:ecjCheck :neoforge:26.3:ecjCheck test`
 
 Update the player/contributor documentation in `wiki/` with every feature change. Runtime smoke
 testing is owned by the developer and follows `SMOKE-TEST.md`.

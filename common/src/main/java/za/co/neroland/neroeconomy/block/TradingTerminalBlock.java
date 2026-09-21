@@ -21,8 +21,10 @@ import net.minecraft.world.level.block.state.properties.EnumProperty;
 import net.minecraft.world.phys.BlockHitResult;
 import org.jetbrains.annotations.Nullable;
 
+import za.co.neroland.nerolandcore.registry.BlockCodecs;
+
 public final class TradingTerminalBlock extends BaseEntityBlock {
-    public static final MapCodec<TradingTerminalBlock> CODEC = simpleCodec(TradingTerminalBlock::new);
+    public static final MapCodec<TradingTerminalBlock> CODEC = BlockCodecs.simple(TradingTerminalBlock::new);
     /** The angled market screen faces the placer. Visual only. */
     public static final EnumProperty<Direction> FACING = BlockStateProperties.HORIZONTAL_FACING;
 
@@ -31,7 +33,7 @@ public final class TradingTerminalBlock extends BaseEntityBlock {
         this.registerDefaultState(this.stateDefinition.any().setValue(FACING, Direction.NORTH));
     }
 
-    @Override protected MapCodec<TradingTerminalBlock> codec() { return CODEC; }
+    protected MapCodec<TradingTerminalBlock> codec() { return CODEC; }
     @Override protected RenderShape getRenderShape(BlockState state) { return RenderShape.MODEL; }
 
     @Override

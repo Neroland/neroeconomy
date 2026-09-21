@@ -23,8 +23,10 @@ import net.minecraft.world.phys.BlockHitResult;
 
 import org.jetbrains.annotations.Nullable;
 
+import za.co.neroland.nerolandcore.registry.BlockCodecs;
+
 public final class BankTerminalBlock extends BaseEntityBlock {
-    public static final MapCodec<BankTerminalBlock> CODEC = simpleCodec(BankTerminalBlock::new);
+    public static final MapCodec<BankTerminalBlock> CODEC = BlockCodecs.simple(BankTerminalBlock::new);
     /** The vault door faces the placer. Visual only. */
     public static final EnumProperty<Direction> FACING = BlockStateProperties.HORIZONTAL_FACING;
 
@@ -33,7 +35,7 @@ public final class BankTerminalBlock extends BaseEntityBlock {
         this.registerDefaultState(this.stateDefinition.any().setValue(FACING, Direction.NORTH));
     }
 
-    @Override protected MapCodec<BankTerminalBlock> codec() { return CODEC; }
+    protected MapCodec<BankTerminalBlock> codec() { return CODEC; }
     @Override protected RenderShape getRenderShape(BlockState state) { return RenderShape.MODEL; }
 
     @Override

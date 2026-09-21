@@ -26,8 +26,10 @@ import net.minecraft.world.phys.BlockHitResult;
 
 import org.jetbrains.annotations.Nullable;
 
+import za.co.neroland.nerolandcore.registry.BlockCodecs;
+
 public final class PlayerShopBlock extends BaseEntityBlock {
-    public static final MapCodec<PlayerShopBlock> CODEC = simpleCodec(PlayerShopBlock::new);
+    public static final MapCodec<PlayerShopBlock> CODEC = BlockCodecs.simple(PlayerShopBlock::new);
     /** The stall counter faces the placer. Visual only. */
     public static final EnumProperty<Direction> FACING = BlockStateProperties.HORIZONTAL_FACING;
 
@@ -39,7 +41,7 @@ public final class PlayerShopBlock extends BaseEntityBlock {
         return !(level.getBlockEntity(pos) instanceof PlayerShopBlockEntity shop)
                 || shop.isOwner(player.getUUID());
     }
-    @Override protected MapCodec<PlayerShopBlock> codec() { return CODEC; }
+    protected MapCodec<PlayerShopBlock> codec() { return CODEC; }
     @Override protected RenderShape getRenderShape(BlockState state) { return RenderShape.MODEL; }
 
     @Override
