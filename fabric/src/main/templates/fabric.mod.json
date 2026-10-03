@@ -11,8 +11,8 @@
   "environment": "*",
   "entrypoints": {
     "main": ["za.co.neroland.neroeconomy.fabric.NeroEconomyFabric"],
-    "client": ["za.co.neroland.neroeconomy.fabric.NeroEconomyFabricClient"],
-    "fabric-gametest": ["za.co.neroland.neroeconomy.fabric.NeroEconomyGameTests"]
+    "fabric-gametest": ["za.co.neroland.neroeconomy.fabric.NeroEconomyGameTests"],
+    "client": ["za.co.neroland.neroeconomy.fabric.NeroEconomyFabricClient"]
   },
   "depends": {
     "fabricloader": ">=${fabric_loader_version}",

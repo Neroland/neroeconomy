@@ -2,18 +2,25 @@ package za.co.neroland.neroeconomy.platform;
 
 import java.util.List;
 
-import net.fabricmc.api.EnvType;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.entity.event.v1.ServerLivingEntityEvents;
 import net.fabricmc.fabric.api.event.player.PlayerBlockBreakEvents;
+import net.fabricmc.fabric.api.event.player.UseEntityCallback;
+import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
+import net.fabricmc.fabric.api.transfer.v1.item.ContainerStorage;
+import net.fabricmc.fabric.api.transfer.v1.item.ItemStorage;
+import za.co.neroland.neroeconomy.block.AutoTraderBlock;
 import za.co.neroland.neroeconomy.block.PlayerShopBlock;
+import za.co.neroland.neroeconomy.registry.ModBlockEntities;
 import za.co.neroland.neroeconomy.obligation.BountyHooks;
 import net.fabricmc.loader.api.FabricLoader;
 
 import za.co.neroland.neroeconomy.NeroEconomyCommon;
 import za.co.neroland.neroeconomy.command.EconomyCommands;
+import za.co.neroland.neroeconomy.direct.DirectTrades;
+import za.co.neroland.neroeconomy.network.IntentGuard;
 
 public final class FabricPlatformInfo implements PlatformInfo {
     @Override public void register(Object ignored) {
@@ -22,13 +29,28 @@ public final class FabricPlatformInfo implements PlatformInfo {
         ServerTickEvents.END_SERVER_TICK.register(NeroEconomyCommon.CURRENCY_PROVIDER::tick);
         ServerLivingEntityEvents.AFTER_DEATH.register(BountyHooks::entityKilled);
         PlayerBlockBreakEvents.BEFORE.register((level, player, pos, state, blockEntity) ->
-                !(state.getBlock() instanceof PlayerShopBlock) || PlayerShopBlock.canBreak(level, pos, player));
+                (!(state.getBlock() instanceof PlayerShopBlock) || PlayerShopBlock.canBreak(level, pos, player))
+                        && (!(state.getBlock() instanceof AutoTraderBlock) || AutoTraderBlock.canBreak(level, pos, player)));
+        // The Auto-Trader's slots on the Fabric Transfer API, sided, so any mod's pipes can feed and empty it.
+        ItemStorage.SIDED.registerForBlockEntity((trader, side) -> ContainerStorage.of(trader, side),
+                ModBlockEntities.AUTO_TRADER.get());
         CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) ->
                 EconomyCommands.register(dispatcher));
+        // Sneak-use on another player with an empty hand asks them for a trade. The answer is
+        // always PASS: the interaction is never consumed, so the game and every other mod see it.
+        UseEntityCallback.EVENT.register((player, level, hand, entity, hitResult) -> {
+            DirectTrades.useEntity(player, entity, hand);
+            return net.minecraft.world.InteractionResult.PASS;
+        });
+        // The packet limiter keys on the player id in memory; the entry leaves with the player,
+        // and so do their trade requests and a trade they had open.
+        ServerPlayConnectionEvents.DISCONNECT.register((handler, server) -> {
+            DirectTrades.playerLeft(handler.player);
+            IntentGuard.forget(handler.player.getUUID());
+        });
     }
     @Override public String getPlatformName() { return "Fabric"; }
     @Override public boolean isDevelopmentEnvironment() { return FabricLoader.getInstance().isDevelopmentEnvironment(); }
-    @Override public boolean isClient() { return FabricLoader.getInstance().getEnvironmentType() == EnvType.CLIENT; }
     @Override public String getModVersion() {
         return FabricLoader.getInstance().getModContainer(NeroEconomyCommon.MOD_ID)
                 .map(container -> container.getMetadata().getVersion().getFriendlyString()).orElse("unknown");

@@ -6,6 +6,7 @@ import java.util.UUID;
 
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Button;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
 import net.minecraft.world.entity.player.Inventory;
@@ -34,9 +35,6 @@ public final class PlayerShopScreen extends TexturedContainerScreen<PlayerShopMe
 
     private static final Identifier TEXTURE =
             Identifier.fromNamespaceAndPath(NeroEconomyCommon.MOD_ID, "textures/gui/player_shop.png");
-    /** Shop accent: a warmer green than the bank's, still in the credits family. */
-    private static final int ACCENT = 0xFF60E88C;
-
     private static final int PANEL_W = 176;
     private static final int PANEL_H = 214;
     /** Right edge used for right-aligned readouts (panel inner margin). */
@@ -53,7 +51,7 @@ public final class PlayerShopScreen extends TexturedContainerScreen<PlayerShopMe
     private Button buyButton;
 
     public PlayerShopScreen(PlayerShopMenu menu, Inventory inventory, Component title) {
-        super(menu, inventory, title, TEXTURE, ACCENT, PANEL_W, PANEL_H);
+        super(menu, inventory, title, TEXTURE, PANEL_W, PANEL_H);
         this.titleLabelX = 8;
         this.titleLabelY = 6;
         this.inventoryLabelX = 8;
@@ -72,7 +70,9 @@ public final class PlayerShopScreen extends TexturedContainerScreen<PlayerShopMe
         this.ownerButtons.add(stepButton(3, "gui.neroeconomy.shop.price_up_10", 130));
         this.buyButton = addRenderableWidget(Button.builder(Component.translatable("gui.neroeconomy.shop.buy"),
                         ignored -> NeroEconomyNetwork.sendToServer(new ShopBuyPayload(this.menu.containerId,
-                                UUID.randomUUID(), Math.max(1L, this.menu.price()))))
+                                UUID.randomUUID(), Math.max(1L, this.menu.price()),
+                                // The item on show right now; the server refuses the sale if it has changed.
+                                BuiltInRegistries.ITEM.getKey(this.menu.getSlot(0).getItem().getItem()))))
                 .bounds(this.leftPos + BUY_X, this.topPos + BUY_Y, BUY_W, BUY_H).build());
     }
 

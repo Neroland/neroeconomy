@@ -6,12 +6,15 @@ import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.minecraft.client.gui.screens.MenuScreens;
 
 import za.co.neroland.neroeconomy.NeroEconomyCommon;
+import za.co.neroland.neroeconomy.client.AutoTraderScreen;
 import za.co.neroland.neroeconomy.client.BankTerminalScreen;
+import za.co.neroland.neroeconomy.client.DirectTradeScreen;
 import za.co.neroland.neroeconomy.client.GalleryCaptureHarness;
 import za.co.neroland.neroeconomy.client.PlayerShopScreen;
 import za.co.neroland.neroeconomy.registry.ModMenuTypes;
 import za.co.neroland.neroeconomy.platform.Services;
 import za.co.neroland.neroeconomy.client.TradingTerminalScreen;
+import za.co.neroland.neroeconomy.client.VaultScreen;
 
 /** Fabric client entry point for NeroEconomy. */
 public final class NeroEconomyFabricClient implements ClientModInitializer {
@@ -23,6 +26,14 @@ public final class NeroEconomyFabricClient implements ClientModInitializer {
         MenuScreens.register(ModMenuTypes.BANK_TERMINAL.get(), BankTerminalScreen::new);
         MenuScreens.register(ModMenuTypes.PLAYER_SHOP.get(), PlayerShopScreen::new);
         MenuScreens.register(ModMenuTypes.TRADING_TERMINAL.get(), TradingTerminalScreen::new);
+        MenuScreens.register(ModMenuTypes.VAULT.get(), VaultScreen::new);
+        MenuScreens.register(ModMenuTypes.DIRECT_TRADE.get(), DirectTradeScreen::new);
+        MenuScreens.register(ModMenuTypes.AUTO_TRADER.get(), AutoTraderScreen::new);
+        // The capture tooling exists in a development environment only; a release jar wires up
+        // neither the tick hook nor the command.
+        if (!GalleryCaptureHarness.available()) {
+            return;
+        }
         // Screenshot harness state machine — counterpart to NeoForge's ClientTickEvent.Post.
         ClientTickEvents.END_CLIENT_TICK.register(mc -> GalleryCaptureHarness.tick());
         // Client-side /necgallery capture command tree (drives the local camera; separate dispatcher

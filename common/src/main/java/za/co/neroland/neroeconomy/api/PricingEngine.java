@@ -14,7 +14,8 @@ public final class PricingEngine {
     public static PriceQuote quote(MarketListingView listing, UUID buyer) {
         if (listing == null || buyer == null || listing.baseUnitPrice() < 1L)
             throw new IllegalArgumentException("Invalid listing quote");
-        long now = System.currentTimeMillis();
+        // Economy time: the quote's timestamp and the shock windows share one clock with every expiry.
+        long now = NeroEconomyCommon.CURRENCY_PROVIDER.now();
         PriceContext context = new PriceContext(listing, buyer, now);
         BigDecimal multiplier = BigDecimal.valueOf(MarketShocks.multiplier(listing, now));
         for (var entry : PriceModifierRegistry.ordered()) {
@@ -38,9 +39,23 @@ public final class PricingEngine {
         return new PriceQuote(listing.listingId(), Math.max(1L, value), now);
     }
 
+    /**
+     * The symmetric tolerance check, kept for existing callers. It accepts a price up to the
+     * tolerance <em>above</em> the quote, so nothing that charges a buyer should rely on it; use
+     * {@link #executionPriceWithinQuote} there.
+     */
     public static boolean executionPriceAccepted(long quotedUnitPrice, long executionUnitPrice) {
         if (quotedUnitPrice < 1L || executionUnitPrice < 1L) return false;
         double movement = Math.abs((double) executionUnitPrice - quotedUnitPrice) / quotedUnitPrice;
         return movement <= EconomyConfig.EXECUTION_PRICE_TOLERANCE.get();
+    }
+
+    /**
+     * The rule purchases settle under: the unit price the buyer confirmed is a ceiling. Execution at
+     * or below it goes through at the execution price; anything above it is refused, however small
+     * the difference, so a buyer is never charged more than they agreed to.
+     */
+    public static boolean executionPriceWithinQuote(long quotedUnitPrice, long executionUnitPrice) {
+        return quotedUnitPrice >= 1L && executionUnitPrice >= 1L && executionUnitPrice <= quotedUnitPrice;
     }
 }

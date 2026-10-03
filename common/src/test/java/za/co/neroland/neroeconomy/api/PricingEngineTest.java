@@ -60,6 +60,21 @@ final class PricingEngineTest {
         assertFalse(PricingEngine.executionPriceAccepted(100L, 106L));
     }
 
+    @Test void aBuyerIsNeverChargedAboveThePriceTheyConfirmed() {
+        // At the quote, and anywhere below it, the purchase goes through at the execution price.
+        assertTrue(PricingEngine.executionPriceWithinQuote(100L, 100L));
+        assertTrue(PricingEngine.executionPriceWithinQuote(100L, 99L));
+        assertTrue(PricingEngine.executionPriceWithinQuote(100L, 1L));
+        // One credit above is refused, however far inside the old symmetric tolerance it is.
+        assertFalse(PricingEngine.executionPriceWithinQuote(100L, 101L));
+        assertTrue(PricingEngine.executionPriceAccepted(100L, 101L));
+        assertFalse(PricingEngine.executionPriceWithinQuote(Long.MAX_VALUE - 1L, Long.MAX_VALUE));
+        // Neither side may be a non-price.
+        assertFalse(PricingEngine.executionPriceWithinQuote(0L, 0L));
+        assertFalse(PricingEngine.executionPriceWithinQuote(100L, 0L));
+        assertFalse(PricingEngine.executionPriceWithinQuote(-5L, -10L));
+    }
+
     @Test void tagShocksMatchTheListingTags() {
         MarketShocks.applyShock("#c:gems", 2D, Duration.ofMinutes(1));
         assertEquals(200L, PricingEngine.quote(tagged("c:gems"), UUID.randomUUID()).unitPrice());

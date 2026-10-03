@@ -1,0 +1,19 @@
+{
+  "variants": {
+    "facing=east": {
+      "model": "neroeconomy:block/auto_trader",
+      "y": 90
+    },
+    "facing=north": {
+      "model": "neroeconomy:block/auto_trader"
+    },
+    "facing=south": {
+      "model": "neroeconomy:block/auto_trader",
+      "y": 180
+    },
+    "facing=west": {
+      "model": "neroeconomy:block/auto_trader",
+      "y": 270
+    }
+  }
+}

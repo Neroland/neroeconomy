@@ -6,16 +6,16 @@ import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.Identifier;
-import net.minecraft.server.level.ServerPlayer;
 
 import za.co.neroland.neroeconomy.NeroEconomyCommon;
-import za.co.neroland.neroeconomy.menu.PlayerShopMenu;
 
 /**
  * Idempotent player-shop buy intent. The request id is generated on the client so a retried click
- * settles once, and the quoted price is only a stale-quote guard — the server re-prices at execution.
+ * settles once. The quoted price is only the ceiling the buyer agreed to — the server re-prices at
+ * execution — and the item id is the item the buyer was shown, so a shop restocked with something
+ * else between look and click is refused instead of sold.
  */
-public record ShopBuyPayload(int containerId, UUID requestId, long quotedUnitPrice)
+public record ShopBuyPayload(int containerId, UUID requestId, long quotedUnitPrice, Identifier itemId)
         implements CustomPacketPayload {
     public static final Type<ShopBuyPayload> TYPE = new Type<>(
             Identifier.fromNamespaceAndPath(NeroEconomyCommon.MOD_ID, "shop_buy"));
@@ -23,13 +23,10 @@ public record ShopBuyPayload(int containerId, UUID requestId, long quotedUnitPri
             StreamCodec.of(ShopBuyPayload::write, ShopBuyPayload::read);
     private static void write(RegistryFriendlyByteBuf buf, ShopBuyPayload value) {
         buf.writeVarInt(value.containerId); buf.writeUUID(value.requestId); buf.writeVarLong(value.quotedUnitPrice);
+        buf.writeIdentifier(value.itemId);
     }
     private static ShopBuyPayload read(RegistryFriendlyByteBuf buf) {
-        return new ShopBuyPayload(buf.readVarInt(), buf.readUUID(), Math.max(1L, buf.readVarLong()));
-    }
-    public static void handle(ShopBuyPayload value, ServerPlayer player) {
-        if (player.containerMenu instanceof PlayerShopMenu menu && menu.containerId == value.containerId
-                && menu.stillValid(player)) menu.buy(player, value);
+        return new ShopBuyPayload(buf.readVarInt(), buf.readUUID(), Math.max(1L, buf.readVarLong()), buf.readIdentifier());
     }
     @Override public Type<? extends CustomPacketPayload> type() { return TYPE; }
 }

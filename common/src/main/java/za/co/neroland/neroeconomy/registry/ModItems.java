@@ -21,6 +21,8 @@ public final class ModItems {
             key -> new BlockItem(ModBlocks.TRADING_TERMINAL.get(), new Item.Properties().setId(key)));
     public static final RegistryEntry<BlockItem> MARKET_BOARD = ITEMS.register("market_board",
             key -> new BlockItem(ModBlocks.MARKET_BOARD.get(), new Item.Properties().setId(key)));
+    public static final RegistryEntry<BlockItem> AUTO_TRADER = ITEMS.register("auto_trader",
+            key -> new BlockItem(ModBlocks.AUTO_TRADER.get(), new Item.Properties().setId(key)));
     public static final RegistryEntry<CreditChipItem> CREDIT_CHIP = ITEMS.register("credit_chip",
             key -> new CreditChipItem(new Item.Properties().setId(key).stacksTo(16)));
 
@@ -32,6 +34,7 @@ public final class ModItems {
         CoreCreativeTab.add(PLAYER_SHOP);
         CoreCreativeTab.add(TRADING_TERMINAL);
         CoreCreativeTab.add(MARKET_BOARD);
+        CoreCreativeTab.add(AUTO_TRADER);
         CoreCreativeTab.add(CREDIT_CHIP);
     }
 }

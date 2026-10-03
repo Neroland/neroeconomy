@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Turn the four block front sprites into animated pulse strips (stdlib only).
+"""Turn the block front sprites into animated pulse strips (stdlib only).
 
 Each <id>_front.png becomes a vertical frame strip whose accent pixels (the gold vault trim, the
 teal market line, the amber pins, the shop lamp) breathe in brightness -- HSV value only, so the
@@ -26,6 +26,7 @@ PULSE = [
     ("trading_terminal_front", 8, 3, 0.28, (0.32, 0.58)),
     ("market_board_front", 8, 3, 0.24, (0.00, 0.18)),
     ("player_shop_front", 8, 3, 0.20, (0.02, 0.18)),
+    ("auto_trader_front", 8, 3, 0.26, (0.06, 0.48)),
 ]
 
 

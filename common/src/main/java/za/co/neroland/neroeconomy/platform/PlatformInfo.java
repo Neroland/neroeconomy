@@ -7,7 +7,6 @@ public interface PlatformInfo {
     void register(Object loaderBus);
     String getPlatformName();
     boolean isDevelopmentEnvironment();
-    boolean isClient();
     String getModVersion();
     List<String> getLoadedModIds();
 

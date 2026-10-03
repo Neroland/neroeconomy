@@ -20,6 +20,10 @@ completion brief.
 | Privacy commands | Private history and erasure hooks existed, but `/eco export`, `/eco erase`, per-player audit opt-out, and daily retention were absent. | Add the missing privacy surface and scheduled purge. |
 | Feature scope | Trading terminal, market board, contracts, delivery jobs, bounties, auctions, chip, Link module, complete assets, and their tests/docs were absent. | Implement in Stages 2–12 and keep faction wallets deferred. |
 
+Later change to the saved-data row: the local `data.SavedDataRecovery` copy has been removed. Every
+store now loads through Neroland Core's own guard, which keeps a backup and restores from it; see
+`USING-CORE.md`. The current Core pin is `nerolandcore_version` in `gradle.properties`.
+
 ## Known cosmetic follow-ups
 
 Not defects; tracked here so the next art pass has a list.

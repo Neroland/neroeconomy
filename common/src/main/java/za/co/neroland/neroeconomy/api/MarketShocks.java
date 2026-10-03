@@ -6,13 +6,15 @@ import java.util.concurrent.ConcurrentHashMap;
 
 import net.minecraft.resources.Identifier;
 
+import za.co.neroland.neroeconomy.NeroEconomyCommon;
 import za.co.neroland.neroeconomy.config.EconomyConfig;
 
 /**
  * Restart-local, automatically expiring item/tag price shocks.
  *
  * <p>The table is static, so it must never outlive the world that created it: the currency provider
- * clears it when a server unbinds and sweeps expired entries while one is running.
+ * clears it when a server unbinds and sweeps expired entries while one is running. Shock windows
+ * are measured on the economy clock, the same one a quote is stamped with.
  */
 public final class MarketShocks {
     private record Shock(double multiplier, long expiresAt) { }
@@ -26,7 +28,7 @@ public final class MarketShocks {
             throw new IllegalArgumentException("Invalid market shock");
         double capped = Math.max(EconomyConfig.MIN_PRICE_MULTIPLIER.get(),
                 Math.min(EconomyConfig.MAX_PRICE_MULTIPLIER.get(), multiplier));
-        long now = System.currentTimeMillis();
+        long now = NeroEconomyCommon.CURRENCY_PROVIDER.now();
         long millis;
         try { millis = duration.toMillis(); }
         catch (ArithmeticException overflow) { millis = Long.MAX_VALUE - now; }
@@ -46,7 +48,7 @@ public final class MarketShocks {
     public static void clear() { SHOCKS.clear(); }
 
     /** Drops shocks whose window has closed; safe to call from a server tick. */
-    public static void purgeExpired() { purge(System.currentTimeMillis()); }
+    public static void purgeExpired() { purge(NeroEconomyCommon.CURRENCY_PROVIDER.now()); }
     private static void purge(long now) { SHOCKS.entrySet().removeIf(entry -> entry.getValue().expiresAt() <= now); }
     private static double multiplierFor(String key, long now) {
         Shock shock = SHOCKS.get(normalize(key));

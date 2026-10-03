@@ -360,11 +360,85 @@ def gen_shop_front():
     write_block("player_shop_front", cv)
 
 
+# --------------------------------------------------------------- auto-trader
+
+# Auto-Trader -- hull steel like the terminal, copper conveyor fittings, a green/amber order display.
+TRADER = [(38, 46, 58, 255), (32, 40, 51, 255), (44, 53, 66, 255), (28, 35, 45, 255)]
+TRADER_L = (98, 114, 132, 255)
+TRADER_D = (13, 18, 26, 255)
+COPPER = (206, 124, 74, 255)
+COPPER_HI = (242, 168, 112, 255)
+COPPER_D = (112, 62, 36, 255)
+
+
+def gen_trader_side():
+    rng = random.Random(1501)
+    cv = canvas()
+    noise(cv, TRADER, rng)
+    bevel(cv, TRADER_L, TRADER_D)
+    # Intake slot under the rim: every face takes items in.
+    rect(cv, 3, 3, 12, 5, TRADER_D)
+    rect(cv, 4, 4, 11, 4, INK)
+    rect(cv, 3, 6, 12, 6, COPPER_D)
+    # Conveyor louvres, then the output slot along the bottom.
+    for y in (8, 10):
+        rect(cv, 4, y, 11, y, TRADER_D)
+    rect(cv, 3, 12, 12, 13, TRADER_D)
+    rect(cv, 5, 13, 10, 13, COPPER)
+    rivets(cv, COPPER)
+    write_block("auto_trader", cv)
+
+
+def gen_trader_top():
+    rng = random.Random(1502)
+    cv = canvas()
+    noise(cv, TRADER, rng)
+    bevel(cv, TRADER_L, TRADER_D)
+    # Funnel: copper rim, dark throat, a lit grate at the bottom.
+    rect(cv, 3, 3, 12, 12, COPPER_D)
+    rect(cv, 4, 4, 11, 11, TRADER_D)
+    rect(cv, 5, 5, 10, 10, INK)
+    for x in (6, 9):
+        rect(cv, x, 5, x, 10, TRADER[3])
+    rect(cv, 3, 3, 12, 3, COPPER)
+    rect(cv, 3, 3, 3, 12, COPPER)
+    cv[3][3] = COPPER_HI
+    rivets(cv, COPPER)
+    write_block("auto_trader_top", cv)
+
+
+def gen_trader_front():
+    rng = random.Random(1503)
+    cv = canvas()
+    noise(cv, TRADER, rng)
+    bevel(cv, TRADER_L, TRADER_D)
+    # Order display: a buy arrow coming in (green) over a sell arrow going out (amber).
+    rect(cv, 2, 2, 13, 9, TRADER_D)
+    rect(cv, 3, 3, 12, 8, SCREEN)
+    for x in range(5, 11):
+        cv[4][x] = ACCENT
+        cv[7][x] = WARN
+    for (x, y) in ((5, 3), (4, 4), (5, 5)):
+        cv[y][x] = ACCENT
+    cv[4][4] = LIGHT
+    for (x, y) in ((10, 6), (11, 7), (10, 8)):
+        cv[y][x] = WARN
+    # Output tray with a copper lip, and two status lamps.
+    rect(cv, 3, 11, 12, 13, TRADER_D)
+    rect(cv, 4, 12, 11, 12, INK)
+    rect(cv, 3, 11, 12, 11, COPPER)
+    cv[10][2] = ACCENT
+    cv[10][13] = WARN
+    rivets(cv, COPPER)
+    write_block("auto_trader_front", cv)
+
+
 BLOCK_GENERATORS = (
     gen_bank_side, gen_bank_top, gen_bank_front,
     gen_terminal_side, gen_terminal_top, gen_terminal_front,
     gen_board_side, gen_board_top, gen_board_front,
     gen_shop_side, gen_shop_top, gen_shop_front,
+    gen_trader_side, gen_trader_top, gen_trader_front,
 )
 
 

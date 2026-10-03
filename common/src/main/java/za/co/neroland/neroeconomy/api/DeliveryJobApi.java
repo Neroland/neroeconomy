@@ -44,14 +44,16 @@ public final class DeliveryJobApi {
      * than to anyone's account.
      *
      * <p>Funding differs from {@link #post}: there is no player wallet to escrow from, so the payout
-     * is minted by the server account when the job settles. Servers that do not want minted payouts
-     * should leave the issuer uninstalled, in which case this returns {@code null} and no job exists.
+     * is moved from the Reserve into escrow when the job is posted, within the daily system-job
+     * budget. When system jobs are switched off, or the Reserve or that budget cannot cover the
+     * payout, this returns {@code null} and no job exists.
      */
     public static EconomyJob postSystem(MinecraftServer server, String itemOrTag, int quantity, String destination,
             long payout, long expiresAt) {
         SystemIssuer issuer = systemIssuer;
         if (server == null || issuer == null || itemOrTag == null || itemOrTag.isBlank() || quantity < 1
-                || destination == null || payout < 1L || expiresAt <= System.currentTimeMillis()) {
+                || destination == null || payout < 1L
+                || expiresAt <= NeroEconomyCommon.CURRENCY_PROVIDER.now()) {
             if (issuer == null) NeroEconomyCommon.LOGGER.debug(
                     "[NeroEconomy] System delivery job refused: no system issuer installed.");
             return null;

@@ -1,5 +1,5 @@
 {
   "item": "neroeconomy:credit_chip",
-  "pool": "exotic",
-  "weight": 30
+  "tier": "exotic",
+  "weight_override": 30
 }

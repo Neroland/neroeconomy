@@ -24,6 +24,9 @@ public final class NeroEconomyTelemetry {
     public static final int MAX_EVENTS_PER_SESSION = 10;
     private static final Pattern USER_PATH = Pattern.compile(
             "(?i)(?:[A-Z]:)?[/\\\\](?:Users|home)[/\\\\][^/\\\\\\s:;,'\"]+");
+    /** Dashed or bare 32-digit hex: a player id must never leave the server inside an error message. */
+    private static final Pattern UUID_SHAPE = Pattern.compile(
+            "(?i)(?<![0-9a-f])(?:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|[0-9a-f]{32})(?![0-9a-f])");
     private static final AtomicInteger SENT = new AtomicInteger();
     private static final Set<String> SEEN = ConcurrentHashMap.newKeySet();
     private static volatile boolean active;
@@ -104,5 +107,9 @@ public final class NeroEconomyTelemetry {
         return result.toString();
     }
 
-    static String scrub(String value) { return value == null ? "" : USER_PATH.matcher(value).replaceAll("/~"); }
+    /** Removes home-directory paths and anything shaped like a UUID from text bound for telemetry. */
+    static String scrub(String value) {
+        if (value == null) return "";
+        return UUID_SHAPE.matcher(USER_PATH.matcher(value).replaceAll("/~")).replaceAll("<uuid>");
+    }
 }

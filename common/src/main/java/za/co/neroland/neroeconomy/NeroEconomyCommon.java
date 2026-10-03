@@ -18,7 +18,11 @@ import za.co.neroland.neroeconomy.registry.ModMenuTypes;
 import za.co.neroland.neroeconomy.network.NeroEconomyNetwork;
 import za.co.neroland.neroeconomy.platform.Services;
 import za.co.neroland.neroeconomy.shop.ShopOwnershipState;
+import za.co.neroland.neroeconomy.simulation.Simulation;
 import za.co.neroland.neroeconomy.telemetry.NeroEconomyTelemetry;
+import za.co.neroland.neroeconomy.trade.Trading;
+import za.co.neroland.neroeconomy.trade.TradingSteps;
+import za.co.neroland.neroeconomy.vault.VaultSection;
 import za.co.neroland.neroeconomy.market.MarketSavedData;
 import za.co.neroland.neroeconomy.obligation.ObligationSavedData;
 
@@ -48,11 +52,21 @@ public final class NeroEconomyCommon {
         // 1. Privacy hooks are registered before any gameplay store can be exposed. Obligation
         //    settlement runs before the market sweep, so a claim it books for the erased player's
         //    counterparty survives while anything owed to the erased player is then dropped.
-        PlayerDataErasure.register((server, player) -> EconomySavedData.get(server).forgetPlayer(player));
-        PlayerDataErasure.register((server, player) -> ShopOwnershipState.get(server).forgetPlayer(player));
-        PlayerDataErasure.register((server, player) -> ObligationSavedData.get(server).forgetPlayer(server, player));
-        PlayerDataErasure.register((server, player) -> MarketSavedData.get(server).forgetPlayer(player));
+        //    Each store's eraser also pushes the purge into Core's recovery backup, which is a second
+        //    copy of the same rows. The ledger eraser here is the only ledger pass: Core's built-in
+        //    currency eraser reaches ServerCurrencyProvider.forgetPlayer, which is deliberately empty.
+        PlayerDataErasure.register(EconomySavedData::eraseFor);
+        PlayerDataErasure.register(ShopOwnershipState::eraseFor);
+        PlayerDataErasure.register(ObligationSavedData::eraseFor);
+        //    The order book goes before the market sweep too: nothing it erases is owed to anyone
+        //    else, and a seller's proceeds from the erased player's purchases are claims that stay.
+        PlayerDataErasure.register(Trading::eraseFor);
+        PlayerDataErasure.register(MarketSavedData::eraseFor);
+        //    The vault goes after the stores that could still deliver goods to it: the erased
+        //    player's goods are destroyed, and the prototypes only they referred to with them.
+        PlayerDataErasure.register(VaultSection::eraseFor);
         PlayerDataErasure.register(LedgerExportFiles::delete);
+        PlayerDataErasure.register((server, player) -> za.co.neroland.neroeconomy.link.EconomyAlerts.forget(player));
         // 2. Configuration and the real Core currency provider.
         EconomyConfig.init();
         NeroEconomyTelemetry.init();
@@ -61,6 +75,10 @@ public final class NeroEconomyCommon {
         Services.PLATFORM.getPlatformName();
         Services.NETWORK.getClass();
         NeroEconomyNetwork.init();
+        // The trading rules' simulation handlers, after the housekeeping ones the pipeline starts with.
+        TradingSteps.register(Simulation.PIPELINE, context -> Trading.env(context.store()));
+        // Auto-Trader blocks are the inventories a rule can work from besides its owner's vault.
+        Trading.ruleBinder(za.co.neroland.neroeconomy.trader.AutoTraders.BINDER);
         // Server-funded delivery jobs (soft logistics seam); without this the overload refuses jobs.
         za.co.neroland.neroeconomy.api.DeliveryJobApi.setSystemIssuer(
                 (server, type, target, quantity, destination, payout, expiresAt) -> ObligationSavedData

@@ -107,6 +107,18 @@ def generateModMetadata = tasks.register('generateModMetadata', ProcessResources
 sourceSets.main.resources.srcDir generateModMetadata
 eclipse.synchronizationTasks generateModMetadata
 
+// The Fabric GameTests are a development aid. They stay compiled into the dev classes, and the
+// generated fabric.mod.json keeps their `fabric-gametest` entrypoint so a dev run can execute them,
+// but a released jar carries neither: the test class is left out and the entrypoint line is dropped
+// from the manifest as it is packed. (The entrypoint sits on its own line, followed by another
+// entry, so removing the line leaves valid JSON; Loom nests its jars into the manifest afterwards.)
+tasks.named('jar', Jar) {
+    exclude 'za/co/neroland/neroeconomy/fabric/NeroEconomyGameTests*.class'
+    filesMatching('fabric.mod.json') {
+        filter { String line -> line.contains('"fabric-gametest"') ? null : line }
+    }
+}
+
 loom {
     // BlockEntityType's constructor is private only in 26.1.2. Keep the widening out of 26.2's
     // manifest and Loom transform so the cell does not retain obsolete privileged access.

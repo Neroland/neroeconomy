@@ -1,0 +1,56 @@
+{
+  "ok": true,
+  "data": {
+    "items": [
+      {
+        "reason": "MARKET_PURCHASE",
+        "amount": 120,
+        "currency": "nerolandcore:credits",
+        "timestamp": 1790999400000
+      },
+      {
+        "reason": "MARKET_PAYOUT",
+        "amount": 350,
+        "currency": "nerolandcore:credits",
+        "timestamp": 1790995800000
+      },
+      {
+        "reason": "PLAYER_PAYMENT",
+        "amount": 50,
+        "currency": "nerolandcore:credits",
+        "timestamp": 1790992200000
+      }
+    ],
+    "rows": [
+      {
+        "id": "tx-murusthc-0",
+        "at": 1790999400000,
+        "kind": "purchase",
+        "amount": -120,
+        "item": "Market purchase",
+        "qty": 0,
+        "reason": "MARKET_PURCHASE"
+      },
+      {
+        "id": "tx-mursnnpc-0",
+        "at": 1790995800000,
+        "kind": "sale",
+        "amount": 350,
+        "item": "Market sale",
+        "qty": 0,
+        "reason": "MARKET_PAYOUT"
+      },
+      {
+        "id": "tx-murqihxc-0",
+        "at": 1790992200000,
+        "kind": "transfer",
+        "amount": -50,
+        "item": "Payment sent",
+        "qty": 0,
+        "reason": "PLAYER_PAYMENT"
+      }
+    ],
+    "nextCursor": "3",
+    "asOf": 1791000000000
+  }
+}

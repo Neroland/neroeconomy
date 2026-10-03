@@ -1,8 +1,8 @@
 # NeroEconomy 0.1.0 completion plan
 
 All implementation stages are complete; runtime verification remains owner-operated. The 0.1.0
-feature set ships as `0.0.1-alpha.1` (`mod_version` in `gradle.properties`) until release; "0.1.0"
-below names the scope, not the published version string.
+feature set ships under the alpha version held in `mod_version` (`gradle.properties`) until
+release; "0.1.0" below names the scope, not the published version string.
 
 - [x] Stage 0: audit Core currency ownership, recovery, networking, platform seams, init order,
   configuration, telemetry, manifests, and dupe surfaces. See `AUDIT.md`.
@@ -21,5 +21,5 @@ below names the scope, not the published version string.
 
 ## Automated verification
 
-The handoff is valid only after the exact six-cell command in `AGENTS.md` succeeds, JSON parses,
+The handoff is valid only after the exact nine-cell command in `AGENTS.md` succeeds, JSON parses,
 Markdown and `git diff --check` are clean, and `AGENTS.md` equals `CLAUDE.md` byte-for-byte.

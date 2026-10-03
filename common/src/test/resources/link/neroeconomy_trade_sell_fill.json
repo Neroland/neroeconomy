@@ -1,0 +1,52 @@
+{
+  "ok": true,
+  "data": {
+    "currency": "nerolandcore:credits",
+    "balance": 1380,
+    "recentTrend": [
+      {
+        "at": 1790999400000,
+        "amount": 120,
+        "reason": "MARKET_PURCHASE"
+      },
+      {
+        "at": 1790995800000,
+        "amount": 350,
+        "reason": "MARKET_PAYOUT"
+      },
+      {
+        "at": 1790992200000,
+        "amount": 50,
+        "reason": "PLAYER_PAYMENT"
+      },
+      {
+        "at": 1790988600000,
+        "amount": 200,
+        "reason": "SHOP_PURCHASE"
+      },
+      {
+        "at": 1790902200000,
+        "amount": 1000,
+        "reason": "STARTING_BALANCE"
+      }
+    ],
+    "amount": 1380,
+    "symbol": "cr",
+    "history": [
+      0,
+      1000,
+      1200,
+      1150,
+      1500,
+      1380
+    ],
+    "asOf": 1791000000000,
+    "op": "sell",
+    "listingId": "9b2d7c10-3e4f-4c6a-8a1b-6d5e4f3a2b11",
+    "qty": 16,
+    "price": 4,
+    "total": 64,
+    "filled": true,
+    "delivery": "credit_claim"
+  }
+}

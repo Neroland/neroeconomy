@@ -1,7 +1,6 @@
 package za.co.neroland.neroeconomy.client;
 
 import java.util.List;
-import java.util.Locale;
 import java.util.UUID;
 
 import net.minecraft.client.gui.GuiGraphicsExtractor;
@@ -9,7 +8,6 @@ import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.network.chat.Component;
-import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.resources.Identifier;
 import net.minecraft.world.entity.player.Inventory;
 
@@ -27,6 +25,9 @@ import za.co.neroland.neroeconomy.network.MarketQueryPayload;
 import za.co.neroland.neroeconomy.network.NeroEconomyNetwork;
 import za.co.neroland.neroeconomy.network.OpportunityIntentPayload;
 import za.co.neroland.neroeconomy.network.OpportunityPagePayload;
+import za.co.neroland.neroeconomy.obligation.JobState;
+import za.co.neroland.neroeconomy.obligation.JobTargets;
+import za.co.neroland.neroeconomy.text.TimeText;
 
 /**
  * Paged searchable market UI, shared by the Trading Terminal and the Market Board. Selection and all
@@ -36,7 +37,7 @@ import za.co.neroland.neroeconomy.network.OpportunityPagePayload;
  * <pre>
  *   0..16     header: title (8, 6)
  *   20..38    search field (8, 20, 180x18) | Search (192, 20, 56x18)
- *   42..58    status well: balance (11, 46), listing/claim counts right-aligned at 245
+ *   42..58    status well: balance (11, 46), result/claim counts right-aligned at 245
  *   62..156   listing frame: 8 fixed rows of 11px from y 66, text clipped to the frame
  *   160..178  Previous (8) | Next (70) | Select (132), page readout right-aligned at 245
  *   182..200  Buy (8) | Collect (70) | Jobs (132) | Act (194), all 54 wide
@@ -83,10 +84,12 @@ public final class TradingTerminalScreen extends TexturedContainerScreen<Trading
     private int selected;
     private OpportunityPagePayload opportunities = new OpportunityPagePayload(0, 0,
             OpportunityPagePayload.Tab.CONTRACTS, List.of());
+    /** This client's monotonic clock when {@link #opportunities} arrived; its timers count down from here. */
+    private long opportunitiesReceivedNanos;
     private boolean opportunityTab;
 
     public TradingTerminalScreen(TradingTerminalMenu menu, Inventory inventory, Component title) {
-        super(menu, inventory, title, TERMINAL_TEXTURE, TERMINAL_ACCENT, PANEL_W, PANEL_H);
+        super(menu, inventory, title, TERMINAL_TEXTURE, PANEL_W, PANEL_H);
         this.titleLabelX = 8;
         this.titleLabelY = 6;
     }
@@ -184,7 +187,7 @@ public final class TradingTerminalScreen extends TexturedContainerScreen<Trading
 
     private void query(int targetPage) {
         this.opportunityTab = false;
-        NeroEconomyNetwork.sendToServer(new MarketQueryPayload(this.menu.containerId, UUID.randomUUID(),
+        NeroEconomyNetwork.sendToServer(new MarketQueryPayload(this.menu.containerId,
                 this.search == null ? "" : this.search.getValue(), targetPage));
     }
 
@@ -198,7 +201,7 @@ public final class TradingTerminalScreen extends TexturedContainerScreen<Trading
                     line.listingId(), 1));
         } else {
             NeroEconomyNetwork.sendToServer(new MarketBuyPayload(this.menu.containerId, UUID.randomUUID(),
-                    line.listingId(), 1, line.unitPrice()));
+                    line.listingId(), 1, line.unitPrice(), line.itemId()));
         }
     }
 
@@ -244,12 +247,22 @@ public final class TradingTerminalScreen extends TexturedContainerScreen<Trading
             return;
         }
         var line = this.opportunities.lines().get(Math.min(this.selected, this.opportunities.lines().size() - 1));
-        var action = this.opportunities.tab() == OpportunityPagePayload.Tab.AUCTIONS
-                ? OpportunityIntentPayload.Action.BID
-                : "CLAIMED".equals(line.state()) ? OpportunityIntentPayload.Action.FULFILL
+        boolean auction = this.opportunities.tab() == OpportunityPagePayload.Tab.AUCTIONS;
+        var action = auction ? OpportunityIntentPayload.Action.BID
+                : line.state() == JobState.CLAIMED ? OpportunityIntentPayload.Action.FULFILL
                 : OpportunityIntentPayload.Action.CLAIM;
+        // A bid is exactly the minimum next bid the server put on the row; the server refuses it,
+        // rather than raising it, if the auction has moved on since this page was sent.
         NeroEconomyNetwork.sendToServer(new OpportunityIntentPayload(this.menu.containerId, UUID.randomUUID(),
-                this.opportunities.tab(), action, line.id().toString(), Math.max(1L, line.amount() + 1L)));
+                this.opportunities.tab(), action, line.id().toString(), auction ? line.nextBid() : 0L));
+    }
+
+    /** Closing the screen empties both page mailboxes, so nothing sent to this terminal lingers. */
+    @Override
+    public void removed() {
+        super.removed();
+        ClientMarketPage.clear();
+        ClientOpportunityPage.clear();
     }
 
     @Override
@@ -262,23 +275,33 @@ public final class TradingTerminalScreen extends TexturedContainerScreen<Trading
             this.page = update;
             this.selected = pageChanged ? 0 : Math.min(this.selected, Math.max(0, this.page.lines().size() - 1));
         }
-        OpportunityPagePayload opportunityUpdate = ClientOpportunityPage.poll(this.menu.containerId);
-        if (opportunityUpdate != null && opportunityUpdate.revision() > this.opportunities.revision()) {
-            // The server re-pushes the open tab once a second to keep countdowns live, so neither the
-            // active tab nor the selection may be reset by a refresh of the same tab.
-            boolean tabChanged = opportunityUpdate.tab() != this.opportunities.tab();
-            this.opportunities = opportunityUpdate;
+        ClientOpportunityPage.Received received = ClientOpportunityPage.poll(this.menu.containerId);
+        if (received != null && received.page().revision() > this.opportunities.revision()) {
+            // The server re-pushes the open tab every few seconds, so neither the active tab nor the
+            // selection may be reset by a refresh of the same tab.
+            boolean tabChanged = received.page().tab() != this.opportunities.tab();
+            this.opportunities = received.page();
+            this.opportunitiesReceivedNanos = received.receivedNanos();
             this.selected = tabChanged ? 0
                     : Math.min(this.selected, Math.max(0, this.opportunities.lines().size() - 1));
         }
     }
 
-    /** Remaining time until an auction closes or a job expires, rendered from the server timestamp. */
-    private static String remaining(long endsAt) {
-        long seconds = Math.max(0L, endsAt - System.currentTimeMillis()) / 1000L;
-        return seconds >= 3600L
-                ? String.format(Locale.ROOT, "%dh%02dm", seconds / 3600L, seconds % 3600L / 60L)
-                : String.format(Locale.ROOT, "%02d:%02d", seconds / 60L, seconds % 60L);
+    /**
+     * Time left until an auction closes or a job expires. The server sends how long was left when it
+     * built the page; this counts down from when the page arrived, on this client's own monotonic
+     * clock, so no server timestamp is ever compared with the local clock.
+     */
+    private Component remaining(long remainingAtReceipt) {
+        TimeText.Remaining left = TimeText.remaining(TimeText.remainingNow(remainingAtReceipt,
+                this.opportunitiesReceivedNanos, System.nanoTime()));
+        return Component.translatable(left.key(), left.first(), left.second());
+    }
+
+    /** A job target as shown: ids are shown as sent, a player-bounty token through its lang key. */
+    private static Object targetText(String target) {
+        String key = JobTargets.playerLabelKey(target);
+        return key == null ? target : Component.translatable(key);
     }
 
     @Override
@@ -323,12 +346,13 @@ public final class TradingTerminalScreen extends TexturedContainerScreen<Trading
     private Component lineText(int index) {
         if (this.opportunityTab) {
             var line = this.opportunities.lines().get(index);
-            MutableComponent text = Component.translatable("gui.neroeconomy.opportunity.line", line.target(),
-                    line.amount(), line.state());
-            if (line.endsAt() > 0L) {
-                text = text.append(Component.literal("  " + remaining(line.endsAt())));
+            Component time = remaining(line.remainingMillis());
+            if (this.opportunities.tab() == OpportunityPagePayload.Tab.AUCTIONS) {
+                return Component.translatable("gui.neroeconomy.opportunity.auction_line", targetText(line.target()),
+                        line.amount(), line.nextBid(), time);
             }
-            return text;
+            return Component.translatable("gui.neroeconomy.opportunity.line", targetText(line.target()),
+                    line.amount(), Component.translatable(line.state().translationKey()), time);
         }
         var line = this.page.lines().get(index);
         return Component.translatable(line.buyOffer() ? "gui.neroeconomy.market.buy_line"

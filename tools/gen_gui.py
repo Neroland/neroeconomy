@@ -34,6 +34,9 @@ ACCENTS = {
     "player_shop": (96, 232, 140, 255),
     "trading_terminal": (48, 214, 190, 255),
     "market_board": (150, 236, 120, 255),
+    "vault": (72, 220, 150, 255),
+    "direct_trade": (84, 226, 172, 255),
+    "auto_trader": (120, 228, 150, 255),
 }
 
 
@@ -162,6 +165,70 @@ def gen_player_shop():
     return name, buf
 
 
+def gen_vault():
+    """176x236 — six rows of nine vault sockets, a status well, player inventory. Mirrors VaultScreen."""
+    name = "vault"
+    width, height = 176, 236
+    accent = ACCENTS[name]
+    buf = new_sheet()
+    hull(buf, name, width, height, accent)
+    header_rule(buf, width, 14, accent)
+    for row in range(6):
+        for col in range(9):
+            socket(buf, 8 + col * 18, 18 + row * 18)
+    recess(buf, 7, 128, 169, 142)   # status line: stacks waiting off screen, or the empty-vault hint
+    player_inventory(buf, 153, 211)
+    return name, buf
+
+
+def gen_direct_trade():
+    """176x224 — two three-by-three panes with a status column between them, a credits row, a
+    summary well, one action row and the player inventory. Mirrors DirectTradeScreen."""
+    name = "direct_trade"
+    width, height = 176, 224
+    accent = ACCENTS[name]
+    buf = new_sheet()
+    hull(buf, name, width, height, accent)
+    header_rule(buf, width, 14, accent)
+    for row in range(3):
+        for col in range(3):
+            socket(buf, 8 + col * 18, 27 + row * 18)     # you give
+            socket(buf, 116 + col * 18, 27 + row * 18)   # they give
+    recess(buf, 63, 26, 113, 81)    # confirmation lamps and the countdown
+    rect(buf, 65, 51, 111, 52, DIVIDER)
+    recess(buf, 7, 82, 169, 99)     # credits row: field, Set, the other side's credits
+    recess(buf, 7, 100, 169, 122)   # summary: what you give and what you get
+    recess(buf, 7, 122, 169, 140)   # Confirm / Cancel
+    player_inventory(buf, 143, 201)
+    return name, buf
+
+
+def gen_auto_trader():
+    """256x234 — input and output panes with a progress well under them, the rule editor on the
+    right, a two-line confirm well and the player inventory in the middle. Mirrors AutoTraderScreen."""
+    name = "auto_trader"
+    width, height = 256, 234
+    accent = ACCENTS[name]
+    buf = new_sheet()
+    hull(buf, name, width, height, accent)
+    header_rule(buf, width, 14, accent)
+    for row in range(3):
+        for col in range(3):
+            socket(buf, 8 + col * 18, 27 + row * 18)    # inputs
+            socket(buf, 70 + col * 18, 27 + row * 18)   # outputs
+    recess(buf, 7, 84, 128, 126)     # the rule's status, today, in total, the daily value cap
+    recess(buf, 131, 15, 251, 126)   # rule editor: toggles, id, three amounts, three buttons
+    rect(buf, 133, 60, 249, 61, DIVIDER)
+    rect(buf, 133, 108, 249, 109, DIVIDER)
+    recess(buf, 7, 128, 249, 150)    # confirm lines
+    for row in range(3):
+        for col in range(9):
+            socket(buf, 47 + col * 18, 153 + row * 18)
+    for col in range(9):
+        socket(buf, 47 + col * 18, 211)
+    return name, buf
+
+
 def gen_terminal(name):
     """256x226 — search row, status well, eight-row listing frame, two control rows, posting row."""
     width, height = 256, 226
@@ -182,7 +249,7 @@ def gen_terminal(name):
 
 def main():
     written = []
-    for build in (gen_bank_terminal, gen_player_shop):
+    for build in (gen_bank_terminal, gen_player_shop, gen_vault, gen_direct_trade, gen_auto_trader):
         name, buf = build()
         written.append((name, write_png(GUI_DIR / f"{name}.png", buf)))
     for board in ("trading_terminal", "market_board"):

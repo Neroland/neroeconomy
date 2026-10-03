@@ -6,10 +6,8 @@ import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.Identifier;
-import net.minecraft.server.level.ServerPlayer;
 
 import za.co.neroland.neroeconomy.NeroEconomyCommon;
-import za.co.neroland.neroeconomy.menu.TradingTerminalMenu;
 
 /** Board-only intent to escrow held goods into a sell offer. */
 public record MarketPostPayload(int containerId, UUID requestId, int quantity, long unitPrice)
@@ -25,10 +23,6 @@ public record MarketPostPayload(int containerId, UUID requestId, int quantity, l
     private static MarketPostPayload read(RegistryFriendlyByteBuf buf) {
         return new MarketPostPayload(buf.readVarInt(), buf.readUUID(), Math.max(1, Math.min(64, buf.readVarInt())),
                 Math.max(1L, buf.readVarLong()));
-    }
-    public static void handle(MarketPostPayload value, ServerPlayer player) {
-        if (player.containerMenu instanceof TradingTerminalMenu menu && menu.containerId == value.containerId
-                && menu.stillValid(player)) menu.post(player, value);
     }
     @Override public Type<? extends CustomPacketPayload> type() { return TYPE; }
 }

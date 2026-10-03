@@ -5,6 +5,7 @@ import java.util.UUID;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
+import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
 import net.minecraft.world.entity.player.Inventory;
@@ -23,16 +24,13 @@ import za.co.neroland.neroeconomy.network.NeroEconomyNetwork;
  *   16..32   balance readout well, text at (11, 20)
  *   38       "Recipient" caption          48..66  recipient field  (10, 48, 156x18)
  *   72       "Amount" caption             82..100 amount field     (10, 82, 156x18)
- *   106..126 action row: Send (10, 106, 74x20) | Collect (92, 106, 74x20)
+ *   106..126 action row: Send (10, 106, 50x20) | Collect (63, 106, 50x20) | Vault (116, 106, 50x20)
  * </pre>
  */
 public final class BankTerminalScreen extends TexturedContainerScreen<BankTerminalMenu> {
 
     private static final Identifier TEXTURE =
             Identifier.fromNamespaceAndPath(NeroEconomyCommon.MOD_ID, "textures/gui/bank_terminal.png");
-    /** Credit-green: the bank's accent. */
-    private static final int ACCENT = 0xFF38E6A1;
-
     private static final int PANEL_W = 176;
     private static final int PANEL_H = 134;
     private static final int FIELD_X = 10;
@@ -41,16 +39,15 @@ public final class BankTerminalScreen extends TexturedContainerScreen<BankTermin
     private static final int TARGET_Y = 48;
     private static final int AMOUNT_Y = 82;
     private static final int ACTION_Y = 106;
-    private static final int ACTION_W = 74;
+    private static final int ACTION_W = 50;
     private static final int ACTION_H = 20;
-    /** Menu button id for "collect everything owed to me". */
-    private static final int COLLECT_BUTTON = 3;
+    private static final int ACTION_STEP = 53;
 
     private EditBox target;
     private EditBox amount;
 
     public BankTerminalScreen(BankTerminalMenu menu, Inventory inventory, Component title) {
-        super(menu, inventory, title, TEXTURE, ACCENT, PANEL_W, PANEL_H);
+        super(menu, inventory, title, TEXTURE, PANEL_W, PANEL_H);
         this.titleLabelX = 8;
         this.titleLabelY = 6;
     }
@@ -69,12 +66,22 @@ public final class BankTerminalScreen extends TexturedContainerScreen<BankTermin
         addRenderableWidget(this.target);
         addRenderableWidget(this.amount);
         addRenderableWidget(Button.builder(Component.translatable("gui.neroeconomy.bank.send"), ignored -> send())
-                .bounds(this.leftPos + FIELD_X, this.topPos + ACTION_Y, ACTION_W, ACTION_H).build());
-        addRenderableWidget(Button.builder(Component.translatable("gui.neroeconomy.market.collect"), ignored -> {
+                .bounds(this.leftPos + FIELD_X, this.topPos + ACTION_Y, ACTION_W, ACTION_H)
+                .tooltip(Tooltip.create(Component.translatable("gui.neroeconomy.bank.send.tooltip"))).build());
+        addRenderableWidget(menuButton("gui.neroeconomy.market.collect", "gui.neroeconomy.bank.collect.tooltip",
+                BankTerminalMenu.COLLECT_BUTTON, 1));
+        addRenderableWidget(menuButton("gui.neroeconomy.bank.vault", "gui.neroeconomy.bank.vault.tooltip",
+                BankTerminalMenu.VAULT_BUTTON, 2));
+    }
+
+    /** A button of the action row that presses a menu button on the server. */
+    private Button menuButton(String label, String tooltip, int id, int position) {
+        return Button.builder(Component.translatable(label), ignored -> {
             if (this.minecraft != null && this.minecraft.gameMode != null) {
-                this.minecraft.gameMode.handleInventoryButtonClick(this.menu.containerId, COLLECT_BUTTON);
+                this.minecraft.gameMode.handleInventoryButtonClick(this.menu.containerId, id);
             }
-        }).bounds(this.leftPos + 92, this.topPos + ACTION_Y, ACTION_W, ACTION_H).build());
+        }).bounds(this.leftPos + FIELD_X + position * ACTION_STEP, this.topPos + ACTION_Y, ACTION_W, ACTION_H)
+                .tooltip(Tooltip.create(Component.translatable(tooltip))).build();
     }
 
     private void send() {

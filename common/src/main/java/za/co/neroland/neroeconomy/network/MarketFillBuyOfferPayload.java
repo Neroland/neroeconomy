@@ -5,9 +5,7 @@ import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.Identifier;
-import net.minecraft.server.level.ServerPlayer;
 import za.co.neroland.neroeconomy.NeroEconomyCommon;
-import za.co.neroland.neroeconomy.menu.TradingTerminalMenu;
 
 /** Idempotent intent to fill a credits-backed buy offer from the player's main hand. */
 public record MarketFillBuyOfferPayload(int containerId, UUID requestId, UUID offerId, int quantity)
@@ -23,10 +21,6 @@ public record MarketFillBuyOfferPayload(int containerId, UUID requestId, UUID of
     private static MarketFillBuyOfferPayload read(RegistryFriendlyByteBuf buf) {
         return new MarketFillBuyOfferPayload(buf.readVarInt(), buf.readUUID(), buf.readUUID(),
                 Math.max(1, Math.min(2304, buf.readVarInt())));
-    }
-    public static void handle(MarketFillBuyOfferPayload value, ServerPlayer player) {
-        if (player.containerMenu instanceof TradingTerminalMenu menu && menu.containerId == value.containerId
-                && menu.stillValid(player)) menu.fillBuyOffer(player, value);
     }
     @Override public Type<? extends CustomPacketPayload> type() { return TYPE; }
 }

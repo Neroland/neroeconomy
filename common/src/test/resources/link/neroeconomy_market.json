@@ -1,0 +1,74 @@
+{
+  "ok": true,
+  "data": {
+    "items": [
+      {
+        "listingId": "5f0c1a52-8f0e-4a51-9d2e-0b7c3a1e4d01",
+        "item": "minecraft:diamond",
+        "stock": 12,
+        "unitPrice": 95
+      },
+      {
+        "listingId": "5f0c1a52-8f0e-4a51-9d2e-0b7c3a1e4d02",
+        "item": "minecraft:diamond_sword",
+        "stock": 1,
+        "unitPrice": 420
+      },
+      {
+        "listingId": "5f0c1a52-8f0e-4a51-9d2e-0b7c3a1e4d03",
+        "item": "minecraft:iron_ingot",
+        "stock": 64,
+        "unitPrice": 6
+      },
+      {
+        "listingId": "5f0c1a52-8f0e-4a51-9d2e-0b7c3a1e4d04",
+        "item": "neroeconomy:credit_chip",
+        "stock": 3,
+        "unitPrice": 250
+      }
+    ],
+    "page": 0,
+    "listings": [
+      {
+        "listingId": "5f0c1a52-8f0e-4a51-9d2e-0b7c3a1e4d01",
+        "displayName": "Diamond",
+        "item": "minecraft:diamond",
+        "qtyAvailable": 12,
+        "unitPrice": 95,
+        "side": "buy",
+        "pristine": true
+      },
+      {
+        "listingId": "5f0c1a52-8f0e-4a51-9d2e-0b7c3a1e4d02",
+        "displayName": "Diamond Sword (modified)",
+        "item": "minecraft:diamond_sword",
+        "qtyAvailable": 1,
+        "unitPrice": 420,
+        "side": "buy",
+        "pristine": false
+      },
+      {
+        "listingId": "5f0c1a52-8f0e-4a51-9d2e-0b7c3a1e4d04",
+        "displayName": "Credit Chip",
+        "item": "neroeconomy:credit_chip",
+        "qtyAvailable": 3,
+        "unitPrice": 250,
+        "side": "buy",
+        "pristine": true
+      },
+      {
+        "listingId": "9b2d7c10-3e4f-4c6a-8a1b-6d5e4f3a2b11",
+        "displayName": "Oak Log",
+        "item": "minecraft:oak_log",
+        "qtyAvailable": 128,
+        "unitPrice": 4,
+        "side": "sell",
+        "pristine": true
+      }
+    ],
+    "pageSize": 25,
+    "total": 6,
+    "hasMore": false,
+    "asOf": 1791000000000
+  }
+}

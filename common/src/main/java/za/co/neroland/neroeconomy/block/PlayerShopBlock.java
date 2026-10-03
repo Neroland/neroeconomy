@@ -2,8 +2,10 @@ package za.co.neroland.neroeconomy.block;
 
 import com.mojang.serialization.MapCodec;
 
+import net.minecraft.commands.Commands;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.LivingEntity;
@@ -27,6 +29,9 @@ import net.minecraft.world.phys.BlockHitResult;
 import org.jetbrains.annotations.Nullable;
 
 import za.co.neroland.nerolandcore.registry.BlockCodecs;
+import za.co.neroland.neroeconomy.economy.EconomyHealth;
+import za.co.neroland.neroeconomy.market.MarketSavedData;
+import za.co.neroland.neroeconomy.shop.ShopOwnershipState;
 
 public final class PlayerShopBlock extends BaseEntityBlock {
     public static final MapCodec<PlayerShopBlock> CODEC = BlockCodecs.simple(PlayerShopBlock::new);
@@ -37,9 +42,27 @@ public final class PlayerShopBlock extends BaseEntityBlock {
         super(properties);
         this.registerDefaultState(this.stateDefinition.any().setValue(FACING, Direction.NORTH));
     }
+    /**
+     * Who may break a shop: its owner, a permission-level-2 operator, or anyone at all when the shop
+     * has no owner on record (its owner's data was erased, or it was placed by a command). Breaking
+     * never loses stock: whatever is in escrow goes to the listed owner's vault.
+     */
     public static boolean canBreak(Level level, BlockPos pos, Player player) {
-        return !(level.getBlockEntity(pos) instanceof PlayerShopBlockEntity shop)
-                || shop.isOwner(player.getUUID());
+        if (!(level.getBlockEntity(pos) instanceof PlayerShopBlockEntity shop)) return true;
+        boolean operator = Commands.LEVEL_GAMEMASTERS.check(player.permissions());
+        // While the economy is frozen the owner records cannot be read, so "no owner on record"
+        // proves nothing: only an operator may break a shop until the store is back.
+        if (!level.isClientSide() && EconomyHealth.frozen()) return operator;
+        return !shop.hasOwner() || shop.isOwner(player.getUUID()) || operator;
+    }
+
+    /**
+     * Forgets the shop that stood at {@code pos}: drops its owner row and releases any listing still
+     * recorded there. Safe to call when nothing is recorded, so every removal path may call it.
+     */
+    private static void forgetShop(ServerLevel level, BlockPos pos) {
+        ShopOwnershipState.get(level.getServer()).remove(level, pos);
+        MarketSavedData.get(level.getServer()).releaseShopsAt(ShopOwnershipState.key(level, pos));
     }
     protected MapCodec<PlayerShopBlock> codec() { return CODEC; }
     @Override protected RenderShape getRenderShape(BlockState state) { return RenderShape.MODEL; }
@@ -96,12 +119,26 @@ public final class PlayerShopBlock extends BaseEntityBlock {
         return super.getDestroyProgress(state, player, level, pos);
     }
 
+    /**
+     * A freshly placed shop starts with no owner and no listing. Anything still recorded at this
+     * position belongs to an earlier shop whose removal was never reported, so it is settled here
+     * before {@link #setPlacedBy} claims the new one for its placer.
+     */
     @Override
-    public BlockState playerWillDestroy(Level level, BlockPos pos, BlockState state, Player player) {
-        if (level instanceof net.minecraft.server.level.ServerLevel serverLevel) {
-            if (level.getBlockEntity(pos) instanceof PlayerShopBlockEntity shop) shop.cancel();
-            za.co.neroland.neroeconomy.shop.ShopOwnershipState.get(serverLevel.getServer()).remove(serverLevel, pos);
-        }
-        return super.playerWillDestroy(level, pos, state, player);
+    protected void onPlace(BlockState state, Level level, BlockPos pos, BlockState oldState, boolean movedByPiston) {
+        super.onPlace(state, level, pos, oldState, movedByPiston);
+        if (level instanceof ServerLevel serverLevel && !oldState.is(state.getBlock())) forgetShop(serverLevel, pos);
+    }
+
+    /**
+     * Runs for every removal that updates neighbours — mining, explosions, pistons, {@code destroy} —
+     * whoever or whatever caused it. The block entity is already gone here, so the records are
+     * settled by position. Removals that suppress this hook are caught by {@code ShopSweep}.
+     */
+    @Override
+    protected void affectNeighborsAfterRemoval(BlockState state, ServerLevel level, BlockPos pos,
+            boolean movedByPiston) {
+        forgetShop(level, pos);
+        super.affectNeighborsAfterRemoval(state, level, pos, movedByPiston);
     }
 }

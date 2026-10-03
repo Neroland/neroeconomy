@@ -20,8 +20,15 @@ import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.phys.Vec3;
 
+import za.co.neroland.neroeconomy.platform.Services;
+
 /**
- * CLIENT, creative-debug: an automated, fully-reproducible screenshot pass over the
+ * CLIENT, creative-debug, <b>development environment only</b> (see {@link #available()}): the
+ * {@code /necgallery} command and the tick hook are wired up in a dev run and nowhere else, and the
+ * {@code neroeconomy:capture} dimension it teleports into is left out of every built jar, so a
+ * release build carries no capture command and adds no dimension to anyone's world.
+ *
+ * <p>An automated, fully-reproducible screenshot pass over the
  * {@code /neroeconomy gallery} scene — the four listing shots the Modrinth gallery sync consumes
  * ({@code bank_terminal}, {@code player_shop}, {@code trading_terminal}, {@code market_board}).
  * {@code /neroeconomy gallery} builds the scene server-side; this harness then drives the camera,
@@ -145,6 +152,15 @@ public final class GalleryCaptureHarness {
     private GalleryCaptureHarness() {
     }
 
+    /**
+     * Whether the capture tooling exists in this run: only in a development environment. Each
+     * loader's client setup asks this before registering the command or the tick hook, and
+     * {@link #registerClientCommands} asks again, so a release jar has no {@code /necgallery}.
+     */
+    public static boolean available() {
+        return Services.PLATFORM.isDevelopmentEnvironment();
+    }
+
     // ------------------------------------------------------------------------------------------------
     // Command registration (generic in the brigadier source type — bodies never read the source).
     // ------------------------------------------------------------------------------------------------
@@ -156,6 +172,9 @@ public final class GalleryCaptureHarness {
      * The root must NOT be {@code neroeconomy} — see the class javadoc (it would shadow the server tree).
      */
     public static <S> void registerClientCommands(CommandDispatcher<S> dispatcher) {
+        if (!available()) {
+            return;
+        }
         dispatcher.register(
                 LiteralArgumentBuilder.<S>literal("necgallery")
                         .then(LiteralArgumentBuilder.<S>literal("capture")
@@ -177,14 +196,14 @@ public final class GalleryCaptureHarness {
             return 0;
         }
         if (running) {
-            mc.player.sendSystemMessage(Component.literal("Gallery capture already running."));
+            mc.player.sendSystemMessage(Component.translatable("command.neroeconomy.capture.already_running"));
             return 0;
         }
         QUEUE.clear();
         QUEUE.addAll(galleryQueue(time));
         begin(mc);
-        mc.player.sendSystemMessage(Component.literal("Gallery capture: rebuilding scene, time=" + time + ", "
-                + QUEUE.size() + " shots → screenshots/neroeconomy/ (overlays hidden)."));
+        mc.player.sendSystemMessage(Component.translatable("command.neroeconomy.capture.started", time,
+                QUEUE.size()));
         return Command.SINGLE_SUCCESS;
     }
 
@@ -372,7 +391,7 @@ public final class GalleryCaptureHarness {
         RenderTarget target = mainRenderTarget(mc);
         if (target == null) {
             if (mc.player != null) {
-                mc.player.sendSystemMessage(Component.literal("Capture: could not resolve the render target."));
+                mc.player.sendSystemMessage(Component.translatable("command.neroeconomy.capture.no_render_target"));
             }
             return;
         }
@@ -395,7 +414,7 @@ public final class GalleryCaptureHarness {
         current = null;
         QUEUE.clear();
         if (mc.player != null) {
-            mc.player.sendSystemMessage(Component.literal("Capture done — see screenshots/neroeconomy/."));
+            mc.player.sendSystemMessage(Component.translatable("command.neroeconomy.capture.done"));
         }
     }
 

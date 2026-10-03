@@ -1,3 +1,11 @@
+[![NeroLink App — Beta](https://img.shields.io/badge/NeroLink_App-Now_in_Beta-60d4e8?style=for-the-badge)](https://nerolandmc.net/nerolink/#beta) [![Explore the Neroland ecosystem](https://img.shields.io/badge/Explore-The_Neroland_Ecosystem-1a5a6c?style=for-the-badge)](https://nerolandmc.net/ecosystem/)
+
+> 📱 **NeroLink App Beta — your Neroland world on your phone.** Check energy, alerts and machines live, claim quest rewards and search your storage without logging in. **[Join the beta at nerolandmc.net →](https://nerolandmc.net/nerolink/#beta)**
+>
+> 🌌 **Explore the Neroland ecosystem.** See how NeroEconomy fits together with the rest of the Nero mods — every mod, wiki and changelog in one place. **[View the ecosystem at nerolandmc.net →](https://nerolandmc.net/ecosystem/)** · [NeroEconomy on the website](https://nerolandmc.net/mods/neroeconomy/)
+
+---
+
 # NeroEconomy
 
 **Buy, sell, haul and bid — a player-driven economy that turns a Neroland server from sixteen solo grinds into one living market.**
@@ -36,7 +44,7 @@ History is **bounded** and has a **configurable, finite retention window**, purg
 
 - 🧩 **Built on Neroland Core** — one currency API, one progression arc, shared `c:` tags, and its own creative tab. Core is the only hard dependency.
 - 🔌 **Interoperates, never hard-depends** — siblings are detected at runtime behind string-keyed interfaces: **NeroLogistics** can post and fulfil delivery jobs, **NeroEvents** can apply capped price shocks, **NeroQuests** can pay credit rewards, and **Nerospace** meteors can drop Credit Chips. With them absent, everything degrades gracefully.
-- 🧱 **Cross-loader** — NeoForge, Forge, and Fabric on Minecraft **26.1.2** and **26.2**.
+- 🧱 **Cross-loader** — NeoForge, Forge, and Fabric on Minecraft **26.1.2**, **26.2** and **26.3**.
 
 ### Coming later
 

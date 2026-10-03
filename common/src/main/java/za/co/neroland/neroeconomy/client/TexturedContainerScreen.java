@@ -1,7 +1,13 @@
 package za.co.neroland.neroeconomy.client;
 
+import com.mojang.blaze3d.platform.InputConstants;
+
+import net.minecraft.client.gui.ComponentPath;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.components.EditBox;
+import net.minecraft.client.gui.navigation.FocusNavigationEvent;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
+import net.minecraft.client.input.KeyEvent;
 import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
@@ -20,7 +26,6 @@ import net.minecraft.world.inventory.AbstractContainerMenu;
 public abstract class TexturedContainerScreen<T extends AbstractContainerMenu> extends AbstractContainerScreen<T> {
 
     /** Shared palette (kept byte-identical in spirit with the rest of the ecosystem's screens). */
-    protected static final int INK = 0xFF05080D;       // near-black trough border
     protected static final int TROUGH = 0xFF0B1119;    // gauge / list backing
     protected static final int TITLE = 0xFFD6ECFF;     // bright label
     protected static final int SUBTLE = 0xFF8DA0B4;    // dim label
@@ -28,16 +33,50 @@ public abstract class TexturedContainerScreen<T extends AbstractContainerMenu> e
     protected static final int CREDIT = 0xFF38E6A1;
     /** Selected list row text. */
     protected static final int SELECTED = 0xFFFFD166;
+    /** Lang key that wraps a shortened text with its ellipsis. */
+    private static final String ELLIPSIS = "gui.neroeconomy.ellipsis";
 
     private final Identifier background;
-    /** Screen accent colour (ARGB). */
-    protected final int accent;
 
     protected TexturedContainerScreen(T menu, Inventory playerInventory, Component title, Identifier background,
-                                      int accent, int width, int height) {
+                                      int width, int height) {
         super(menu, playerInventory, title, width, height);
         this.background = background;
-        this.accent = accent;
+    }
+
+    /**
+     * While a text box has focus, keys belong to it. Without this the container screen closes on
+     * the inventory key and fires its hotbar, drop and pick hotkeys for letters typed into a
+     * search, recipient, amount or price field. Escape still closes and Tab still moves between
+     * fields; everything else goes to the box and nowhere else.
+     */
+    @Override
+    public boolean keyPressed(KeyEvent event) {
+        EditBox typing = getFocused() instanceof EditBox box && box.canConsumeInput() ? box : null;
+        TextInputKeys.Route route = TextInputKeys.route(event.isEscape(), typing != null,
+                event.key() == InputConstants.KEY_TAB);
+        if (route == TextInputKeys.Route.SCREEN || typing == null) {
+            return super.keyPressed(event);
+        }
+        if (route == TextInputKeys.Route.FOCUS) {
+            moveFocus(!event.hasShiftDown());
+        } else {
+            typing.keyPressed(event);
+        }
+        return true;
+    }
+
+    /** Tab traversal, as the base screen does it, without the container hotkeys that follow it there. */
+    private void moveFocus(boolean forward) {
+        FocusNavigationEvent.TabNavigation navigation = new FocusNavigationEvent.TabNavigation(forward);
+        ComponentPath path = nextFocusPath(navigation);
+        if (path == null) {
+            clearFocus();
+            path = nextFocusPath(navigation);
+        }
+        if (path != null) {
+            changeFocus(path);
+        }
     }
 
     @Override
@@ -70,19 +109,6 @@ public abstract class TexturedContainerScreen<T extends AbstractContainerMenu> e
 
     // --- Drawing helpers (panel-relative dx/dy) -----------------------------
 
-    /** A horizontal gauge: dark trough with an accent fill {@code frac} (0..1) of its width. */
-    protected void hGauge(GuiGraphicsExtractor g, int dx, int dy, int w, int h, float frac, int fill) {
-        int x = this.leftPos + dx;
-        int y = this.topPos + dy;
-        g.fill(x - 1, y - 1, x + w + 1, y + h + 1, INK);
-        g.fill(x, y, x + w, y + h, TROUGH);
-        int fw = Math.max(0, Math.min(w, Math.round(w * frac)));
-        if (fw > 0) {
-            g.fill(x, y, x + fw, y + h, fill);
-            g.fill(x, y, x + fw, y + 1, 0x55FFFFFF); // top sheen
-        }
-    }
-
     /** Left-aligned label text at a panel-relative position. */
     protected void label(GuiGraphicsExtractor g, Component text, int dx, int dy, int color) {
         g.text(this.font, text, this.leftPos + dx, this.topPos + dy, color, false);
@@ -93,11 +119,6 @@ public abstract class TexturedContainerScreen<T extends AbstractContainerMenu> e
         g.text(this.font, text, this.leftPos + dxRight - this.font.width(text), this.topPos + dy, color, false);
     }
 
-    /** Centred label text within {@code [dx, dx+width)}. */
-    protected void labelCentered(GuiGraphicsExtractor g, Component text, int dx, int width, int dy, int color) {
-        g.centeredText(this.font, text, this.leftPos + dx + width / 2, this.topPos + dy, color);
-    }
-
     /** A flat filled band (selection highlights, dividers) in panel-relative coords. */
     protected void band(GuiGraphicsExtractor g, int dx, int dy, int w, int h, int color) {
         int x = this.leftPos + dx;
@@ -105,28 +126,17 @@ public abstract class TexturedContainerScreen<T extends AbstractContainerMenu> e
         g.fill(x, y, x + w, y + h, color);
     }
 
-    /** A 1px hollow rectangle in panel-relative coords. */
-    protected void outline(GuiGraphicsExtractor g, int dx, int dy, int w, int h, int color) {
-        int x = this.leftPos + dx;
-        int y = this.topPos + dy;
-        g.fill(x, y, x + w, y + 1, color);
-        g.fill(x, y + h - 1, x + w, y + h, color);
-        g.fill(x, y, x + 1, y + h, color);
-        g.fill(x + w - 1, y, x + w, y + h, color);
-    }
-
     /**
      * Shortens {@code text} to fit {@code maxWidth} pixels, appending an ellipsis. List rows carry
      * server-supplied item ids of unbounded length, so every row is trimmed before it is drawn and can
-     * never bleed past its frame.
+     * never bleed past its frame. Text that already fits is returned as it is.
      */
     protected Component trim(Component text, int maxWidth) {
         String raw = text.getString();
         if (this.font.width(raw) <= maxWidth) {
-            return Component.literal(raw);
+            return text;
         }
-        String ellipsis = "...";
-        int budget = Math.max(0, maxWidth - this.font.width(ellipsis));
+        int budget = Math.max(0, maxWidth - this.font.width(Component.translatable(ELLIPSIS, "")));
         StringBuilder kept = new StringBuilder();
         int used = 0;
         for (int i = 0; i < raw.length(); i++) {
@@ -137,6 +147,6 @@ public abstract class TexturedContainerScreen<T extends AbstractContainerMenu> e
             kept.append(raw.charAt(i));
             used += charWidth;
         }
-        return Component.literal(kept + ellipsis);
+        return Component.translatable(ELLIPSIS, kept.toString());
     }
 }

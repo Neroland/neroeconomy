@@ -9,6 +9,7 @@ import net.minecraft.world.level.material.MapColor;
 import za.co.neroland.nerolandcore.registry.RegistrationProvider;
 import za.co.neroland.nerolandcore.registry.RegistrationProvider.RegistryEntry;
 import za.co.neroland.neroeconomy.NeroEconomyCommon;
+import za.co.neroland.neroeconomy.block.AutoTraderBlock;
 import za.co.neroland.neroeconomy.block.BankTerminalBlock;
 import za.co.neroland.neroeconomy.block.PlayerShopBlock;
 import za.co.neroland.neroeconomy.block.TradingTerminalBlock;
@@ -25,6 +26,8 @@ public final class ModBlocks {
             key -> new TradingTerminalBlock(properties().setId(key)));
     public static final RegistryEntry<MarketBoardBlock> MARKET_BOARD = BLOCKS.register("market_board",
             key -> new MarketBoardBlock(properties().setId(key)));
+    public static final RegistryEntry<AutoTraderBlock> AUTO_TRADER = BLOCKS.register("auto_trader",
+            key -> new AutoTraderBlock(properties().setId(key)));
 
     private ModBlocks() {
     }

@@ -8,6 +8,7 @@ import net.minecraft.world.level.block.entity.BlockEntityType;
 import za.co.neroland.nerolandcore.registry.RegistrationProvider;
 import za.co.neroland.nerolandcore.registry.RegistrationProvider.RegistryEntry;
 import za.co.neroland.neroeconomy.NeroEconomyCommon;
+import za.co.neroland.neroeconomy.block.AutoTraderBlockEntity;
 import za.co.neroland.neroeconomy.block.BankTerminalBlockEntity;
 import za.co.neroland.neroeconomy.block.PlayerShopBlockEntity;
 import za.co.neroland.neroeconomy.block.TradingTerminalBlockEntity;
@@ -28,6 +29,10 @@ public final class ModBlockEntities {
     public static final RegistryEntry<BlockEntityType<MarketBoardBlockEntity>> MARKET_BOARD =
             TYPES.register("market_board", key -> new BlockEntityType<>(MarketBoardBlockEntity::new,
                     Set.of(ModBlocks.MARKET_BOARD.get())));
+
+    public static final RegistryEntry<BlockEntityType<AutoTraderBlockEntity>> AUTO_TRADER =
+            TYPES.register("auto_trader", key -> new BlockEntityType<>(AutoTraderBlockEntity::new,
+                    Set.of(ModBlocks.AUTO_TRADER.get())));
 
     private ModBlockEntities() {
     }

@@ -168,6 +168,18 @@ subprojects {
         }
     }
     if (isNode) {
+        // Dev-only capture tooling. The flat `neroeconomy:capture` dimension is the backdrop for the
+        // /necgallery screenshot harness, which only exists in a development environment. The JSON
+        // stays in common/src/main/resources, so every dev run (which reads the processed resources
+        // directory, not a jar) still has the dimension, but it is left out of every jar this build
+        // produces: a released mod must not add a dimension to players' worlds.
+        tasks.withType(org.gradle.jvm.tasks.Jar).configureEach {
+            exclude 'data/neroeconomy/dimension/capture.json'
+            // ...and do not leave the emptied `dimension/` folder behind in its place.
+            includeEmptyDirs = false
+        }
+    }
+    if (isNode) {
         // Compute the unique name HERE (project = the Gradle project); inside
         // `eclipse.project {}` `project` rebinds to the Eclipse model, which has no `parent`.
         def nodeEclipseName = "neroeconomy-${project.parent.name}-${project.name}"
@@ -238,69 +250,6 @@ subprojects {
         // their Java/test tasks disabled makes the root `test` selector exercise only real nodes.
         tasks.withType(JavaCompile).configureEach { enabled = false }
         tasks.withType(Test).configureEach { enabled = false }
-    }
-}
-
-// ---------------------------------------------------------------------------
-// Bidirectional Blockbench <-> Java entity-model sync for the MULTILOADER.
-// Runs the shared tools/model_sync.py with --multiloader, so it operates on
-// common/src/main/java (the entity model classes carry the
-// model_sync:begin/end markers) + the repo-root art/blockbench/entity/*.bbmodel.
-// Standalone (NOT auto-wired into compileJava — keeps the green build free of a
-// hard Python requirement); run it deliberately when you edit a .bbmodel or the
-// marked Java cube block:
-//   ./gradlew syncModels                          # auto direction (newest wins)
-//   ./gradlew syncModels -PmodelSyncArgs=--check  # report drift, write nothing
-//   ./gradlew syncModels -PmodelSyncArgs=--to-java # force .bbmodel -> Java
-// Python is auto-detected (python/py/python3 + pyenv shims); override -PpythonCmd=.
-// ---------------------------------------------------------------------------
-tasks.register('syncModels') {
-    group = 'neroeconomy'
-    description = 'Sync entity-model Blockbench <-> Java for common (tools/model_sync.py --multiloader).'
-    // <repo> = the project root (now flattened); run python from there so tools/model_sync.py resolves.
-    def repoRoot = rootProject.projectDir
-    def pythonOverride = providers.gradleProperty('pythonCmd').getOrNull()
-    def isWindows = System.getProperty('os.name').toLowerCase().contains('win')
-    def pyenvRoot = System.getenv('PYENV_ROOT') ?: System.getenv('PYENV')
-    if (!pyenvRoot && System.getenv('USERPROFILE')) {
-        pyenvRoot = System.getenv('USERPROFILE') + '\\.pyenv\\pyenv-win'
-    }
-    if (!pyenvRoot && System.getenv('HOME')) {
-        pyenvRoot = System.getenv('HOME') + '/.pyenv'
-    }
-    def extra = (providers.gradleProperty('modelSyncArgs').getOrElse('')).split(' ').findAll { it } as List
-    doLast {
-        def wrap = { c -> isWindows ? (['cmd', '/c'] + c) : c }
-        def candidates = []
-        if (pythonOverride) candidates << [pythonOverride]
-        candidates += [['python'], ['py'], ['python3']]
-        if (pyenvRoot) {
-            def r = pyenvRoot.replaceAll(/[\\\/]+$/, '')
-            candidates << [r + (isWindows ? '\\shims\\python.bat' : '/shims/python')]
-            candidates << [r + (isWindows ? '\\bin\\python.exe' : '/bin/python')]
-        }
-        def python = null
-        for (c in candidates) {
-            try {
-                def probe = wrap(c + ['--version']).execute(null, repoRoot)
-                def o = new StringBuilder(); def e = new StringBuilder()
-                probe.consumeProcessOutput(o, e); probe.waitFor()
-                if (probe.exitValue() == 0) { python = c; break }
-            } catch (ignored) {}
-        }
-        if (python == null) {
-            throw new GradleException(
-                "model_sync: no Python found (tried ${candidates}); set -PpythonCmd=<path>. " +
-                "Detected pyenv root: ${pyenvRoot}")
-        }
-        def proc = wrap(python + ['tools/model_sync.py', '--multiloader'] + extra).execute(null, repoRoot)
-        def out = new StringBuilder(); def err = new StringBuilder()
-        proc.consumeProcessOutput(out, err)
-        proc.waitFor()
-        if (out.length() > 0) println out.toString().trim()
-        if (proc.exitValue() != 0) {
-            throw new GradleException("model_sync failed (exit ${proc.exitValue()}):\n${err}")
-        }
     }
 }
 
