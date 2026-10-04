@@ -187,7 +187,11 @@ companies ship, one index fund and three bond terms.
 - **The exchange is the counterparty.** Buys pay the ask and sells receive the bid (a spread around
   the model price), plus `exchangeFeePercent`. Player orders do not move the price.
 - **Principal and gains.** A buy moves principal to `system:exchange`. A sell returns principal;
-  a gain is paid by the Reserve within `exchangeDailyBudget`, a loss goes to the Reserve.
+  a gain is paid by the Reserve within `exchangeDailyBudget`, a loss goes to the Reserve. When the
+  Reserve cannot pay a gain in full the sell is refused unless the player accepts the exact reduced
+  amount quoted; principal always returns in full.
+- **Dividends** are paid once per economy-day on units held for a full day, pro rata when the
+  budget is short. **Splits**: a share at or above 2000 credits splits 10-for-1 at the day roll.
 - **Limits.** A lot cannot be sold for `shareHoldMinutes` (60) after it was bought. Positions are
   capped per stock (`maxPositionPerStock`, 5000 credits at cost) and in total (`maxPortfolio`,
   20000). An immediate round trip always loses the spread and both fees.

@@ -1,0 +1,18 @@
+{
+  "name": "stock.neroeconomy.settlers_row_supply",
+  "description": "stock.neroeconomy.settlers_row_supply.description",
+  "sector": "colonies",
+  "type": "steady",
+  "start_price": 95,
+  "volatility": 4.0,
+  "drift": 7.5,
+  "dividend_yield": 1.0,
+  "linked": [
+    "#minecraft:planks",
+    "#minecraft:logs",
+    "#c:stones",
+    "#c:cobblestones",
+    "minecraft:bricks",
+    "#minecraft:beds"
+  ]
+}

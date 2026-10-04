@@ -146,6 +146,8 @@ public final class ServerCurrencyProvider implements CurrencyProvider {
             za.co.neroland.neroeconomy.network.IntentGuard.clear();
             // Trade requests and open trade windows belong to the players of the world that stopped.
             za.co.neroland.neroeconomy.direct.DirectTrades.clear();
+            // And the exchange's per-account rate limits.
+            za.co.neroland.neroeconomy.exchange.Investing.clear();
             // A new session reports each failing simulation handler once again.
             Simulation.reset();
             // Nor whatever the companion-app module holds per player.
@@ -565,6 +567,22 @@ public final class ServerCurrencyProvider implements CurrencyProvider {
             if (ok) total += share.getValue();
         }
         return new Reserve.ProRata(planned.requested(), total, planned.numerator(), planned.denominator(), paid);
+    }
+
+    /**
+     * {@link #payProRata} for {@code ledger}: through Core, so balance listeners hear of it, when
+     * that is the ledger of the server this provider is bound to, and straight to the ledger
+     * otherwise — a store in a unit test, or one that is not bound yet.
+     */
+    public Reserve.ProRata payProRataOn(EconomySavedData ledger, BudgetKind kind, Map<UUID, Long> amounts,
+            TransactionType type) {
+        if (ledger != null && active == ledger) return payProRata(kind, amounts, type);
+        Map<AccountId, Long> wanted = new LinkedHashMap<>();
+        if (amounts != null) amounts.forEach((player, amount) -> {
+            if (player != null && amount != null) wanted.put(new PlayerAccountId(player), amount);
+        });
+        if (ledger == null || kind == null || type == null) return Reserve.shares(wanted, 0L);
+        return ledger.payProRata(kind, wanted, type);
     }
 
     /**

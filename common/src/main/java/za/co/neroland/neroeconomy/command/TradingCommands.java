@@ -84,7 +84,7 @@ final class TradingCommands {
      * The player running a trading command, or null after telling the caller why not: not a
      * player, a frozen economy, dead or spectating, or over the packet budget.
      */
-    private static ServerPlayer trader(CommandContext<CommandSourceStack> context, boolean movesValue) {
+    static ServerPlayer trader(CommandContext<CommandSourceStack> context, boolean movesValue) {
         ServerPlayer player = context.getSource().getPlayer();
         if (player == null) return refuse(context, "command.neroeconomy.player_only");
         if (movesValue && EconomyHealth.frozen()) return refuse(context, EconomyHealth.FROZEN_KEY);
@@ -99,7 +99,7 @@ final class TradingCommands {
         return null;
     }
 
-    private static int fail(CommandContext<CommandSourceStack> context, String key, Object... args) {
+    static int fail(CommandContext<CommandSourceStack> context, String key, Object... args) {
         context.getSource().sendFailure(Component.translatable(key, args));
         return 0;
     }

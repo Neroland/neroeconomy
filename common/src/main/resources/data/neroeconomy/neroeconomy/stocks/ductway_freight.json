@@ -1,0 +1,19 @@
+{
+  "name": "stock.neroeconomy.ductway_freight",
+  "description": "stock.neroeconomy.ductway_freight.description",
+  "sector": "logistics",
+  "type": "steady",
+  "start_price": 70,
+  "volatility": 4.0,
+  "drift": 7.0,
+  "dividend_yield": 1.0,
+  "linked": [
+    "#c:chests",
+    "#c:barrels",
+    "minecraft:hopper",
+    "minecraft:rail",
+    "minecraft:powered_rail",
+    "minecraft:minecart",
+    "#minecraft:boats"
+  ]
+}

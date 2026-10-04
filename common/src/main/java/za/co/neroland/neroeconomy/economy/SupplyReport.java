@@ -16,11 +16,16 @@ import java.util.Map;
  * @param budgetUsedToday  what each Reserve budget has paid out in the current economy day
  * @param supplyBalanced   Invariant A: every balance together equals minted less burned
  * @param escrowBalanced   Invariant B: the escrow balance equals the recorded obligations
+ * @param exchangeHeld     what the exchange section records as held for open positions: the cost
+ *                         of every share and index unit, the principal of every bond and the
+ *                         interest reserved for them
+ * @param exchangeBalanced Invariant C: the exchange balance equals {@code exchangeHeld}
  */
 public record SupplyReport(long circulation, long reserve, long escrow, long exchange, long houses,
         long mintedToday, long burnedToday, long mintedAllTime, long burnedAllTime,
         Map<TransactionType, Long> mintedByReason, Map<TransactionType, Long> burnedByReason,
-        Map<BudgetKind, Long> budgetUsedToday, long obligations, boolean supplyBalanced, boolean escrowBalanced) {
+        Map<BudgetKind, Long> budgetUsedToday, long obligations, boolean supplyBalanced, boolean escrowBalanced,
+        long exchangeHeld, boolean exchangeBalanced) {
 
     public SupplyReport {
         mintedByReason = Collections.unmodifiableMap(new EnumMap<>(mintedByReason));
@@ -33,5 +38,5 @@ public record SupplyReport(long circulation, long reserve, long escrow, long exc
     /** Every credit in existence: all balances together. */
     public long total() { return circulation + reserve + escrow + exchange + houses; }
 
-    public boolean healthy() { return supplyBalanced && escrowBalanced; }
+    public boolean healthy() { return supplyBalanced && escrowBalanced && exchangeBalanced; }
 }

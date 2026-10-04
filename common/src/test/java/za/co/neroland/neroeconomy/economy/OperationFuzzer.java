@@ -10,8 +10,16 @@ import java.util.Set;
  * The operation fuzzer: one harness over the real ledger section, the real vault section, the real
  * simulation driver and a pure model of escrow. It picks operations at random by weight, runs each
  * against a {@link FuzzWorld}, and after <b>every</b> operation checks Invariant A (all balances
- * equal minted less burned), Invariant B (the escrow account equals what is owed from it) and item
+ * equal minted less burned), Invariant B (the escrow account equals what is owed from it),
+ * Invariant C (the exchange account equals the open positions the exchange records) and item
  * conservation (no kind of goods appears or vanishes unless an operation said so).
+ *
+ * <p>The exchange is under it as well — shares, the index fund, Savings Bonds and practice mode,
+ * with prices, splits, dividends, maturities and delisting payouts running in the world's
+ * simulation steps.
+ *
+ * <p>Direct trades and rules bound to Auto-Trader blocks are under it too: a trade's escrow is a
+ * section of the store, and a block's slots are counted beside the store (see {@link FuzzWorld}).
  *
  * <p><b>Adding a part of the economy:</b> write a {@link FuzzOperation} class for each thing it
  * can do and add it to {@link #OPERATIONS}. If the new section escrows credits it implements
@@ -33,6 +41,9 @@ final class OperationFuzzer {
         all.addAll(BookOperations.all());
         all.addAll(OfferOperations.all());
         all.addAll(RuleOperations.all());
+        all.addAll(DirectTradeOperations.all());
+        all.addAll(TraderOperations.all());
+        all.addAll(ExchangeOperations.all());
         return List.copyOf(all);
     }
 
@@ -73,11 +84,12 @@ final class OperationFuzzer {
             world.check(operation.name(), step);
             if (checkpoints.contains(step)) {
                 world.checkpoint();
-                if (crash) {
-                    world.crash();
-                    // What was read back satisfies every invariant before anything else happens to it.
-                    world.check("crash", step);
-                }
+                // No trade window survives a restart, crashed or clean: either way what its sides
+                // had put in is back in their vaults afterwards.
+                if (crash) world.crash();
+                else world.stopTrades();
+                // What was read back satisfies every invariant before anything else happens to it.
+                world.check(crash ? "crash" : "stop", step);
             }
         }
         return new Result(world, calls, effects);

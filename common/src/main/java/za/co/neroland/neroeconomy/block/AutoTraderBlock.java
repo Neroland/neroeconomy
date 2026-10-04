@@ -53,7 +53,8 @@ public final class AutoTraderBlock extends BaseEntityBlock {
     /**
      * Who may break an Auto-Trader: its owner, a permission-level-2 operator, or anyone at all when
      * it has no owner on record (its owner's data was erased, or it was placed by a command) — the
-     * same policy as a Player Shop. Breaking never loses anything the rule held.
+     * same policy as a Player Shop. Breaking never loses anything the rule held: its budget goes
+     * back to its owner and the goods it had listed go to the owner's vault.
      */
     public static boolean canBreak(Level level, BlockPos pos, Player player) {
         if (!(level.getBlockEntity(pos) instanceof AutoTraderBlockEntity trader)) return true;
@@ -102,7 +103,9 @@ public final class AutoTraderBlock extends BaseEntityBlock {
         super.setPlacedBy(level, pos, state, placer, stack);
         if (level instanceof ServerLevel serverLevel && placer instanceof ServerPlayer player
                 && !AutoTraders.claim(serverLevel, pos, player.getUUID()))
-            player.sendSystemMessage(Component.translatable("message.neroeconomy.auto_trader.not_claimed"));
+            // No owner could be recorded: the economy is frozen, or the placer is at their bound.
+            player.sendSystemMessage(Component.translatable(EconomyHealth.frozen() ? EconomyHealth.FROZEN_KEY
+                    : "message.neroeconomy.auto_trader.not_claimed"));
     }
 
     @Override
@@ -110,10 +113,12 @@ public final class AutoTraderBlock extends BaseEntityBlock {
             BlockHitResult hit) {
         if (!level.isClientSide() && player instanceof ServerPlayer serverPlayer
                 && level.getBlockEntity(pos) instanceof AutoTraderBlockEntity trader) {
-            // Only the owner opens it. Nobody else is told who that is.
+            // Only the owner opens it. Nobody else is told who that is. While the economy is frozen
+            // the owner records cannot be read, so nobody is told it has no owner either.
             if (trader.isOwner(serverPlayer.getUUID())) serverPlayer.openMenu(trader);
-            else serverPlayer.sendSystemMessage(Component.translatable(trader.hasOwner()
-                    ? "message.neroeconomy.auto_trader.not_owner" : "message.neroeconomy.auto_trader.no_owner"));
+            else serverPlayer.sendSystemMessage(Component.translatable(EconomyHealth.frozen() ? EconomyHealth.FROZEN_KEY
+                    : trader.hasOwner() ? "message.neroeconomy.auto_trader.not_owner"
+                    : "message.neroeconomy.auto_trader.no_owner"));
         }
         return InteractionResult.SUCCESS;
     }
@@ -132,7 +137,7 @@ public final class AutoTraderBlock extends BaseEntityBlock {
     @Override
     protected void onPlace(BlockState state, Level level, BlockPos pos, BlockState oldState, boolean movedByPiston) {
         super.onPlace(state, level, pos, oldState, movedByPiston);
-        if (level instanceof ServerLevel serverLevel && !oldState.is(state.getBlock())) AutoTraders.removed(serverLevel, pos, null);
+        if (level instanceof ServerLevel serverLevel && !oldState.is(state.getBlock())) AutoTraders.removed(serverLevel, pos);
     }
 
     /**
@@ -143,7 +148,7 @@ public final class AutoTraderBlock extends BaseEntityBlock {
     @Override
     protected void affectNeighborsAfterRemoval(BlockState state, ServerLevel level, BlockPos pos,
             boolean movedByPiston) {
-        AutoTraders.removed(level, pos, null);
+        AutoTraders.removed(level, pos);
         super.affectNeighborsAfterRemoval(state, level, pos, movedByPiston);
     }
 }

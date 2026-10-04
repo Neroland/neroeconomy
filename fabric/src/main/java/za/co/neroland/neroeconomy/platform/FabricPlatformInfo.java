@@ -16,10 +16,12 @@ import za.co.neroland.neroeconomy.block.PlayerShopBlock;
 import za.co.neroland.neroeconomy.registry.ModBlockEntities;
 import za.co.neroland.neroeconomy.obligation.BountyHooks;
 import net.fabricmc.loader.api.FabricLoader;
+import net.minecraft.core.Direction;
 
 import za.co.neroland.neroeconomy.NeroEconomyCommon;
 import za.co.neroland.neroeconomy.command.EconomyCommands;
 import za.co.neroland.neroeconomy.direct.DirectTrades;
+import za.co.neroland.neroeconomy.exchange.StockData;
 import za.co.neroland.neroeconomy.network.IntentGuard;
 
 public final class FabricPlatformInfo implements PlatformInfo {
@@ -27,13 +29,19 @@ public final class FabricPlatformInfo implements PlatformInfo {
         ServerLifecycleEvents.SERVER_STARTED.register(NeroEconomyCommon.CURRENCY_PROVIDER::bind);
         ServerLifecycleEvents.SERVER_STOPPED.register(NeroEconomyCommon.CURRENCY_PROVIDER::unbind);
         ServerTickEvents.END_SERVER_TICK.register(NeroEconomyCommon.CURRENCY_PROVIDER::tick);
+        // Data packs were reloaded: the listed companies are read again from the new packs.
+        ServerLifecycleEvents.END_DATA_PACK_RELOAD.register((server, resourceManager, success) -> {
+            if (success) StockData.reload(server);
+        });
         ServerLivingEntityEvents.AFTER_DEATH.register(BountyHooks::entityKilled);
         PlayerBlockBreakEvents.BEFORE.register((level, player, pos, state, blockEntity) ->
                 (!(state.getBlock() instanceof PlayerShopBlock) || PlayerShopBlock.canBreak(level, pos, player))
                         && (!(state.getBlock() instanceof AutoTraderBlock) || AutoTraderBlock.canBreak(level, pos, player)));
-        // The Auto-Trader's slots on the Fabric Transfer API, sided, so any mod's pipes can feed and empty it.
-        ItemStorage.SIDED.registerForBlockEntity((trader, side) -> ContainerStorage.of(trader, side),
-                ModBlockEntities.AUTO_TRADER.get());
+        // The Auto-Trader's slots on the Fabric Transfer API, so any mod's pipes can feed and empty
+        // it. Every face behaves alike, and a caller that names no face gets the same view as one
+        // that does: inputs take, outputs give, and nothing else.
+        ItemStorage.SIDED.registerForBlockEntity((trader, side) ->
+                ContainerStorage.of(trader, side != null ? side : Direction.DOWN), ModBlockEntities.AUTO_TRADER.get());
         CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) ->
                 EconomyCommands.register(dispatcher));
         // Sneak-use on another player with an empty hand asks them for a trade. The answer is

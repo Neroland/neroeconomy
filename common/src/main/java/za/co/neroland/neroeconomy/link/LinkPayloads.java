@@ -244,6 +244,9 @@ public final class LinkPayloads {
             case "admin" -> "Admin adjustment";
             case "fee" -> "Fee";
             case "adjustment" -> "Price adjustment";
+            case "investment" -> "Exchange purchase";
+            case "redemption" -> "Exchange sale";
+            case "earnings" -> "Exchange earnings";
             default -> "Transaction";
         };
     }
@@ -268,8 +271,13 @@ public final class LinkPayloads {
             case SIBLING_PAYOUT -> "deposit";
             case FEE_MARKET, FEE_LISTING, FEE_AUCTION, FEE_EXCHANGE, TRADE_TAX -> "fee";
             case PRICE_ADJUSTMENT -> "adjustment";
+            // The exchange: what goes into a position, what comes back out of it, and what it earned.
+            case SHARE_BUY, BOND_BUY -> "investment";
+            case SHARE_SELL, BOND_REDEEM -> "redemption";
+            case CAPITAL_GAIN, DIVIDEND, BOND_INTEREST -> "earnings";
             // Never part of a player's own history: they move between system accounts only.
-            case RESERVE_MINT, MIGRATION, ERASURE_SWEEP -> "system";
+            case RESERVE_MINT, MIGRATION, ERASURE_SWEEP, CAPITAL_LOSS, BOND_INTEREST_RESERVED,
+                    BOND_INTEREST_RELEASED -> "system";
         };
     }
 

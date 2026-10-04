@@ -2,6 +2,7 @@ package za.co.neroland.neroeconomy.trader;
 
 import java.util.HashSet;
 import java.util.Set;
+import java.util.function.ToIntFunction;
 
 import za.co.neroland.neroeconomy.goods.Lot;
 
@@ -17,6 +18,8 @@ public final class FakeSlots implements TraderInventory.Slots {
     /** Whether the block's chunk is loaded and ticking. */
     public boolean loaded = true;
     public int limit = 64;
+    /** A slot limit per item, for a world whose items stack differently; null for {@link #limit} throughout. */
+    public ToIntFunction<String> limits;
     /** How many times a slot was written. */
     public int writes;
 
@@ -31,7 +34,7 @@ public final class FakeSlots implements TraderInventory.Slots {
         writes++;
     }
 
-    @Override public int limit(String item) { return limit; }
+    @Override public int limit(String item) { return limits == null ? limit : limits.applyAsInt(item); }
 
     /** Puts goods into an input slot, as a hopper or a player does. */
     public FakeSlots input(int slot, String item, int count) {

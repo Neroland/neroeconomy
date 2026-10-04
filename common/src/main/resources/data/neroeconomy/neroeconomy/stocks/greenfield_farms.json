@@ -1,0 +1,17 @@
+{
+  "name": "stock.neroeconomy.greenfield_farms",
+  "description": "stock.neroeconomy.greenfield_farms.description",
+  "sector": "farming",
+  "type": "steady",
+  "start_price": 45,
+  "volatility": 3.2,
+  "drift": 5.5,
+  "dividend_yield": 2.0,
+  "linked": [
+    "#c:crops",
+    "#c:seeds",
+    "#c:foods/bread",
+    "minecraft:hay_block",
+    "minecraft:bone_meal"
+  ]
+}

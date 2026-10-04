@@ -59,9 +59,10 @@ import za.co.neroland.neroeconomy.trader.TraderInventory;
  * and its order leaves the book.
  *
  * <p><b>Removal</b>, by anything: the rule is deleted (its budget goes back to the owner, the
- * goods it had listed go to the owner's vault), what the output slots hold — goods the owner
- * bought — goes to the owner's vault, and what the input slots hold, which nobody had listed yet,
- * drops like a chest's contents.
+ * goods it had listed — which are on the order book, not in a slot — go to the owner's vault), and
+ * what the slots hold, inputs nobody had listed yet and outputs alike, drops like a chest's
+ * contents. A removal that skips the drop (a command that replaces the block) loses the slots'
+ * contents exactly as it loses a chest's; the rule and its budget are still settled.
  */
 public final class AutoTraderBlockEntity extends BlockEntity implements WorldlyContainer, MenuProvider {
     public static final int INPUTS = TraderInventory.INPUTS;
@@ -120,8 +121,13 @@ public final class AutoTraderBlockEntity extends BlockEntity implements WorldlyC
         }
 
         @Override public void set(int slot, Lot lot) {
-            Item item = lot == null ? null : item(lot.item());
-            items.set(slot, item == null ? ItemStack.EMPTY : new ItemStack(item, lot.count()));
+            ItemStack stack = ItemStack.EMPTY;
+            if (lot != null) {
+                Item item = item(lot.item());
+                // An id this server no longer knows names nothing that can be held: the slot is left empty.
+                if (item != null) stack = new ItemStack(item, lot.count());
+            }
+            items.set(slot, stack);
             // Marks the chunk to be saved without waking the rule: this change is the rule's own.
             AutoTraderBlockEntity.super.setChanged();
             // Goods crossed between the world and the store; get the store to disk promptly.
@@ -130,7 +136,8 @@ public final class AutoTraderBlockEntity extends BlockEntity implements WorldlyC
 
         @Override public int limit(String id) {
             Item item = item(id);
-            return item == null ? 1 : Math.min(getMaxStackSize(), item.getDefaultMaxStackSize());
+            // An id this server does not know cannot be held in a slot; such goods go to the vault.
+            return item == null ? 0 : Math.min(getMaxStackSize(), item.getDefaultMaxStackSize());
         }
     };
 
@@ -163,40 +170,15 @@ public final class AutoTraderBlockEntity extends BlockEntity implements WorldlyC
 
     /**
      * The block is being replaced, by anything: a player, an explosion, a command that keeps side
-     * effects. The rule goes first, with the block already unreachable so the goods it had listed
-     * go to the owner's vault; then the output slots; and only what is left — the input slots —
-     * is dropped by the default handler.
+     * effects. The rule goes first, with the block already unreachable, so the goods it had listed
+     * go from the order book to the owner's vault rather than back into slots that are about to
+     * be emptied; then the default handler drops what the slots hold, inputs and outputs alike,
+     * as it drops a chest's contents.
      */
     @Override public void preRemoveSideEffects(BlockPos pos, BlockState state) {
         removing = true;
-        if (level instanceof ServerLevel serverLevel) AutoTraders.removed(serverLevel, pos, this);
+        if (level instanceof ServerLevel serverLevel) AutoTraders.removed(serverLevel, pos);
         super.preRemoveSideEffects(pos, state);
-    }
-
-    /**
-     * Takes every stack out of the output slots: the goods the owner bought. Only the teardown
-     * calls this, to book them into the owner's vault.
-     */
-    public NonNullList<ItemStack> drainOutputs() {
-        NonNullList<ItemStack> out = NonNullList.create();
-        for (int slot = INPUTS; slot < SLOTS; slot++) {
-            ItemStack stack = items.get(slot);
-            if (!stack.isEmpty()) out.add(stack);
-            items.set(slot, ItemStack.EMPTY);
-        }
-        if (!out.isEmpty()) super.setChanged();
-        return out;
-    }
-
-    /** Takes every stack out of every slot; see {@link #clearContent}. */
-    private NonNullList<ItemStack> drainAll() {
-        NonNullList<ItemStack> out = NonNullList.create();
-        for (int slot = 0; slot < SLOTS; slot++) {
-            ItemStack stack = items.get(slot);
-            if (!stack.isEmpty()) out.add(stack);
-            items.set(slot, ItemStack.EMPTY);
-        }
-        return out;
     }
 
     // --- MenuProvider ------------------------------------------------------------------------
@@ -256,14 +238,12 @@ public final class AutoTraderBlockEntity extends BlockEntity implements WorldlyC
     }
 
     /**
-     * Empties the block on behalf of a caller that will not keep the contents (a command, or
-     * another mod, clearing a container before replacing the block). Nothing is destroyed: with an
-     * owner on record everything goes to their vault.
+     * Empties the block on behalf of a caller that will not keep the contents, exactly as a
+     * chest is emptied. What the rule had listed is not in a slot and is not touched.
      */
     @Override public void clearContent() {
-        NonNullList<ItemStack> contents = drainAll();
-        if (level instanceof ServerLevel serverLevel) AutoTraders.cleared(serverLevel, worldPosition, contents);
-        super.setChanged();
+        items.clear();
+        setChanged();
     }
 
     @Override public int[] getSlotsForFace(Direction side) { return EVERY_SLOT; }

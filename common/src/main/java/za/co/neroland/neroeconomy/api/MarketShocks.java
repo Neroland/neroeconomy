@@ -44,6 +44,20 @@ public final class MarketShocks {
                 Math.min(EconomyConfig.MAX_PRICE_MULTIPLIER.get(), result));
     }
 
+    /**
+     * The combined multiplier of every shock that is active at {@code now} (economy time) for any
+     * of {@code keys}: item ids, tag ids with a leading {@code #}, or any other id a shock was
+     * applied under, such as a listed company's. 1 when none is active. The result is clamped to
+     * {@code minPriceMultiplier}…{@code maxPriceMultiplier}, exactly as a market quote is.
+     */
+    public static double multiplier(java.util.Collection<String> keys, long now) {
+        if (keys == null || keys.isEmpty() || SHOCKS.isEmpty()) return 1.0D;
+        double result = 1.0D;
+        for (String key : keys) if (key != null && !key.isBlank()) result *= multiplierFor(key, now);
+        return Math.max(EconomyConfig.MIN_PRICE_MULTIPLIER.get(),
+                Math.min(EconomyConfig.MAX_PRICE_MULTIPLIER.get(), result));
+    }
+
     /** Drops every shock; call this when a server unbinds so shocks cannot leak across worlds. */
     public static void clear() { SHOCKS.clear(); }
 

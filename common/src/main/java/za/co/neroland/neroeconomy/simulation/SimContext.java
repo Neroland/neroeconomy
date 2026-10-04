@@ -4,6 +4,7 @@ import net.minecraft.server.MinecraftServer;
 
 import za.co.neroland.neroeconomy.economy.EconomySavedData;
 import za.co.neroland.neroeconomy.economy.EconomyStore;
+import za.co.neroland.neroeconomy.exchange.ExchangeSection;
 import za.co.neroland.neroeconomy.goods.GoodsSection;
 import za.co.neroland.neroeconomy.market.MarketSavedData;
 import za.co.neroland.neroeconomy.obligation.ObligationSavedData;
@@ -49,6 +50,7 @@ public final class SimContext {
     public VaultSection vault() { return store.vault(); }
     public GoodsSection goods() { return store.goods(); }
     public SimulationSection simulation() { return store.simulation(); }
+    public ExchangeSection exchange() { return store.exchange(); }
 
     /**
      * The running server, for the few things only it can do (an alert, a block lookup). Null in a

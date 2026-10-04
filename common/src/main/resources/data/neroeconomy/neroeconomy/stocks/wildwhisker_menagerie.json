@@ -1,0 +1,19 @@
+{
+  "name": "stock.neroeconomy.wildwhisker_menagerie",
+  "description": "stock.neroeconomy.wildwhisker_menagerie.description",
+  "sector": "creatures",
+  "type": "risky",
+  "start_price": 60,
+  "volatility": 20.0,
+  "drift": 21.0,
+  "dividend_yield": 0.0,
+  "linked": [
+    "#c:leathers",
+    "#c:feathers",
+    "#c:bones",
+    "#c:eggs",
+    "#c:strings",
+    "minecraft:lead",
+    "minecraft:name_tag"
+  ]
+}

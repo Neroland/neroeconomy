@@ -1,0 +1,18 @@
+{
+  "name": "stock.neroeconomy.farside_salvage",
+  "description": "stock.neroeconomy.farside_salvage.description",
+  "sector": "space",
+  "type": "risky",
+  "start_price": 210,
+  "volatility": 21.0,
+  "drift": 22.0,
+  "dividend_yield": 0.0,
+  "linked": [
+    "#c:gems/void_crystal",
+    "#c:ingots/nero_alloy",
+    "#c:ender_pearls",
+    "#c:obsidians",
+    "#c:nether_stars",
+    "minecraft:end_stone"
+  ]
+}

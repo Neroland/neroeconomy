@@ -16,7 +16,19 @@ import java.util.function.Supplier;
 import za.co.neroland.neroeconomy.NeroEconomyCommon;
 import za.co.neroland.neroeconomy.api.AccountId;
 import za.co.neroland.neroeconomy.api.PlayerAccountId;
+import za.co.neroland.neroeconomy.api.StockType;
 import za.co.neroland.neroeconomy.api.SystemAccountId;
+import za.co.neroland.neroeconomy.direct.TradeEscrowSection;
+import za.co.neroland.neroeconomy.direct.TradeSession;
+import za.co.neroland.neroeconomy.exchange.ActionLimiter;
+import za.co.neroland.neroeconomy.exchange.ExchangeEnv;
+import za.co.neroland.neroeconomy.exchange.ExchangeSection;
+import za.co.neroland.neroeconomy.exchange.ExchangeSettings;
+import za.co.neroland.neroeconomy.exchange.ExchangeStep;
+import za.co.neroland.neroeconomy.exchange.ExchangeSteps;
+import za.co.neroland.neroeconomy.exchange.StockDefinition;
+import za.co.neroland.neroeconomy.exchange.StockRegistry;
+import za.co.neroland.neroeconomy.exchange.TradingTerms;
 import za.co.neroland.neroeconomy.goods.Lot;
 import za.co.neroland.neroeconomy.goods.StackLimit;
 import za.co.neroland.neroeconomy.simulation.Housekeeping;
@@ -30,6 +42,8 @@ import za.co.neroland.neroeconomy.trade.ItemCatalog;
 import za.co.neroland.neroeconomy.trade.TradeEnv;
 import za.co.neroland.neroeconomy.trade.TradeSettings;
 import za.co.neroland.neroeconomy.trade.TradingSteps;
+import za.co.neroland.neroeconomy.trader.FakeSlots;
+import za.co.neroland.neroeconomy.trader.TraderRules;
 import za.co.neroland.neroeconomy.vault.VaultSection;
 
 /**
@@ -40,11 +54,19 @@ import za.co.neroland.neroeconomy.vault.VaultSection;
  *   <li>{@link #supply} — minted less burned. <b>Invariant A:</b> every balance together equals it.</li>
  *   <li>{@link #escrow} — who is owed what out of the escrow account. <b>Invariant B:</b> the escrow
  *       balance equals the sum of it plus whatever the store's own sections record.</li>
+ *   <li><b>Invariant C</b> needs no model: the exchange account holds exactly what the exchange
+ *       section records for open positions — share cost, bond principal, reserved bond interest —
+ *       and nothing but the exchange's own operations ever moves a credit into or out of it.</li>
  *   <li>{@link #goods} and {@link #outside} — how many of each kind of goods exist, and how many
  *       of them are outside the store (in inventories, as far as the model cares). <b>Item
  *       conservation:</b> for every kind, what the store holds plus what is outside equals what
  *       exists; only an operation that explicitly creates or destroys goods changes the total.</li>
  * </ul>
+ *
+ * <p>Two things live in the world rather than in the store, as they do in the game: the slots of
+ * the Auto-Trader blocks ({@link #traders}) — whose contents are counted where they lie, as a third
+ * place goods can be — and the direct trades that are open ({@link #trades}), which no restart
+ * survives.
  */
 final class FuzzWorld {
     static final int PLAYERS = 36;
@@ -61,9 +83,30 @@ final class FuzzWorld {
         case "minecraft:diamond_sword" -> 1;
         default -> 64;
     };
-    /** Every system account an ordinary ledger operation may touch. Escrow moves only through the escrow model. */
-    static final SystemAccountId[] SYSTEM = {SystemAccountId.RESERVE, SystemAccountId.EXCHANGE,
+    /**
+     * Every system account an ordinary ledger operation may touch. Escrow moves only through the
+     * escrow model, and the exchange account only through the exchange's own operations.
+     */
+    static final SystemAccountId[] SYSTEM = {SystemAccountId.RESERVE, SystemAccountId.house("quarry"),
             SystemAccountId.house("ironworks"), SystemAccountId.house("granary")};
+    /**
+     * The companies of the world's exchange: a steady one that pays a dividend, a risky one, and a
+     * dear one that grows fast enough to split. None is linked to a commodity, so no price depends
+     * on the order book's volume tally, which is not saved.
+     */
+    static final List<StockDefinition> STOCKS = List.of(
+            new StockDefinition("fuzz:calm", "stock.fuzz.calm", "stock.fuzz.calm.description", "farming",
+                    StockType.STEADY, 20L, 3.0D, 6.0D, 2.0D, List.of(), true),
+            new StockDefinition("fuzz:wild", "stock.fuzz.wild", "stock.fuzz.wild.description", "space",
+                    StockType.RISKY, 60L, 20.0D, 20.0D, 0.0D, List.of(), true),
+            new StockDefinition("fuzz:pricey", "stock.fuzz.pricey", "stock.fuzz.pricey.description", "mining",
+                    StockType.RISKY, 1_900L, 10.0D, 40.0D, 0.7D, List.of(), true));
+    /**
+     * The exchange's terms: a two-minute holding period so sales happen, small limits and a tight
+     * rate limit so they are hit all the time, three bonds an account, 2000 play credits.
+     */
+    static final TradingTerms EXCHANGE_TERMS = new TradingTerms(true, 100, 100, 200, 100, 120_000L, 4_000L, 8_000L, 3,
+            80, 300, 800, 2_000L, 3);
     /** Who the escrow of a server-funded job is recorded for. */
     static final UUID SYSTEM_ISSUER = new UUID(0L, 0L);
     private static final long START_WALL = 1_800_000_000_000L;
@@ -94,14 +137,37 @@ final class FuzzWorld {
     long stepsRun;
     long stepsSkipped;
     /**
+     * The Auto-Trader blocks of the world, by location. They are the world's, not the store's: a
+     * crash of the store leaves them as they were, as a chunk on disk is left.
+     */
+    final Map<String, FakeSlots> traders = new LinkedHashMap<>();
+    /** How often a rule wrote a slot of a block that has since been removed; see {@link #slotWrites}. */
+    long writesOfRemovedBlocks;
+    /** The direct trades open right now. Not saved anywhere: a trade lasts as long as its window. */
+    final List<TradeSession> trades = new ArrayList<>();
+    /** How many stacks a restart found in trade escrow and returned to their owners' vaults. */
+    long tradeStacksReturned;
+    /**
      * What the trading rules are given: small caps so they are hit all the time, a short order
      * life so expiry happens, and a price modifier that surcharges some buyers and discounts
      * others, so every branch of a fill's settlement is taken.
      */
     final TradeEnv env = new TradeEnv(new TradeSettings(2.0D, 1L, 5, 4, 5L * 3_600_000L, CAP, CAP, BOUND, 3.0D,
-            4L * 3_600_000L, 4, 6, 3, 400L, 8), LIMIT, this::buyerPrice, CATALOG, (account, kind) -> this.alerts++, null);
+            4L * 3_600_000L, 4, 6, 3, 400L, 8), LIMIT, this::buyerPrice, CATALOG, (account, kind) -> this.alerts++, null,
+            TraderRules.binder(location -> this.traders.get(location)));
     /** How many alerts the trading rules raised; a count only, part of the fingerprint. */
     long alerts;
+    /**
+     * Which companies are listed right now. The world's, as a data pack is: a crash of the store
+     * leaves it as it was.
+     */
+    final List<StockDefinition> listed = new ArrayList<>(STOCKS);
+    /** The exchange's rate limiters. In memory only in the game too; kept across a crash so both runs agree. */
+    final ActionLimiter exchangeLimiter = new ActionLimiter();
+    final ActionLimiter practiceLimiter = new ActionLimiter();
+    /** How many alerts the exchange raised, by kind: bonds matured, dividends paid, delistings paid out. */
+    final Map<za.co.neroland.neroeconomy.link.EconomyAlerts.Kind, Long> exchangeAlerts =
+            new java.util.EnumMap<>(za.co.neroland.neroeconomy.link.EconomyAlerts.Kind.class);
     /** How many times the fuzzer played the server tick's rule evaluation; each is its own tick. */
     long ruleTicks;
     /** Credits' worth of fills the rules made by acting; shows the run really traded through them. */
@@ -122,7 +188,27 @@ final class FuzzWorld {
         Housekeeping.register(pipeline);
         TradingSteps.register(pipeline, context -> env);
         pipeline.register(new MerchantStandIn());
+        // The exchange, as the game registers it: prices, then dividends, then maturities and payouts.
+        pipeline.register(new ExchangeStep(new ExchangeStep.Wiring() {
+            @Override public ExchangeSettings settings() { return ExchangeSettings.DEFAULTS; }
+            @Override public StockRegistry registry(SimContext context) { return FuzzWorld.this.registry(); }
+            @Override public ItemCatalog items(SimContext context) { return CATALOG; }
+            @Override public double shock(List<String> keys, long now) { return 1.0D; }
+        }));
+        ExchangeSteps.register(pipeline, context -> exchangeEnv());
+        store.exchange().reconcile(registry());
     }
+
+    /** The companies listed right now. */
+    StockRegistry registry() { return StockRegistry.of(listed); }
+
+    /** What every exchange operation is handed. */
+    ExchangeEnv exchangeEnv() {
+        return new ExchangeEnv(EXCHANGE_TERMS, registry(), (account, kind) -> exchangeAlerts.merge(kind, 1L, Long::sum),
+                exchangeLimiter, practiceLimiter);
+    }
+
+    ExchangeSection exchange() { return store.exchange(); }
 
     /** One player in seven pays a tenth more than the seller asks; one in five, a tenth less. */
     private long buyerPrice(AccountId buyer, UUID listing, String item, long base, int available) {
@@ -220,6 +306,28 @@ final class FuzzWorld {
     /** Goods moved out of the store. */
     void outOfStore(Lot.Key kind, long count) { outside.merge(kind, count, Long::sum); }
 
+    /** Goods moved from outside into a slot of an Auto-Trader; the slots are counted where they lie. */
+    void intoSlots(Lot.Key kind, long count) { outside.merge(kind, -count, Long::sum); }
+
+    /** Goods taken out of a slot of an Auto-Trader, or dropped by one that was broken. */
+    void outOfSlots(Lot.Key kind, long count) { outside.merge(kind, count, Long::sum); }
+
+    /** Goods in the slots of an Auto-Trader ceased to exist: a command replaced the block. */
+    void destroyedInSlots(Lot.Key kind, long count) { goods.merge(kind, -count, Long::sum); }
+
+    /** How often the rules wrote a slot of an Auto-Trader: listed goods taken out, purchases put in. */
+    long slotWrites() {
+        long writes = writesOfRemovedBlocks;
+        for (FakeSlots slots : traders.values()) writes += slots.writes;
+        return writes;
+    }
+
+    /** The direct trade an account is in, or null. */
+    TradeSession tradeOf(AccountId account) {
+        for (TradeSession session : trades) if (session.sideOf(account) != null) return session;
+        return null;
+    }
+
     // --- the invariants ----------------------------------------------------------------------
 
     /** Checked after every operation, successful or refused. */
@@ -233,16 +341,25 @@ final class FuzzWorld {
         assertTrue(ledger.balance(SystemAccountId.RESERVE) >= 0L, where);
         // Invariant B: the escrow account holds exactly what is recorded as owed from it.
         assertEquals(escrowTotal + store.escrowObligations(), ledger.balance(SystemAccountId.ESCROW), where);
+        // Invariant C: the exchange account holds exactly the open share cost, bond principal and reserved interest.
+        assertEquals(store.exchangeObligations(), ledger.balance(SystemAccountId.EXCHANGE), where);
         // Item conservation: for every kind, in the store plus outside equals what exists.
         // Counted into a plain array: this walks every lot in the store after every operation.
         long[] held = new long[ITEMS.length * PAYLOADS];
         store.forEachLot(lot -> held[slotOf(lot.item(), lot.payload())] += lot.count());
+        // The slots of the Auto-Trader blocks are a place of their own: neither the store nor a hand.
+        for (FakeSlots slots : traders.values())
+            for (Lot lot : slots.held) if (lot != null) held[slotOf(lot.item(), lot.payload())] += lot.count();
         for (Map.Entry<Lot.Key, Long> kind : goods.entrySet()) {
             long out = outside(kind.getKey());
             assertTrue(out >= 0L, where);
             assertEquals(kind.getValue(), held[slotOf(kind.getKey().item(), kind.getKey().payload())] + out,
                     () -> where.get() + ", " + kind.getKey());
         }
+        // Trade escrow is only ever held for a side of a trade that is open: nothing is stranded in it.
+        TradeEscrowSection tradeEscrow = store.tradeEscrow();
+        if (!tradeEscrow.isEmpty())
+            for (AccountId owner : tradeEscrow.owners()) assertTrue(tradeOf(owner) != null, where);
     }
 
     /** Where a kind of goods is counted. A kind the world does not know is a failure in itself. */
@@ -264,8 +381,45 @@ final class FuzzWorld {
         ledger().now();
     }
 
-    /** A crash and a restart: the store is written with its codecs and read into a fresh one. */
-    void crash() { store = StoreTesting.reload(store); }
+    /**
+     * A crash and a restart: the store is written with its codecs and read into a fresh one. No
+     * trade window survives that, so — as the game does when it loads the store — whatever the
+     * sides of open trades had put in is returned to their own vaults. It must have come through
+     * the reload exactly as it was, and all of it must arrive.
+     */
+    void crash() {
+        Map<AccountId, List<Lot>> inEscrow = new LinkedHashMap<>();
+        for (TradeSession session : trades) for (TradeSession.Side side : TradeSession.Side.values())
+            inEscrow.put(session.account(side), store.tradeEscrow().held(session.account(side)));
+        store = StoreTesting.reload(store);
+        Map<AccountId, Map<Lot.Key, Long>> expected = new LinkedHashMap<>();
+        inEscrow.forEach((owner, lots) -> {
+            assertEquals(lots, store.tradeEscrow().held(owner), "trade escrow changed across a reload");
+            Map<Lot.Key, Long> totals = new LinkedHashMap<>();
+            for (Lot lot : lots) totals.merge(lot.key(), (long) lot.count(), Long::sum);
+            totals.replaceAll((kind, count) -> count + vault().total(owner, kind.item(), kind.payload()));
+            expected.put(owner, totals);
+        });
+        tradeStacksReturned += store.tradeEscrow().recover(env);
+        assertTrue(store.tradeEscrow().isEmpty());
+        expected.forEach((owner, totals) -> totals.forEach((kind, count) ->
+                assertEquals(count, vault().total(owner, kind.item(), kind.payload()), "trade escrow not returned")));
+        trades.clear();
+    }
+
+    /**
+     * What the run that does not crash does at the same point: the server stops cleanly, every
+     * open trade is cancelled and what its sides had put in goes back to their vaults. The two
+     * runs must then be indistinguishable.
+     */
+    void stopTrades() {
+        for (TradeSession session : trades) {
+            session.cancel(TradeSession.CancelReason.STOPPED);
+            for (TradeSession.Side side : TradeSession.Side.values())
+                tradeStacksReturned += store.tradeEscrow().returnToVault(env, session.account(side)).size();
+        }
+        trades.clear();
+    }
 
     /** Everything that matters about the world, as text: equal for two runs that ended the same. */
     String fingerprint() {
@@ -275,6 +429,10 @@ final class FuzzWorld {
                 .append(ledger.locked(player)).append('/').append(ledger.unvested(player)).append('/')
                 .append(owed(player)).append('/').append(vault().stacks(player)).append(';');
         for (SystemAccountId system : SYSTEM) out.append(ledger.balance(system)).append(';');
+        // The exchange: what its account holds, every price, every portfolio and every practice sandbox.
+        out.append(ledger.balance(SystemAccountId.EXCHANGE)).append(';').append(exchangeAlerts).append(';')
+                .append(listed.size()).append(';').append(ExchangeSection.CODEC.encodeStart(
+                        com.mojang.serialization.JsonOps.INSTANCE, store.exchange()).getOrThrow()).append(';');
         out.append(ledger.balance(SystemAccountId.ESCROW)).append(';').append(owed(SYSTEM_ISSUER)).append(';');
         for (BudgetKind kind : BudgetKind.values()) out.append(ledger.budgetUsed(kind)).append(';');
         out.append(supply).append(';').append(store.simulation().lastStep()).append(';').append(outside).append(';')
@@ -282,7 +440,11 @@ final class FuzzWorld {
                 .append(stepsSkipped).append(';').append(digest).append(';').append(store.book().size()).append(';')
                 .append(store.offers().size()).append(';').append(store.rules().size()).append(';')
                 .append(store.rules().waiting()).append(';').append(ruleTicks).append(';').append(ruleTraded).append(';')
-                .append(store.escrowObligations()).append(';').append(alerts);
+                .append(store.escrowObligations()).append(';').append(alerts).append(';')
+                .append(store.autoTraders().locations()).append(';').append(trades.size()).append(';')
+                .append(slotWrites());
+        traders.forEach((location, slots) -> out.append(';').append(location).append(slots.loaded ? '+' : '-')
+                .append(java.util.Arrays.toString(slots.held)));
         return out.toString();
     }
 

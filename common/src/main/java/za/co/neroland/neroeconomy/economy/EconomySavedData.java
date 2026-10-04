@@ -510,11 +510,22 @@ public final class EconomySavedData extends EconomySection implements CurrencyPr
     }
 
     /**
-     * Where every credit is, as aggregates.
+     * Where every credit is, for a ledger that stands alone: with no exchange section to say what
+     * the exchange account should hold, Invariant C is taken as met.
      *
      * @param obligations the sum of every recorded escrow obligation, for Invariant B
      */
     public synchronized SupplyReport supplyReport(long obligations) {
+        return supplyReport(obligations, balanceOf(SystemAccountId.EXCHANGE));
+    }
+
+    /**
+     * Where every credit is, as aggregates.
+     *
+     * @param obligations  the sum of every recorded escrow obligation, for Invariant B
+     * @param exchangeHeld what the exchange section records as held for open positions, for Invariant C
+     */
+    public synchronized SupplyReport supplyReport(long obligations, long exchangeHeld) {
         long circulation = 0L;
         long houses = 0L;
         for (Map.Entry<AccountId, Long> entry : balances.entrySet()) {
@@ -527,10 +538,11 @@ public final class EconomySavedData extends EconomySection implements CurrencyPr
         for (BudgetKind kind : BudgetKind.values())
             if (kind != BudgetKind.UNBUDGETED) budgets.put(kind, reserve.used(kind, day));
         long escrow = balanceOf(SystemAccountId.ESCROW);
-        return new SupplyReport(circulation, balanceOf(SystemAccountId.RESERVE), escrow,
-                balanceOf(SystemAccountId.EXCHANGE), houses, supply.mintedToday(day), supply.burnedToday(day),
-                supply.mintedTotal(), supply.burnedTotal(), supply.mintedByReason(), supply.burnedByReason(),
-                budgets, obligations, supplyBalanced(), escrow == obligations);
+        long exchange = balanceOf(SystemAccountId.EXCHANGE);
+        return new SupplyReport(circulation, balanceOf(SystemAccountId.RESERVE), escrow, exchange, houses,
+                supply.mintedToday(day), supply.burnedToday(day), supply.mintedTotal(), supply.burnedTotal(),
+                supply.mintedByReason(), supply.burnedByReason(), budgets, obligations, supplyBalanced(),
+                escrow == obligations, exchangeHeld, exchange == exchangeHeld);
     }
 
     public synchronized boolean reserveSeeded() { return reserve.seeded(); }
@@ -706,6 +718,22 @@ public final class EconomySavedData extends EconomySection implements CurrencyPr
         long moved = Math.min(Math.max(0L, amount), balanceOf(SystemAccountId.ESCROW));
         if (moved > 0L) {
             moveUnchecked(SystemAccountId.ESCROW, SystemAccountId.RESERVE, moved, TransactionType.ERASURE_SWEEP);
+            setDirty();
+        }
+        return moved;
+    }
+
+    /**
+     * Erasure for the exchange section: the principal of an erased player's shares and bonds, and
+     * the interest reserved for those bonds, move from the exchange account to the Reserve. The
+     * row names two system accounts and nobody else. Works while frozen, because erasure always does.
+     *
+     * @return what was moved; less than {@code amount} only if the exchange account did not hold it
+     */
+    public synchronized long sweepErasedExchange(long amount) {
+        long moved = Math.min(Math.max(0L, amount), balanceOf(SystemAccountId.EXCHANGE));
+        if (moved > 0L) {
+            moveUnchecked(SystemAccountId.EXCHANGE, SystemAccountId.RESERVE, moved, TransactionType.ERASURE_SWEEP);
             setDirty();
         }
         return moved;

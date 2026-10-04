@@ -162,6 +162,17 @@ class TraderInventoryTest {
         assertEquals(8L * 64L, buying().room(DIAMOND));
     }
 
+    @Test void goodsTheSlotsCannotHoldAtAllGoToTheVault() {
+        // An item id the game no longer knows fits in no slot: there is no room for it, and what
+        // comes back all the same is handed on whole, with no slot written.
+        slots.limit = 0;
+        assertEquals(0L, buying().room(DIAMOND));
+        buying().put(Lot.of(DIAMOND, 5));
+        selling().put(Lot.of(DIAMOND, 2));
+        assertEquals(List.of(Lot.of(DIAMOND, 5), Lot.of(DIAMOND, 2)), vault);
+        assertEquals(0, slots.writes);
+    }
+
     @Test void anInventoryNeedsItsSlotsAndSomewhereForTheOverflow() {
         assertThrows(IllegalArgumentException.class, () -> new TraderInventory(null, true, vault::add));
         assertThrows(IllegalArgumentException.class, () -> new TraderInventory(slots, true, null));

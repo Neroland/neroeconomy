@@ -61,6 +61,9 @@ public final class NeroEconomyCommon {
         //    The order book goes before the market sweep too: nothing it erases is owed to anyone
         //    else, and a seller's proceeds from the erased player's purchases are claims that stay.
         PlayerDataErasure.register(Trading::eraseFor);
+        //    The exchange: the erased player's share cost, bond principal and reserved interest move
+        //    from the exchange account to the Reserve, and their practice portfolio is dropped.
+        PlayerDataErasure.register(za.co.neroland.neroeconomy.exchange.Investing::eraseFor);
         PlayerDataErasure.register(MarketSavedData::eraseFor);
         //    The vault goes after the stores that could still deliver goods to it: the erased
         //    player's goods are destroyed, and the prototypes only they referred to with them.
@@ -77,6 +80,12 @@ public final class NeroEconomyCommon {
         NeroEconomyNetwork.init();
         // The trading rules' simulation handlers, after the housekeeping ones the pipeline starts with.
         TradingSteps.register(Simulation.PIPELINE, context -> Trading.env(context.store()));
+        // The exchange's price step. Not housekeeping: autonomousEconomy=false switches it off.
+        Simulation.PIPELINE.register(new za.co.neroland.neroeconomy.exchange.ExchangeStep(
+                za.co.neroland.neroeconomy.exchange.ExchangeStep.GAME));
+        // After the prices: the day's dividends, then bond maturities and delisting payouts.
+        za.co.neroland.neroeconomy.exchange.ExchangeSteps.register(Simulation.PIPELINE,
+                za.co.neroland.neroeconomy.exchange.Investing::env);
         // Auto-Trader blocks are the inventories a rule can work from besides its owner's vault.
         Trading.ruleBinder(za.co.neroland.neroeconomy.trader.AutoTraders.BINDER);
         // Server-funded delivery jobs (soft logistics seam); without this the overload refuses jobs.

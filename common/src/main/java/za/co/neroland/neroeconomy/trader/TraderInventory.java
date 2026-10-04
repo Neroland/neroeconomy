@@ -50,7 +50,10 @@ public final class TraderInventory implements RuleInventory {
         /** Replaces what a slot holds with unmodified goods; null empties it. */
         void set(int slot, Lot lot);
 
-        /** How many of an item fit in one slot. */
+        /**
+         * How many of an item fit in one slot; 0 when a slot cannot hold it at all (an item id the
+         * game does not know). Such goods are never put in a slot: they go to the overflow.
+         */
         int limit(String item);
     }
 
@@ -121,7 +124,8 @@ public final class TraderInventory implements RuleInventory {
 
     /** Tops up stacks of the item, then fills empty slots, between two slot indices. @return what did not fit */
     private int fill(String item, int count, int from, int to) {
-        int limit = Math.max(1, slots.limit(item));
+        int limit = slots.limit(item);
+        if (limit < 1) return count;
         int left = count;
         for (int slot = from; slot < to && left > 0; slot++) {
             Lot held = slots.unmodified(slot);
@@ -142,7 +146,8 @@ public final class TraderInventory implements RuleInventory {
     /** What the output slots can still take of an item: the space in its stacks plus the empty slots. */
     @Override public long room(String item) {
         if (item == null || !reachable()) return 0L;
-        int limit = Math.max(1, slots.limit(item));
+        int limit = slots.limit(item);
+        if (limit < 1) return 0L;
         long room = 0L;
         for (int slot = INPUTS; slot < SLOTS; slot++) {
             if (slots.empty(slot)) room += limit;

@@ -42,7 +42,27 @@ public enum TransactionType {
     /** A deposit another mod made without a reason of its own; paid by the Reserve. */
     SIBLING_PAYOUT,
     /** A withdrawal another mod made without a reason of its own; paid to the Reserve. */
-    SIBLING_CHARGE;
+    SIBLING_CHARGE,
+    /** The principal of a share or index purchase, moving into the exchange account. */
+    SHARE_BUY,
+    /** Principal coming back out of the exchange account when shares or index units are sold. */
+    SHARE_SELL,
+    /** What a sale fetched above what the units cost; paid by the Reserve within the exchange budget. */
+    CAPITAL_GAIN,
+    /** What a sale fetched below what the units cost; moves from the exchange account to the Reserve. */
+    CAPITAL_LOSS,
+    /** A day's dividend on steady shares; paid by the Reserve within the exchange budget. */
+    DIVIDEND,
+    /** The principal of a Savings Bond, moving into the exchange account. */
+    BOND_BUY,
+    /** A Savings Bond's principal coming back, at maturity or when it is cashed in early. */
+    BOND_REDEEM,
+    /** A Savings Bond's interest, paid out of the exchange account at maturity. */
+    BOND_INTEREST,
+    /** A Savings Bond's interest set aside when it is bought: Reserve to exchange account, within the exchange budget. */
+    BOND_INTEREST_RESERVED,
+    /** Interest set aside for a bond that was cashed in early, going back to the Reserve. */
+    BOND_INTEREST_RELEASED;
 
     /** Whether this reason may create credits. */
     public boolean mints() {

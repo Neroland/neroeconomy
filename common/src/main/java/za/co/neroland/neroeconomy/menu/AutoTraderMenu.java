@@ -179,6 +179,9 @@ public final class AutoTraderMenu extends AbstractContainerMenu {
     }
 
     private void apply(ServerPlayer sender, ServerLevel level, AutoTraderPayload intent) {
+        // A sell rule puts whatever reaches the input slots on the market. Somebody with an endless
+        // supply of items may not set one up; buying is never refused, it adds nothing of value.
+        if (!intent.buy() && GoodsSource.refused(sender)) return;
         boolean hadRule = AutoTraders.rule(level, trader.getBlockPos(), sender.getUUID()) != null;
         // A tag is typed with or without its leading '#'; the rule stores it without.
         String target = intent.target() == null ? "" : intent.target().trim();

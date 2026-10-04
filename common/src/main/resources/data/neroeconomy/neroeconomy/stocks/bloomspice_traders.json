@@ -1,0 +1,17 @@
+{
+  "name": "stock.neroeconomy.bloomspice_traders",
+  "description": "stock.neroeconomy.bloomspice_traders.description",
+  "sector": "farming",
+  "type": "risky",
+  "start_price": 28,
+  "volatility": 22.0,
+  "drift": 23.0,
+  "dividend_yield": 0.0,
+  "linked": [
+    "#c:foods",
+    "minecraft:cocoa_beans",
+    "minecraft:sugar",
+    "minecraft:honey_bottle",
+    "minecraft:glow_berries"
+  ]
+}

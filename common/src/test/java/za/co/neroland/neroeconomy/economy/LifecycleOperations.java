@@ -99,6 +99,8 @@ final class LifecycleOperations {
             long owed = world.owed(player);
             assertEquals(owed, ledger.sweepErasedEscrow(owed));
             world.owe(player, -owed);
+            // A direct trade they have open ends first, so the other side gets its goods back.
+            destroyed += DirectTradeOperations.erased(world, player);
             // The trading sections go in the order the game erases them: the book and offers, then
             // the market's claims. Each sweeps its own escrow; the erased player's goods on the
             // book and in offers they sent are destroyed, and offers sent to them go back.
@@ -114,6 +116,17 @@ final class LifecycleOperations {
             assertEquals(0, world.store.offers().incoming(FuzzWorld.account(player)));
             world.store.rules().forgetPlayer(player);
             assertEquals(0, world.store.rules().count(FuzzWorld.account(player)));
+            // Their Auto-Trader blocks stay in the world, ownerless and with no rule.
+            TraderOperations.erased(world, player);
+            // Their shares and bonds go: the principal and the reserved interest move from the
+            // exchange account to the Reserve, and their practice sandbox is dropped.
+            long exchangeBefore = ledger.balance(za.co.neroland.neroeconomy.api.SystemAccountId.EXCHANGE);
+            long swept = world.exchange().forgetPlayer(player);
+            assertEquals(exchangeBefore - swept, ledger.balance(za.co.neroland.neroeconomy.api.SystemAccountId.EXCHANGE));
+            assertTrue(world.exchange().desk().portfolio(FuzzWorld.account(player)) == null);
+            assertTrue(world.exchange().practice().portfolio(FuzzWorld.account(player)) == null);
+            world.exchangeLimiter.forget(FuzzWorld.account(player));
+            world.practiceLimiter.forget(FuzzWorld.account(player));
             world.store.market().forgetPlayer(player);
             assertEquals(0, world.store.book().sellCount(FuzzWorld.account(player)));
             assertEquals(0, world.store.book().buyCount(FuzzWorld.account(player)));
@@ -121,7 +134,7 @@ final class LifecycleOperations {
             ledger.forgetPlayer(player);
             assertEquals(0L, ledger.getBalance(player, NeroEconomyCommon.CREDITS));
             assertEquals(0, world.vault().stackCount(player));
-            return 1L + destroyed + owed;
+            return 1L + destroyed + owed + swept;
         }
     }
 }

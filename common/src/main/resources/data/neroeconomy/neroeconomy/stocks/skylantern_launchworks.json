@@ -1,0 +1,18 @@
+{
+  "name": "stock.neroeconomy.skylantern_launchworks",
+  "description": "stock.neroeconomy.skylantern_launchworks.description",
+  "sector": "space",
+  "type": "risky",
+  "start_price": 480,
+  "volatility": 23.0,
+  "drift": 25.0,
+  "dividend_yield": 0.0,
+  "linked": [
+    "#c:ingots/netherite",
+    "#c:ingots/starsteel",
+    "#c:plates/starsteel",
+    "#c:gunpowders",
+    "minecraft:firework_rocket",
+    "minecraft:elytra"
+  ]
+}

@@ -1,0 +1,19 @@
+{
+  "name": "stock.neroeconomy.lanternleaf_decor",
+  "description": "stock.neroeconomy.lanternleaf_decor.description",
+  "sector": "decor",
+  "type": "steady",
+  "start_price": 35,
+  "volatility": 3.4,
+  "drift": 5.5,
+  "dividend_yield": 2.0,
+  "linked": [
+    "#c:dyes",
+    "#c:glass_blocks",
+    "#c:glass_panes",
+    "#minecraft:wool",
+    "#minecraft:terracotta",
+    "#minecraft:candles",
+    "minecraft:lantern"
+  ]
+}

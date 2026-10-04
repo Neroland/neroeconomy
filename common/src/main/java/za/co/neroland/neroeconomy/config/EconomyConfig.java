@@ -4,6 +4,8 @@ import za.co.neroland.nerolandcore.config.ConfigManager;
 import za.co.neroland.nerolandcore.config.ConfigSchema;
 import za.co.neroland.nerolandcore.config.ConfigValue;
 import za.co.neroland.neroeconomy.NeroEconomyCommon;
+import za.co.neroland.neroeconomy.exchange.ExchangeSettings;
+import za.co.neroland.neroeconomy.exchange.TradingTerms;
 
 /** Server-authoritative economy policy, persisted by Neroland Core's config framework. */
 public final class EconomyConfig {
@@ -147,8 +149,105 @@ public final class EconomyConfig {
             "Fee on the winning bid, taken from the seller's proceeds, rounded up and at least 1 "
                     + "credit; 0 charges nothing. Paid to the Reserve.");
     public static final ConfigValue<Double> EXCHANGE_FEE_PERCENT = SCHEMA.doubleRange(
-            "exchangeFeePercent", 1.0D, 0.0D, 50.0D, true,
-            "Fee on every share buy and sell. Paid to the Reserve.");
+            "exchangeFeePercent", TradingTerms.DEFAULT_FEE_PERCENT, 0.0D, 50.0D, true,
+            "Fee on every share and index purchase and sale, rounded up and at least 1 credit; 0 "
+                    + "charges nothing. Savings Bonds carry no fee. Paid to the Reserve.");
+    public static final ConfigValue<Boolean> EXCHANGE_ENABLED = SCHEMA.bool(
+            "exchangeEnabled", true, true,
+            "Run the exchange: the prices of the listed companies move once per simulation step, "
+                    + "and shares, the index fund and Savings Bonds can be bought and sold. false leaves "
+                    + "every price where it is and refuses every purchase and sale; a Savings Bond can "
+                    + "still be cashed in and still pays out at maturity. autonomousEconomy=false stops "
+                    + "the prices and the dividends, but not trading.");
+    public static final ConfigValue<Double> EXCHANGE_STEP_LIMIT_STEADY_PERCENT = SCHEMA.doubleRange(
+            "exchangeStepLimitSteadyPercent", ExchangeSettings.DEFAULT_STEP_LIMIT_STEADY_PERCENT, 0.1D, 50.0D, true,
+            "Most a steady share's price may move in one simulation step, as a percentage.");
+    public static final ConfigValue<Double> EXCHANGE_STEP_LIMIT_RISKY_PERCENT = SCHEMA.doubleRange(
+            "exchangeStepLimitRiskyPercent", ExchangeSettings.DEFAULT_STEP_LIMIT_RISKY_PERCENT, 0.1D, 50.0D, true,
+            "Most a risky share's price may move in one simulation step, as a percentage.");
+    public static final ConfigValue<Double> EXCHANGE_DAY_LIMIT_STEADY_PERCENT = SCHEMA.doubleRange(
+            "exchangeDayLimitSteadyPercent", ExchangeSettings.DEFAULT_DAY_LIMIT_STEADY_PERCENT, 0.5D, 90.0D, true,
+            "Most a steady share's price may be above or below its price at the start of the "
+                    + "economy day, as a percentage. A share that gets there is halted.");
+    public static final ConfigValue<Double> EXCHANGE_DAY_LIMIT_RISKY_PERCENT = SCHEMA.doubleRange(
+            "exchangeDayLimitRiskyPercent", ExchangeSettings.DEFAULT_DAY_LIMIT_RISKY_PERCENT, 0.5D, 90.0D, true,
+            "Most a risky share's price may be above or below its price at the start of the "
+                    + "economy day, as a percentage. A share that gets there is halted.");
+    public static final ConfigValue<Integer> EXCHANGE_HALT_STEPS = SCHEMA.intRange(
+            "exchangeHaltSteps", ExchangeSettings.DEFAULT_HALT_STEPS, 0, 1008, true,
+            "Simulation steps a share is halted for after reaching its daily limit: its price stands "
+                    + "still and it cannot be bought or sold. 6 steps are one hour at the default "
+                    + "step length. 0 never halts.");
+    public static final ConfigValue<Double> EXCHANGE_REVERSION_PERCENT = SCHEMA.doubleRange(
+            "exchangeReversionPercent", ExchangeSettings.DEFAULT_REVERSION_PERCENT, 0.0D, 50.0D, true,
+            "How much of the gap between a share's price and its anchor closes in one simulation "
+                    + "step, as a percentage. Higher keeps prices closer to their trend.");
+    public static final ConfigValue<Double> EXCHANGE_VOLUME_NUDGE_CAP_PERCENT = SCHEMA.doubleRange(
+            "exchangeVolumeNudgeCapPercent", ExchangeSettings.DEFAULT_VOLUME_NUDGE_CAP_PERCENT, 0.0D, 5.0D, true,
+            "Most that trade in a company's linked items may move its share price in one "
+                    + "simulation step, up or down, as a percentage. 0 turns the link off.");
+    public static final ConfigValue<Long> EXCHANGE_VOLUME_SCALE = SCHEMA.longRange(
+            "exchangeVolumeScale", ExchangeSettings.DEFAULT_VOLUME_SCALE, 1L, 1_000_000_000L, true,
+            "Credits of counted trade above (or below) the usual level, in one simulation step, "
+                    + "that move a share price by the whole of exchangeVolumeNudgeCapPercent.");
+    public static final ConfigValue<Long> EXCHANGE_VOLUME_PAIR_CAP = SCHEMA.longRange(
+            "exchangeVolumePairCap", ExchangeSettings.DEFAULT_VOLUME_PAIR_CAP, 0L, 1_000_000_000L, true,
+            "Credits of trade between the same two player accounts that count toward share prices "
+                    + "per simulation step, so two accounts trading back and forth cannot move a price.");
+    public static final ConfigValue<Long> EXCHANGE_VOLUME_ACCOUNT_CAP = SCHEMA.longRange(
+            "exchangeVolumeAccountCap", ExchangeSettings.DEFAULT_VOLUME_ACCOUNT_CAP, 0L, 1_000_000_000L, true,
+            "Credits of one player account's trade that count toward share prices per simulation step.");
+    public static final ConfigValue<Double> EXCHANGE_SHOCK_STEP_PERCENT = SCHEMA.doubleRange(
+            "exchangeShockStepPercent", ExchangeSettings.DEFAULT_SHOCK_STEP_PERCENT, 0.0D, 10.0D, true,
+            "How much of an active market shock on a company or its linked items reaches its share "
+                    + "price in one simulation step, as a percentage. 0 keeps shocks out of the exchange.");
+    public static final ConfigValue<Double> EXCHANGE_FLOOR_PERCENT = SCHEMA.doubleRange(
+            "exchangeFloorPercent", ExchangeSettings.DEFAULT_FLOOR_PERCENT, 0.0D, 100.0D, true,
+            "A share price never falls below this percentage of the company's start price, nor "
+                    + "below 0.01 credit.");
+    public static final ConfigValue<Double> BOND_RATE_1_DAY_PERCENT = SCHEMA.doubleRange(
+            "bondRate1DayPercent", ExchangeSettings.DEFAULT_BOND_RATE_1_DAY_PERCENT, 0.0D, 100.0D, true,
+            "Interest a 1-day Savings Bond pays for its whole term, as a percentage of what was put in.");
+    public static final ConfigValue<Double> BOND_RATE_3_DAY_PERCENT = SCHEMA.doubleRange(
+            "bondRate3DayPercent", ExchangeSettings.DEFAULT_BOND_RATE_3_DAY_PERCENT, 0.0D, 100.0D, true,
+            "Interest a 3-day Savings Bond pays for its whole term, as a percentage of what was put in.");
+    public static final ConfigValue<Double> BOND_RATE_7_DAY_PERCENT = SCHEMA.doubleRange(
+            "bondRate7DayPercent", ExchangeSettings.DEFAULT_BOND_RATE_7_DAY_PERCENT, 0.0D, 100.0D, true,
+            "Interest a 7-day Savings Bond pays for its whole term, as a percentage of what was put in.");
+    public static final ConfigValue<Double> EXCHANGE_SPREAD_STEADY_PERCENT = SCHEMA.doubleRange(
+            "exchangeSpreadSteadyPercent", TradingTerms.DEFAULT_SPREAD_STEADY_PERCENT, 0.1D, 20.0D, true,
+            "Gap between what a steady share is bought at and what it is sold at, as a percentage "
+                    + "of its price: half goes on top of the price when buying and half comes off it "
+                    + "when selling. Buying and selling at once therefore always loses.");
+    public static final ConfigValue<Double> EXCHANGE_SPREAD_RISKY_PERCENT = SCHEMA.doubleRange(
+            "exchangeSpreadRiskyPercent", TradingTerms.DEFAULT_SPREAD_RISKY_PERCENT, 0.1D, 20.0D, true,
+            "The same gap for a risky share.");
+    public static final ConfigValue<Double> EXCHANGE_SPREAD_INDEX_PERCENT = SCHEMA.doubleRange(
+            "exchangeSpreadIndexPercent", TradingTerms.DEFAULT_SPREAD_INDEX_PERCENT, 0.1D, 20.0D, true,
+            "The same gap for the index fund.");
+    public static final ConfigValue<Integer> SHARE_HOLD_MINUTES = SCHEMA.intRange(
+            "shareHoldMinutes", TradingTerms.DEFAULT_HOLD_MINUTES, 0, 10080, true,
+            "Minutes of economy time before shares or index units that were just bought can be sold. "
+                    + "0 turns the holding period off.");
+    public static final ConfigValue<Long> MAX_POSITION_PER_STOCK = SCHEMA.longRange(
+            "maxPositionPerStock", TradingTerms.DEFAULT_MAX_POSITION, 0L, 1_000_000_000L, true,
+            "Most credits one account may have in one stock or in the index fund, counted at what "
+                    + "was paid for the units still held; 0 refuses every purchase.");
+    public static final ConfigValue<Long> MAX_PORTFOLIO = SCHEMA.longRange(
+            "maxPortfolio", TradingTerms.DEFAULT_MAX_PORTFOLIO, 0L, 1_000_000_000L, true,
+            "Most credits one account may have on the exchange altogether - shares, index fund and "
+                    + "Savings Bonds - counted at what was paid in.");
+    public static final ConfigValue<Integer> MAX_BONDS_PER_PLAYER = SCHEMA.intRange(
+            "maxBondsPerPlayer", TradingTerms.DEFAULT_MAX_BONDS, 0, 64, true,
+            "Savings Bonds one account may hold at a time; 0 refuses new ones.");
+    public static final ConfigValue<Long> PRACTICE_STARTING_CREDITS = SCHEMA.longRange(
+            "practiceStartingCredits", TradingTerms.DEFAULT_PRACTICE_START, 0L, 1_000_000_000L, true,
+            "Play credits a practice portfolio starts with and is reset to. They are not credits: "
+                    + "nothing converts between practice and the real economy.");
+    public static final ConfigValue<Integer> EXCHANGE_ACTIONS_PER_MINUTE = SCHEMA.intRange(
+            "exchangeActionsPerMinute", TradingTerms.DEFAULT_ACTIONS_PER_MINUTE, 1, 600, true,
+            "Buys, sells and bond actions one account may make on the exchange per minute; practice "
+                    + "is counted separately, at the same rate.");
     public static final ConfigValue<Double> TRADE_TAX_PERCENT = SCHEMA.doubleRange(
             "tradeTaxPercent", 0.0D, 0.0D, 50.0D, true,
             "Tax on the credits side of a direct trade or an accepted offer, rounded up and at least "

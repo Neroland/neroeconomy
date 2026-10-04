@@ -1,0 +1,17 @@
+{
+  "name": "stock.neroeconomy.glimmerstone_prospecting",
+  "description": "stock.neroeconomy.glimmerstone_prospecting.description",
+  "sector": "mining",
+  "type": "risky",
+  "start_price": 310,
+  "volatility": 21.0,
+  "drift": 23.0,
+  "dividend_yield": 0.0,
+  "linked": [
+    "#c:gems/diamond",
+    "#c:gems/emerald",
+    "#c:gems/amethyst",
+    "#c:gems/lapis",
+    "#c:ingots/gold"
+  ]
+}

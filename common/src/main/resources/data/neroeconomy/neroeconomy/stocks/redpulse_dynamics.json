@@ -1,0 +1,18 @@
+{
+  "name": "stock.neroeconomy.redpulse_dynamics",
+  "description": "stock.neroeconomy.redpulse_dynamics.description",
+  "sector": "energy",
+  "type": "risky",
+  "start_price": 85,
+  "volatility": 20.0,
+  "drift": 22.0,
+  "dividend_yield": 0.0,
+  "linked": [
+    "#c:dusts/redstone",
+    "#c:storage_blocks/redstone",
+    "#c:dusts/glowstone",
+    "#c:gems/quartz",
+    "minecraft:repeater",
+    "minecraft:comparator"
+  ]
+}

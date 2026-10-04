@@ -45,6 +45,7 @@ import net.minecraft.world.phys.AABB;
 import za.co.neroland.nerolandcore.data.PlayerDataErasure;
 import za.co.neroland.nerolandcore.economy.CurrencyApi;
 import za.co.neroland.neroeconomy.NeroEconomyCommon;
+import za.co.neroland.neroeconomy.api.ExchangeApi;
 import za.co.neroland.neroeconomy.block.PlayerShopBlockEntity;
 import za.co.neroland.neroeconomy.config.EconomyConfig;
 import za.co.neroland.neroeconomy.data.LedgerExportFiles;
@@ -56,6 +57,7 @@ import za.co.neroland.neroeconomy.economy.Fees;
 import za.co.neroland.neroeconomy.economy.KnownAccounts;
 import za.co.neroland.neroeconomy.economy.SupplyReport;
 import za.co.neroland.neroeconomy.economy.TransactionType;
+import za.co.neroland.neroeconomy.exchange.PriceText;
 import za.co.neroland.neroeconomy.goods.GoodsSource;
 import za.co.neroland.neroeconomy.market.CancelResult;
 import za.co.neroland.neroeconomy.market.ListingSource;
@@ -111,6 +113,7 @@ public final class EconomyCommands {
                         .then(adminMutation("take", TransactionType.ADMIN_TAKE))
                         .then(adminMutation("set", TransactionType.ADMIN_SET))
                         .then(Commands.literal("supply").executes(EconomyCommands::supply))
+                        .then(Commands.literal("stocks").executes(EconomyCommands::stocks))
                         .then(Commands.literal("health").executes(EconomyCommands::health)
                                 .then(Commands.literal("accept")
                                         .requires(source -> EconomyConfig.ADMIN_MUTATIONS_ENABLED.get())
@@ -139,6 +142,8 @@ public final class EconomyCommands {
                 .then(TradingCommands.offer())
                 .then(TradingCommands.rule())
                 .then(TradingCommands.trade())
+                // The exchange: shares, the index fund, Savings Bonds, and practice mode.
+                .then(InvestCommands.invest())
                 .then(galleryTree());
     }
 
@@ -189,9 +194,48 @@ public final class EconomyCommands {
                 EconomySavedData.dailyLimit(kind)), false));
         source.sendSuccess(() -> Component.translatable("command.neroeconomy.supply.obligations",
                 report.obligations()), false);
+        long[] held = EconomyStore.get(source.getServer()).exchange().desk().heldParts();
+        source.sendSuccess(() -> Component.translatable("command.neroeconomy.supply.exchange_held",
+                report.exchangeHeld(), held[0], held[1], held[2]), false);
         source.sendSuccess(() -> checkLine("command.neroeconomy.supply.check_supply", report.supplyBalanced()), false);
         source.sendSuccess(() -> checkLine("command.neroeconomy.supply.check_escrow", report.escrowBalanced()), false);
+        source.sendSuccess(() -> checkLine("command.neroeconomy.supply.check_exchange", report.exchangeBalanced()), false);
         return Command.SINGLE_SUCCESS;
+    }
+
+    /** Every listed company's price, change today and halt flag, then the index and the bond rates. Names no account. */
+    private static int stocks(CommandContext<CommandSourceStack> context) {
+        if (frozen(context)) return 0;
+        CommandSourceStack source = context.getSource();
+        MinecraftServer server = source.getServer();
+        if (!ExchangeApi.enabled() || !EconomyConfig.AUTONOMOUS_ECONOMY.get())
+            source.sendSuccess(() -> Component.translatable("command.neroeconomy.stocks.off"), false);
+        java.util.List<ExchangeApi.StockQuote> quotes = ExchangeApi.stocks(server);
+        if (quotes.isEmpty()) {
+            source.sendSuccess(() -> Component.translatable("command.neroeconomy.stocks.none"), false);
+        } else {
+            source.sendSuccess(() -> Component.translatable("command.neroeconomy.stocks.header"), false);
+            for (ExchangeApi.StockQuote quote : quotes) source.sendSuccess(() -> stockLine(quote), false);
+        }
+        ExchangeApi.index(server).ifPresent(index -> source.sendSuccess(() -> Component.translatable(
+                "command.neroeconomy.stocks.index", Component.translatable(index.nameKey()),
+                PriceText.credits(index.priceCents()), PriceText.percent(index.dayChangeBasisPoints()),
+                index.members()), false));
+        for (ExchangeApi.BondQuote bond : ExchangeApi.bonds()) source.sendSuccess(() -> Component.translatable(
+                "command.neroeconomy.stocks.bond", Component.translatable(bond.nameKey()),
+                PriceText.percent(bond.rateBasisPoints())), false);
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private static Component stockLine(ExchangeApi.StockQuote quote) {
+        Component name = Component.translatable(quote.nameKey());
+        if (quote.delisted())
+            return Component.translatable("command.neroeconomy.stocks.row_delisted", name,
+                    PriceText.credits(quote.priceCents()));
+        return Component.translatable(quote.halted() ? "command.neroeconomy.stocks.row_halted"
+                : "command.neroeconomy.stocks.row", name, Component.translatable("sector.neroeconomy." + quote.sector()),
+                Component.translatable(quote.type().translationKey()), PriceText.credits(quote.priceCents()),
+                PriceText.percent(quote.dayChangeBasisPoints()));
     }
 
     private static Component transactionType(TransactionType type) {
@@ -203,7 +247,7 @@ public final class EconomyCommands {
                 ? "command.neroeconomy.check.passed" : "command.neroeconomy.check.failed"));
     }
 
-    /** Whether the economy is frozen, what the store holds, and whether both invariants hold. */
+    /** Whether the economy is frozen, what the store holds, and whether the three invariants hold. */
     private static int health(CommandContext<CommandSourceStack> context) {
         CommandSourceStack source = context.getSource();
         EconomyStore store = EconomyStore.get(source.getServer());
@@ -218,6 +262,7 @@ public final class EconomyCommands {
         SupplyReport report = store.supplyReport();
         source.sendSuccess(() -> checkLine("command.neroeconomy.supply.check_supply", report.supplyBalanced()), false);
         source.sendSuccess(() -> checkLine("command.neroeconomy.supply.check_escrow", report.escrowBalanced()), false);
+        source.sendSuccess(() -> checkLine("command.neroeconomy.supply.check_exchange", report.exchangeBalanced()), false);
         if (frozen) source.sendSuccess(() -> Component.translatable("command.neroeconomy.health.how_to_accept"), false);
         return Command.SINGLE_SUCCESS;
     }

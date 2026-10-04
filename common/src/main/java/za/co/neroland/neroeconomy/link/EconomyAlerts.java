@@ -27,7 +27,10 @@ public final class EconomyAlerts {
         OFFER_ACCEPTED("offer_accepted", "A trade offer you sent was accepted."),
         OFFER_EXPIRED("offer_expired", "A trade offer you sent expired and was returned to you."),
         RULE_PAUSED("rule_paused", "One of your auto-trade rules has paused."),
-        RULE_FILLED("rule_filled", "One of your auto-trade rules is complete.");
+        RULE_FILLED("rule_filled", "One of your auto-trade rules is complete."),
+        BOND_MATURED("bond_matured", "A Savings Bond matured and was paid into your balance."),
+        DIVIDEND_PAID("dividend_paid", "Your shares paid a dividend."),
+        STOCK_DELISTED("stock_delisted", "A company you held shares in left the exchange, and you were paid out.");
 
         private final String id;
         private final String text;

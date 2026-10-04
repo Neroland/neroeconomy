@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.HashSet;
+import java.util.List;
 import java.util.Random;
 import java.util.Set;
 
@@ -17,8 +18,10 @@ import za.co.neroland.neroeconomy.api.SystemAccountId;
 /**
  * The whole economy under a long random run of everything it can do: payments, escrow and its
  * refunds, fees, Reserve payouts, another mod's deposits, vault deposits, withdrawals and
- * deliveries, erasures, days rolling over, the clock jumping and the simulation stepping.
- * Invariant A, Invariant B and item conservation are checked after every single operation by
+ * deliveries, erasures, days rolling over, the clock jumping and the simulation stepping, the
+ * order book, offers, auto-trade rules, direct trades, rules bound to Auto-Trader blocks, and the
+ * exchange: shares, the index fund, Savings Bonds, practice mode, dividends, splits and delistings.
+ * Invariants A, B and C and item conservation are checked after every single operation by
  * {@link OperationFuzzer}; this class runs it, makes sure the run was not a run of refusals, and
  * crashes it.
  */
@@ -73,8 +76,49 @@ class OperationFuzzTest {
         System.out.println("[fuzz] rule fills worth " + world.ruleTraded + ", alerts " + world.alerts + ", orders open "
                 + world.store.book().size() + ", offers open " + world.store.offers().size() + ", rules "
                 + world.store.rules().size());
+        System.out.println("[fuzz] trades open " + world.trades.size() + ", Auto-Traders standing " + world.traders.size()
+                + ", slot writes by rules " + world.slotWrites());
         System.out.println("[fuzz] steps run " + world.stepsRun + ", skipped " + world.stepsSkipped + ", lots held "
                 + lotsHeld(world) + ", effects " + result.effects());
+        // Direct trades really swapped and really were cancelled, and rules really worked from
+        // Auto-Trader blocks: they took goods out of slots and put goods into them, blocks were
+        // unloaded with a rule on them, and blocks were removed.
+        assertTrue(result.effects().get("trade_swap") > 100);
+        assertTrue(result.effects().get("trade_cancel") > 20);
+        assertTrue(result.effects().get("trade_escrow_in") > 500);
+        assertTrue(result.effects().get("trade_escrow_out") > 100);
+        assertTrue(result.effects().get("trader_apply") > 100);
+        assertTrue(result.effects().get("trader_remove") > 20);
+        assertTrue(world.slotWrites() > 100L, "rules hardly ever worked from an Auto-Trader's slots");
+        // The exchange really traded, with real credits and with play credits; bonds were bought and
+        // cashed in; dividend days were paid; and its account ends exactly on what it records.
+        za.co.neroland.neroeconomy.exchange.ExchangeSection exchange = world.exchange();
+        long[] parts = exchange.desk().heldParts();
+        int splits = 0;
+        for (za.co.neroland.neroeconomy.exchange.StockDefinition company : FuzzWorld.STOCKS)
+            if (exchange.state(company.id()) != null) splits += exchange.state(company.id()).splits();
+        System.out.println("[fuzz] exchange holds " + ledger.balance(SystemAccountId.EXCHANGE) + " (shares " + parts[0]
+                + ", bond principal " + parts[1] + ", reserved interest " + parts[2] + ") for " + exchange.desk().size()
+                + " accounts; practice sandboxes " + exchange.practice().size() + "; last dividend day paid "
+                + exchange.dividends().paid() + " to " + exchange.dividends().accounts() + " accounts at "
+                + exchange.dividends().percent() + "%; splits " + splits + "; exchange alerts " + world.exchangeAlerts);
+        assertEquals(world.store.exchangeObligations(), ledger.balance(SystemAccountId.EXCHANGE));
+        assertTrue(result.effects().get("exchange_buy") > 300);
+        assertTrue(result.effects().get("exchange_sell") > 150);
+        assertTrue(result.effects().get("bond_buy") > 100);
+        assertTrue(result.effects().get("bond_redeem") > 20);
+        assertTrue(result.effects().get("practice_trade") > 300);
+        assertTrue(result.effects().get("practice_bond") > 50);
+        assertTrue(exchange.dividends().happened(), "no dividend day ever ran");
+        // Each of the three things the simulation does for a holder happened: a bond matured by
+        // itself, a dividend was paid, and the holders of a delisted company were paid out.
+        for (za.co.neroland.neroeconomy.link.EconomyAlerts.Kind kind : List.of(
+                za.co.neroland.neroeconomy.link.EconomyAlerts.Kind.BOND_MATURED,
+                za.co.neroland.neroeconomy.link.EconomyAlerts.Kind.DIVIDEND_PAID,
+                za.co.neroland.neroeconomy.link.EconomyAlerts.Kind.STOCK_DELISTED))
+            assertTrue(world.exchangeAlerts.getOrDefault(kind, 0L) > 0L, kind + " never happened");
+        assertTrue(splits > 0, "no share ever split");
+        assertTrue(exchange.practice().size() > 0);
     }
 
     private static long lotsHeld(FuzzWorld world) {
@@ -107,8 +151,15 @@ class OperationFuzzTest {
             assertEquals(uninterrupted.calls(), crashed.calls(), "seed " + seed);
             assertEquals(uninterrupted.effects(), crashed.effects(), "seed " + seed);
             assertEquals(uninterrupted.world().fingerprint(), crashed.world().fingerprint(), "seed " + seed);
+            // The crashes really did catch trades with goods on the table and rules bound to blocks,
+            // and what was on the table came back out of the reloaded store, stack for stack.
+            assertTrue(crashed.world().tradeStacksReturned > 0L, "no crash ever caught an open trade, seed " + seed);
+            assertEquals(uninterrupted.world().tradeStacksReturned, crashed.world().tradeStacksReturned, "seed " + seed);
+            assertTrue(crashed.world().slotWrites() > 0L, "seed " + seed);
             // And the store that came out of forty reloads is still a store that saves and loads.
+            // (A restart ends every open trade, so they are ended first: the reload itself must change nothing.)
             FuzzWorld world = crashed.world();
+            world.stopTrades();
             String before = world.fingerprint();
             world.crash();
             world.check("final reload", CRASH_RUN);

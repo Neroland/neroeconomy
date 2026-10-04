@@ -52,6 +52,8 @@ public final class PlayerDataExport {
         // Where the subject's Auto-Trader blocks stand; their rules are in the rules section above.
         json.add("auto_traders", EconomyStore.get(server).autoTraders().exportFor(player));
         json.add("vault", VaultSection.get(server).exportFor(player));
+        // The subject's shares, index units and Savings Bonds, and their practice portfolio.
+        json.add("exchange", EconomyStore.get(server).exchange().exportFor(player));
         return json;
     }
 

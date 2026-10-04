@@ -8,8 +8,8 @@ import net.neoforged.fml.loading.FMLEnvironment;
 import net.neoforged.neoforge.capabilities.Capabilities;
 import net.neoforged.neoforge.capabilities.RegisterCapabilitiesEvent;
 import net.neoforged.neoforge.common.NeoForge;
-import net.neoforged.neoforge.transfer.item.VanillaContainerWrapper;
 import net.neoforged.neoforge.transfer.item.WorldlyContainerWrapper;
+import net.neoforged.neoforge.event.OnDatapackSyncEvent;
 import net.neoforged.neoforge.event.RegisterCommandsEvent;
 import net.neoforged.neoforge.event.server.ServerStartedEvent;
 import net.neoforged.neoforge.event.server.ServerStoppedEvent;
@@ -19,6 +19,7 @@ import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
 import net.neoforged.neoforge.event.level.block.BreakBlockEvent;
 
+import net.minecraft.core.Direction;
 import net.minecraft.world.level.Level;
 
 import za.co.neroland.neroeconomy.block.AutoTraderBlock;
@@ -30,21 +31,29 @@ import za.co.neroland.nerolandcore.registry.RegistrationProvider;
 import za.co.neroland.neroeconomy.NeroEconomyCommon;
 import za.co.neroland.neroeconomy.command.EconomyCommands;
 import za.co.neroland.neroeconomy.direct.DirectTrades;
+import za.co.neroland.neroeconomy.exchange.StockData;
 import za.co.neroland.neroeconomy.network.IntentGuard;
 
 public final class NeoForgePlatformInfo implements PlatformInfo {
     @Override public void register(Object bus) {
         RegistrationProvider.attach((IEventBus) bus);
-        // The Auto-Trader's slots on the standard item capability, sided, so any mod's pipes can
-        // feed and empty it; hoppers and NeroLogistics already see it as a vanilla container.
+        // The Auto-Trader's slots on the standard item capability, so any mod's pipes can feed and
+        // empty it; hoppers and NeroLogistics already see it as a vanilla container. Every face
+        // behaves alike, and a caller that names no face gets the same view as one that does:
+        // inputs take, outputs give, and nothing else.
         ((IEventBus) bus).addListener((RegisterCapabilitiesEvent event) -> event.registerBlockEntity(
-                Capabilities.Item.BLOCK, ModBlockEntities.AUTO_TRADER.get(), (trader, side) -> side != null
-                        ? new WorldlyContainerWrapper(trader, side) : VanillaContainerWrapper.of(trader)));
+                Capabilities.Item.BLOCK, ModBlockEntities.AUTO_TRADER.get(), (trader, side) ->
+                        new WorldlyContainerWrapper(trader, side != null ? side : Direction.DOWN)));
         NeoForge.EVENT_BUS.addListener((ServerStartedEvent event) -> NeroEconomyCommon.CURRENCY_PROVIDER.bind(event.getServer()));
         NeoForge.EVENT_BUS.addListener((ServerStoppedEvent event) -> NeroEconomyCommon.CURRENCY_PROVIDER.unbind(event.getServer()));
         NeoForge.EVENT_BUS.addListener((RegisterCommandsEvent event) -> EconomyCommands.register(event.getDispatcher()));
         NeoForge.EVENT_BUS.addListener((ServerTickEvent.Post event) ->
                 NeroEconomyCommon.CURRENCY_PROVIDER.tick(event.getServer()));
+        // Data packs were reloaded (the event names no player then): the listed companies are read
+        // again from the new packs. The same event fires per player on login, which is not a reload.
+        NeoForge.EVENT_BUS.addListener((OnDatapackSyncEvent event) -> {
+            if (event.getPlayer() == null) StockData.reload(event.getPlayerList().getServer());
+        });
         NeoForge.EVENT_BUS.addListener((LivingDeathEvent event) ->
                 BountyHooks.entityKilled(event.getEntity(), event.getSource()));
         // Shop-break protection is otherwise Fabric-only. 26.x moved the break event out of

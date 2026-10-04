@@ -31,6 +31,7 @@ import za.co.neroland.neroeconomy.book.RuleOrders;
 import za.co.neroland.neroeconomy.book.SellOrder;
 import za.co.neroland.neroeconomy.config.EconomyConfig;
 import za.co.neroland.neroeconomy.direct.TradeEscrowSection;
+import za.co.neroland.neroeconomy.exchange.ExchangeSection;
 import za.co.neroland.neroeconomy.goods.GoodsSection;
 import za.co.neroland.neroeconomy.goods.Lot;
 import za.co.neroland.neroeconomy.goods.LotHolder;
@@ -104,7 +105,9 @@ public final class EconomyStore extends SavedData {
             // the next load: a load returns what it finds here to its owners' vaults.
             TradeEscrowSection.CODEC.optionalFieldOf("trade_escrow").forGetter(store -> present(store.tradeEscrow)),
             // Added with the Auto-Trader block, so optional: who owns the block at each position.
-            AutoTraderSection.CODEC.optionalFieldOf("auto_traders").forGetter(store -> present(store.autoTraders)))
+            AutoTraderSection.CODEC.optionalFieldOf("auto_traders").forGetter(store -> present(store.autoTraders)),
+            // Added with the exchange, so optional: an older store loads with nothing listed yet.
+            ExchangeSection.CODEC.optionalFieldOf("exchange").forGetter(store -> present(store.exchange)))
             .apply(instance, EconomyStore::new));
     public static final SavedDataType<EconomyStore> TYPE = new SavedDataType<>(ID, EconomyStore::new, CODEC, null);
 
@@ -133,20 +136,12 @@ public final class EconomyStore extends SavedData {
     private final RulesSection rules;
     private final TradeEscrowSection tradeEscrow;
     private final AutoTraderSection autoTraders;
+    private final ExchangeSection exchange;
 
     public EconomyStore() {
         this(0, Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
                 Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
-                Optional.empty(), Optional.empty(), false);
-    }
-
-    private EconomyStore(int schema, Optional<EconomySavedData> ledger, Optional<MarketSavedData> market,
-            Optional<ObligationSavedData> obligations, Optional<ShopOwnershipState> shopOwners,
-            Optional<GoodsSection> goods, Optional<VaultSection> vault, Optional<SimulationSection> simulation,
-            Optional<BookSection> book, Optional<OffersSection> offers, Optional<RulesSection> rules,
-            Optional<TradeEscrowSection> tradeEscrow, Optional<AutoTraderSection> autoTraders) {
-        this(schema, ledger, market, obligations, shopOwners, goods, vault, simulation, book, offers, rules,
-                tradeEscrow, autoTraders, true);
+                Optional.empty(), Optional.empty(), Optional.empty(), false);
     }
 
     private EconomyStore(int schema, Optional<EconomySavedData> ledger, Optional<MarketSavedData> market,
@@ -154,7 +149,17 @@ public final class EconomyStore extends SavedData {
             Optional<GoodsSection> goods, Optional<VaultSection> vault, Optional<SimulationSection> simulation,
             Optional<BookSection> book, Optional<OffersSection> offers, Optional<RulesSection> rules,
             Optional<TradeEscrowSection> tradeEscrow, Optional<AutoTraderSection> autoTraders,
-            boolean loadedFromDisk) {
+            Optional<ExchangeSection> exchange) {
+        this(schema, ledger, market, obligations, shopOwners, goods, vault, simulation, book, offers, rules,
+                tradeEscrow, autoTraders, exchange, true);
+    }
+
+    private EconomyStore(int schema, Optional<EconomySavedData> ledger, Optional<MarketSavedData> market,
+            Optional<ObligationSavedData> obligations, Optional<ShopOwnershipState> shopOwners,
+            Optional<GoodsSection> goods, Optional<VaultSection> vault, Optional<SimulationSection> simulation,
+            Optional<BookSection> book, Optional<OffersSection> offers, Optional<RulesSection> rules,
+            Optional<TradeEscrowSection> tradeEscrow, Optional<AutoTraderSection> autoTraders,
+            Optional<ExchangeSection> exchange, boolean loadedFromDisk) {
         this.schema = Math.max(0, schema);
         this.loadedFromDisk = loadedFromDisk;
         this.ledger = adopt(ledger.orElseGet(EconomySavedData::new));
@@ -169,6 +174,7 @@ public final class EconomyStore extends SavedData {
         this.rules = adopt(rules.orElseGet(RulesSection::new));
         this.tradeEscrow = adopt(tradeEscrow.orElseGet(TradeEscrowSection::new));
         this.autoTraders = adopt(autoTraders.orElseGet(AutoTraderSection::new));
+        this.exchange = adopt(exchange.orElseGet(ExchangeSection::new));
         // A store written before the vault existed still holds item claims in its market section.
         adoptItemClaims(false);
         // And one written before the order book existed still holds its Market Board rows there.
@@ -207,6 +213,9 @@ public final class EconomyStore extends SavedData {
     /** Who owns the Auto-Trader block at each position. */
     public AutoTraderSection autoTraders() { return autoTraders; }
 
+    /** The exchange: the price state of every listed company, and the index fund's level. */
+    public ExchangeSection exchange() { return exchange; }
+
     /** What the order book asks about an order an auto-trade rule placed: the rules section. */
     public RuleOrders ruleOrders() { return rules; }
 
@@ -223,12 +232,21 @@ public final class EconomyStore extends SavedData {
     }
 
     /**
+     * Pays a batch out of the Reserve to players, scaled down pro rata when the Reserve or the
+     * day's budget is short. Like {@link #execute}, it goes through the currency provider in the
+     * running game and straight to this store's ledger otherwise.
+     */
+    public Reserve.ProRata payProRata(BudgetKind kind, Map<UUID, Long> amounts, TransactionType type) {
+        return NeroEconomyCommon.CURRENCY_PROVIDER.payProRataOn(ledger, kind, amounts, type);
+    }
+
+    /**
      * Every section, in one list. The escrow check and the prototype reference scan walk this, so a
      * new section is part of both by being listed here.
      */
     private List<EconomySection> sections() {
         return List.of(ledger, market, obligations, shopOwners, goods, vault, simulation, book, offers, rules,
-                tradeEscrow, autoTraders);
+                tradeEscrow, autoTraders, exchange);
     }
 
     /** The names of the sections that hold anything, for the health report. */
@@ -246,6 +264,7 @@ public final class EconomyStore extends SavedData {
         if (!rules.isEmpty()) names.add("rules");
         if (!tradeEscrow.isEmpty()) names.add("trade_escrow");
         if (!autoTraders.isEmpty()) names.add("auto_traders");
+        if (!exchange.isEmpty()) names.add("exchange");
         return names;
     }
 
@@ -368,13 +387,21 @@ public final class EconomyStore extends SavedData {
         return total;
     }
 
-    /** Aggregates for {@code /eco admin supply}; names no account. */
-    public SupplyReport supplyReport() { return ledger.supplyReport(escrowObligations()); }
+    /**
+     * What the exchange account should hold: what Invariant C checks it against. The cost of every
+     * open share and index position, the principal of every open bond, and the interest reserved
+     * for those bonds.
+     */
+    public long exchangeObligations() { return exchange.held(); }
 
-    /** Both invariants at once. Cheap: one pass over the balances and one over the open rows. */
+    /** Aggregates for {@code /eco admin supply}; names no account. */
+    public SupplyReport supplyReport() { return ledger.supplyReport(escrowObligations(), exchangeObligations()); }
+
+    /** The three invariants at once. Cheap: one pass over the balances and one over the open rows. */
     public boolean checkInvariants() {
         return ledger.supplyBalanced()
-                && ledger.balance(SystemAccountId.ESCROW) == escrowObligations();
+                && ledger.balance(SystemAccountId.ESCROW) == escrowObligations()
+                && ledger.balance(SystemAccountId.EXCHANGE) == exchangeObligations();
     }
 
     // --- access ------------------------------------------------------------------------------

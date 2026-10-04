@@ -1,0 +1,17 @@
+{
+  "name": "stock.neroeconomy.kindlewick_power",
+  "description": "stock.neroeconomy.kindlewick_power.description",
+  "sector": "energy",
+  "type": "steady",
+  "start_price": 150,
+  "volatility": 3.6,
+  "drift": 6.5,
+  "dividend_yield": 1.5,
+  "linked": [
+    "minecraft:coal",
+    "minecraft:charcoal",
+    "#c:storage_blocks/coal",
+    "#c:rods/blaze",
+    "minecraft:lava_bucket"
+  ]
+}

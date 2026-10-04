@@ -118,6 +118,8 @@ public final class BookSection extends EconomySection implements LotHolder, Escr
     /** Bumped on every change to the book, so an open menu knows when to look again. Not saved. */
     private long revision;
     private final ArrayDeque<Change> changes = new ArrayDeque<>();
+    /** What was filled since the exchange last asked. Not saved; see {@link TradedVolume}. */
+    private final TradedVolume volume = new TradedVolume();
 
     public BookSection() { }
 
@@ -228,6 +230,22 @@ public final class BookSection extends EconomySection implements LotHolder, Escr
         return items;
     }
 
+    // --- traded volume -----------------------------------------------------------------------
+
+    /**
+     * What was filled on the book since this was last called, per item: how many changed hands and
+     * for how many credits (the sellers' side of each fill). The tally is emptied by the call, so
+     * it has exactly one reader: the exchange's price step, once per simulation step.
+     *
+     * <p>Two caps are applied to what is counted (see {@link TradedVolume}): fills between the same
+     * two player accounts count up to {@code pairCap} credits and one player account's fills up to
+     * {@code accountCap}. A self-trade is never in it, because an account never matches itself.
+     * The result names items only.
+     */
+    public synchronized Map<String, ItemVolume> drainTradedVolume(long pairCap, long accountCap) {
+        return volume.drain(Math.max(0L, pairCap), Math.max(0L, accountCap));
+    }
+
     private void touch(String item) {
         changes.addLast(new Change(++revision, item));
         if (changes.size() > CHANGE_LOG) changes.removeFirst();
@@ -313,8 +331,10 @@ public final class BookSection extends EconomySection implements LotHolder, Escr
             if (fill == null) continue;
             fills.add(fill);
             left -= quantity;
-            afterBuyFill(env, store, bid, quantity);
+            // Delivered before the order is taken off the book: a rule's order that this fill
+            // completes is still the rule's while its goods go to the rule's own inventory.
             deliverToBuyer(env, store, bid, Lot.of(item, quantity));
+            afterBuyFill(env, store, bid, quantity);
         }
         return left;
     }
@@ -481,8 +501,9 @@ public final class BookSection extends EconomySection implements LotHolder, Escr
             origin.restore(lot);
             return Traded.refused(why[0] == null ? BookResult.INTERNAL : why[0]);
         }
-        afterBuyFill(env, store, bid, lot.count());
+        // Delivered before the order is taken off the book; see matchSell.
         deliverToBuyer(env, store, bid, lot);
+        afterBuyFill(env, store, bid, lot.count());
         touch(lot.item());
         return new Traded(BookResult.OK, fill, true);
     }
@@ -593,6 +614,8 @@ public final class BookSection extends EconomySection implements LotHolder, Escr
             if (buyer.rule() && buyer.orderId() != null)
                 rules.filled(buyer.orderId(), true, quantity, base, paid, refund, now);
         }
+        // Counted toward the traded volume the exchange's price model reads once per step.
+        volume.record(seller.account(), buyer.account(), item, quantity, base);
         return new Fill(seller.orderId(), buyer.orderId(), seller.account(), buyer.account(), item, payload, quantity,
                 unitBase, base, paid, fee, net, refund, discountSkipped);
     }
@@ -924,6 +947,8 @@ public final class BookSection extends EconomySection implements LotHolder, Escr
     public synchronized List<Lot> forgetPlayer(UUID player) {
         if (player == null) return List.of();
         AccountId account = new PlayerAccountId(player);
+        // The traded-volume tally is only in memory, but it names accounts until it is next read.
+        volume.forget(account);
         List<Lot> destroyed = new ArrayList<>();
         for (SellOrder ask : new ArrayList<>(sells.values())) {
             if (!ask.owner().equals(account)) continue;

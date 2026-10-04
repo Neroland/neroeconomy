@@ -14,8 +14,8 @@ import net.minecraftforge.common.util.LazyOptional;
 import net.minecraftforge.common.util.Result;
 import net.minecraftforge.event.AttachCapabilitiesEvent;
 import net.minecraftforge.items.IItemHandler;
-import net.minecraftforge.items.wrapper.InvWrapper;
 import net.minecraftforge.items.wrapper.SidedInvWrapper;
+import net.minecraftforge.event.OnDatapackSyncEvent;
 import net.minecraftforge.event.RegisterCommandsEvent;
 import net.minecraftforge.event.level.BlockEvent;
 import net.minecraftforge.event.server.ServerStartedEvent;
@@ -36,12 +36,17 @@ import za.co.neroland.nerolandcore.registry.RegistrationProvider;
 import za.co.neroland.neroeconomy.NeroEconomyCommon;
 import za.co.neroland.neroeconomy.command.EconomyCommands;
 import za.co.neroland.neroeconomy.direct.DirectTrades;
+import za.co.neroland.neroeconomy.exchange.StockData;
 import za.co.neroland.neroeconomy.network.IntentGuard;
 
 public final class ForgePlatformInfo implements PlatformInfo {
     private static final Identifier TRADER_ITEMS = Identifier.fromNamespaceAndPath(NeroEconomyCommon.MOD_ID, "auto_trader_items");
 
-    /** One item handler per face of an Auto-Trader, each a view of its sided vanilla container. */
+    /**
+     * One item handler per face of an Auto-Trader, each a view of its sided vanilla container.
+     * Every face behaves alike, and a caller that names no face gets the same view as one that
+     * does: inputs take, outputs give, and nothing else.
+     */
     private static final class TraderItems implements ICapabilityProvider {
         private final AutoTraderBlockEntity trader;
         private final EnumMap<Direction, LazyOptional<IItemHandler>> sided = new EnumMap<>(Direction.class);
@@ -52,7 +57,7 @@ public final class ForgePlatformInfo implements PlatformInfo {
         @Override public <T> LazyOptional<T> getCapability(Capability<T> capability, Direction side) {
             if (capability != ForgeCapabilities.ITEM_HANDLER) return LazyOptional.empty();
             if (side == null) {
-                if (unsided == null) unsided = LazyOptional.of(() -> new InvWrapper(trader));
+                if (unsided == null) unsided = LazyOptional.of(() -> new SidedInvWrapper(trader, Direction.DOWN));
                 return unsided.cast();
             }
             return sided.computeIfAbsent(side, face -> LazyOptional.of(() -> new SidedInvWrapper(trader, face))).cast();
@@ -72,6 +77,11 @@ public final class ForgePlatformInfo implements PlatformInfo {
         ServerStoppedEvent.BUS.addListener(event -> NeroEconomyCommon.CURRENCY_PROVIDER.unbind(event.getServer()));
         RegisterCommandsEvent.BUS.addListener(event -> EconomyCommands.register(event.getDispatcher()));
         TickEvent.ServerTickEvent.Post.BUS.addListener(event -> NeroEconomyCommon.CURRENCY_PROVIDER.tick(event.server()));
+        // Data packs were reloaded (the event names no player then): the listed companies are read
+        // again from the new packs. The same event fires per player on login, which is not a reload.
+        OnDatapackSyncEvent.BUS.addListener(event -> {
+            if (event.getPlayer() == null) StockData.reload(event.getPlayerList().getServer());
+        });
         LivingDeathEvent.BUS.addListener(event -> { BountyHooks.entityKilled(event.getEntity(), event.getSource()); });
         // Shop-break protection is otherwise Fabric-only: deny the break instead of cancelling, since
         // that is what the vanilla hook reads back.
