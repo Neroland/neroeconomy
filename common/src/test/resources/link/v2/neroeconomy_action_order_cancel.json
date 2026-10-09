@@ -1,0 +1,30 @@
+{
+  "ok": true,
+  "data": {
+    "currency": "nerolandcore:credits",
+    "balance": 1380,
+    "recentTrend": [
+      {
+        "at": 1790999400000,
+        "amount": 120,
+        "reason": "MARKET_PURCHASE"
+      },
+      {
+        "at": 1790902200000,
+        "amount": 1500,
+        "reason": "STARTING_BALANCE"
+      }
+    ],
+    "amount": 1380,
+    "symbol": "cr",
+    "history": [
+      0,
+      1500,
+      1380
+    ],
+    "asOf": 1791000000000,
+    "action": "order_cancel",
+    "message": "Order cancelled. Its goods are back in your vault, and credits it held are waiting for you to collect.",
+    "orderId": "3c9e1f20-7b4a-4d8e-9f10-2a3b4c5d6e75"
+  }
+}

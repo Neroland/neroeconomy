@@ -21,9 +21,8 @@ public final class Handbook {
     public static final String PREVIOUS = "gui.neroeconomy.handbook.previous";
     public static final String NEXT = "gui.neroeconomy.handbook.next";
     public static final String DEMO = "gui.neroeconomy.handbook.demo";
-    public static final String CHAPTERS = "gui.neroeconomy.handbook.chapters";
     public static final List<String> FRAME_KEYS = List.of(TITLE, PAGE, PREVIOUS, PREVIOUS + ".tooltip", NEXT,
-            NEXT + ".tooltip", DEMO, DEMO + ".tooltip", CHAPTERS);
+            NEXT + ".tooltip", DEMO, DEMO + ".tooltip");
     private static final String CHAPTER = "gui.neroeconomy.handbook.chapter.";
 
     /**

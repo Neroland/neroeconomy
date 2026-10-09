@@ -1,0 +1,37 @@
+{
+  "ok": true,
+  "data": {
+    "view": "open",
+    "jobs": [
+      {
+        "jobId": "2b3c4d5e-6f70-4a1b-9c2d-3e4f5a6b7c81",
+        "type": "contract",
+        "target": "minecraft:oak_log",
+        "displayName": "Oak Log",
+        "qty": 128,
+        "payout": 300,
+        "expiresIn": 7200000,
+        "state": "open",
+        "mine": false,
+        "claimedByMe": false,
+        "house": true
+      },
+      {
+        "jobId": "2b3c4d5e-6f70-4a1b-9c2d-3e4f5a6b7c82",
+        "type": "bounty",
+        "target": "player",
+        "displayName": "a player",
+        "qty": 1,
+        "payout": 500,
+        "expiresIn": 3600000,
+        "state": "open",
+        "mine": false,
+        "claimedByMe": false,
+        "house": false
+      }
+    ],
+    "mineOpen": 1,
+    "maxJobs": 4,
+    "asOf": 1791000000000
+  }
+}

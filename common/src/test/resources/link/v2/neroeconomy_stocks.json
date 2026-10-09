@@ -1,0 +1,69 @@
+{
+  "ok": true,
+  "data": {
+    "exchangeOpen": true,
+    "stocks": [
+      {
+        "id": "neroeconomy:redstone_works",
+        "displayName": "Redstone Works",
+        "index": false,
+        "type": "risky",
+        "sector": "industry",
+        "priceCents": 12500,
+        "askCents": 12750,
+        "bidCents": 12250,
+        "dayChangeBps": 140,
+        "tradeable": true,
+        "status": "",
+        "risk": "Risky",
+        "dividendBps": 50,
+        "history": [
+          12000,
+          12200,
+          12500
+        ],
+        "daily": [
+          11800,
+          12100
+        ]
+      },
+      {
+        "id": "neroeconomy:index",
+        "displayName": "Index Fund",
+        "index": true,
+        "type": "steady",
+        "sector": "",
+        "priceCents": 10000,
+        "askCents": 10050,
+        "bidCents": 9950,
+        "dayChangeBps": -20,
+        "tradeable": true,
+        "status": "",
+        "risk": "Spread over every company",
+        "dividendBps": 0,
+        "history": [
+          10020,
+          10000
+        ],
+        "daily": []
+      }
+    ],
+    "bonds": [
+      {
+        "term": "1d",
+        "displayName": "One-day Savings Bond",
+        "days": 1,
+        "rateBps": 20
+      },
+      {
+        "term": "7d",
+        "displayName": "Seven-day Savings Bond",
+        "days": 7,
+        "rateBps": 200
+      }
+    ],
+    "feeBps": 100,
+    "holdMinutes": 60,
+    "asOf": 1791000000000
+  }
+}

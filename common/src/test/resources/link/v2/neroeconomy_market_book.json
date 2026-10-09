@@ -1,0 +1,36 @@
+{
+  "ok": true,
+  "data": {
+    "view": "book",
+    "item": "minecraft:wheat",
+    "displayName": "Wheat",
+    "bids": [
+      {
+        "unitPrice": 5,
+        "qty": 96,
+        "orders": 2
+      },
+      {
+        "unitPrice": 4,
+        "qty": 128,
+        "orders": 1
+      }
+    ],
+    "asks": [
+      {
+        "unitPrice": 6,
+        "qty": 40,
+        "orders": 1
+      },
+      {
+        "unitPrice": 7,
+        "qty": 200,
+        "orders": 1
+      }
+    ],
+    "bestBid": 5,
+    "bestAsk": 6,
+    "depth": 10,
+    "asOf": 1791000000000
+  }
+}

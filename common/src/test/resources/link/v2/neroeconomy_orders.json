@@ -1,0 +1,88 @@
+{
+  "ok": true,
+  "data": {
+    "sell": [
+      {
+        "item": "minecraft:oak_log",
+        "displayName": "Oak Log",
+        "qty": 64,
+        "modified": false,
+        "orderId": "3c9e1f20-7b4a-4d8e-9f10-2a3b4c5d6e71",
+        "unitPrice": 6,
+        "expiresIn": 82800000
+      },
+      {
+        "item": "minecraft:diamond_sword",
+        "displayName": "Diamond Sword (modified)",
+        "qty": 1,
+        "modified": true,
+        "orderId": "3c9e1f20-7b4a-4d8e-9f10-2a3b4c5d6e72",
+        "unitPrice": 420,
+        "expiresIn": 3600000
+      }
+    ],
+    "buy": [
+      {
+        "item": "minecraft:iron_ingot",
+        "displayName": "Iron Ingot",
+        "qty": 32,
+        "modified": false,
+        "orderId": "3c9e1f20-7b4a-4d8e-9f10-2a3b4c5d6e73",
+        "unitPrice": 5,
+        "escrow": 160,
+        "expiresIn": 43200000
+      }
+    ],
+    "shops": [
+      {
+        "item": "minecraft:bread",
+        "displayName": "Bread",
+        "qty": 40,
+        "modified": false,
+        "listingId": "3c9e1f20-7b4a-4d8e-9f10-2a3b4c5d6e74",
+        "unitPrice": 3
+      }
+    ],
+    "rules": [
+      {
+        "ruleId": "6a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c41",
+        "side": "buy",
+        "target": "minecraft:wheat",
+        "tag": false,
+        "displayName": "Wheat",
+        "limitPrice": 4,
+        "perDay": 64,
+        "filledToday": 12,
+        "total": 1000,
+        "done": 48,
+        "budget": 952,
+        "paused": false,
+        "vault": true,
+        "status": "running",
+        "statusText": "Running."
+      },
+      {
+        "ruleId": "6a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c42",
+        "side": "sell",
+        "target": "minecraft:logs",
+        "tag": true,
+        "displayName": "#minecraft:logs",
+        "limitPrice": 5,
+        "perDay": 128,
+        "filledToday": 0,
+        "total": 512,
+        "done": 0,
+        "budget": 0,
+        "paused": true,
+        "vault": false,
+        "status": "unreachable",
+        "statusText": "Paused: its inventory is in a chunk that is not loaded."
+      }
+    ],
+    "rulesMax": 8,
+    "ruleValueToday": 300,
+    "ruleValueCap": 10000,
+    "rulesPausedAll": false,
+    "asOf": 1791000000000
+  }
+}

@@ -55,6 +55,11 @@ import za.co.neroland.neroeconomy.network.NeroEconomyNetwork;
  * sender, the tab bar and the House button are gone, clicks go to widgets only (never to the
  * container), and Esc or the inventory key ends it. The live view is left untouched meanwhile and
  * comes back exactly as it was, typed text included. Only {@link #live} can reach the server.</p>
+ *
+ * <p>The Trader's Handbook opens a walkthrough with no hub at all ({@link #demoOnly}): the screen
+ * is given a menu made on the client that the server never hears of, starts the demo at once, and
+ * leaving the demo leaves the screen. Such a screen has no live view and its {@link #send} refuses
+ * everything, so it cannot reach the server even through a slip.</p>
  */
 public final class EconomyHubScreen extends TexturedContainerScreen<EconomyHubMenu> {
     private static final Identifier BODY_TEXTURE =
@@ -72,6 +77,8 @@ public final class EconomyHubScreen extends TexturedContainerScreen<EconomyHubMe
     static final int GOOD = 0xFF96EC78;
     static final int WARNING = 0xFFFFD166;
     static final int BAD = 0xFFFF8A65;
+    /** The container id of a demo-only screen's menu: one the server never opens. */
+    private static final int DEMO_ONLY_CONTAINER = -1;
 
     private final Map<HubTab, HubTabView> views = new EnumMap<>(HubTab.class);
     private final Map<String, ItemStack> icons = new HashMap<>();
@@ -84,12 +91,32 @@ public final class EconomyHubScreen extends TexturedContainerScreen<EconomyHubMe
     private HubPage page;
     /** Set until the first page has arrived: nothing can be acted on before the server has spoken. */
     private boolean waiting = true;
+    /** What ends a demo-only screen (back to the Handbook); null for the hub the server opened. */
+    private final Runnable leave;
 
     public EconomyHubScreen(EconomyHubMenu menu, Inventory inventory, Component title) {
+        this(menu, inventory, title, HubTab.WALLET, null);
+    }
+
+    private EconomyHubScreen(EconomyHubMenu menu, Inventory inventory, Component title, HubTab tab, Runnable leave) {
         super(menu, inventory, title, BODY_TEXTURE, PANEL_W, PANEL_H);
-        this.page = HubPage.empty(menu.containerId, HubTab.WALLET);
+        this.page = HubPage.empty(menu.containerId, tab);
+        this.leave = leave;
+        this.waiting = leave == null;
         this.titleLabelX = TAB_W + 8;
         this.titleLabelY = 5;
+    }
+
+    /**
+     * A screen that only runs {@code tab}'s "Show me" walkthrough, for the Trader's Handbook. Its menu
+     * is made here on the client and never becomes the player's open container, so nothing about it
+     * is sent; the walkthrough starts at once on its sample pages, and Close, Done, Esc or the
+     * inventory key run {@code leave} instead of showing a live tab.
+     */
+    public static EconomyHubScreen demoOnly(HubTab tab, Inventory inventory, Runnable leave) {
+        if (tab == null || inventory == null || leave == null) throw new IllegalArgumentException("demo");
+        return new EconomyHubScreen(new EconomyHubMenu(DEMO_ONLY_CONTAINER, inventory), inventory,
+                Component.translatable(tab.key()), tab, leave);
     }
 
     // --- what the views use ------------------------------------------------------------------
@@ -110,6 +137,8 @@ public final class EconomyHubScreen extends TexturedContainerScreen<EconomyHubMe
 
     /** Sends an intent about the tab on screen, with a fresh request id. Only {@link #live} calls it. */
     private void send(HubAction action, UUID target, long a, long b, String text) {
+        // A demo-only screen has no hub on the server to talk to.
+        if (this.leave != null) return;
         NeroEconomyNetwork.sendToServer(new HubIntentPayload(this.menu.containerId, UUID.randomUUID(),
                 this.page.tab(), action, target, a, b, text == null ? "" : text));
     }
@@ -273,6 +302,10 @@ public final class EconomyHubScreen extends TexturedContainerScreen<EconomyHubMe
 
     /** Ends the walkthrough and shows the live tab again, as it was. */
     void closeDemo() {
+        if (this.leave != null) {
+            this.leave.run();
+            return;
+        }
         if (this.demo == null) return;
         this.demo = null;
         setFocused(null);
@@ -283,6 +316,12 @@ public final class EconomyHubScreen extends TexturedContainerScreen<EconomyHubMe
     protected void init() {
         super.init();
         this.presses.clear();
+        if (this.demo == null && this.leave != null) {
+            // A demo-only screen: the walkthrough is all there is. show() rebuilds the widgets itself.
+            this.demo = new HubDemo(this, DemoScript.of(this.page.tab()));
+            this.demo.show(0);
+            return;
+        }
         if (this.demo != null) {
             this.demo.init();
             return;
@@ -313,7 +352,7 @@ public final class EconomyHubScreen extends TexturedContainerScreen<EconomyHubMe
     @Override
     protected void containerTick() {
         super.containerTick();
-        HubPage update = ClientHubPage.poll(this.menu.containerId);
+        HubPage update = this.leave != null ? null : ClientHubPage.poll(this.menu.containerId);
         if (update != null && update.revision() > this.page.revision()) {
             boolean rebuild = this.waiting || update.tab() != this.page.tab()
                     || update.number(HubPages.ADMIN, 0L) != this.page.number(HubPages.ADMIN, 0L)
@@ -337,7 +376,17 @@ public final class EconomyHubScreen extends TexturedContainerScreen<EconomyHubMe
     @Override
     public void removed() {
         super.removed();
-        ClientHubPage.clear();
+        if (this.leave == null) ClientHubPage.clear();
+    }
+
+    /** A demo-only screen goes back to where it came from; the hub closes its container as usual. */
+    @Override
+    public void onClose() {
+        if (this.leave != null) {
+            this.leave.run();
+            return;
+        }
+        super.onClose();
     }
 
     // --- drawing -----------------------------------------------------------------------------

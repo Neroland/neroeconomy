@@ -13,8 +13,9 @@ any point and resume from the **Next** line without redoing anything. The specif
 
 ## Next
 
-**G2 — Trader's Handbook** (brief `build/briefs/G2.md`). Then G3 + G4 (gallery and capture
-harness, brief `G34.md`), then Stage H.
+**H5b — app screens and widget tests** (brief `build/briefs/H5b.md`, in `../nerolink-app`). H5a is done and staged
+(models, fixtures from the golden samples, repository, contract/privacy tests; analyze clean, 170 tests pass in the VM).
+Then H7 (offline proof), then Stage I.
 
 ## Status
 
@@ -54,8 +55,11 @@ smoke test.
 | F | F3 Admin tab (level 3, supply, simulation, market freeze, tables, health, player data tools) | Done | Nine cells, 879 tests |
 | F | F4 Polish: codec room, market freeze on auctions and jobs, cleanup, lang / tooltip / fit / asset audits | Done | Nine cells, 895 tests incl. fit and asset audits |
 | G | G1 "Show me" walkthrough on every hub tab (sample data, cannot send anything) | Done | Nine cells, 903 tests incl. a bytecode scan proving no serverbound calls |
-| G | G2 Handbook, G3 gallery, G4 capture harness | Not started | — |
-| H | H1–H7 Link schema 2, bridge docs, app | Not started | — |
+| G | G2 Trader's Handbook (12 chapters, Open demo, given once on first join) | Done | Nine cells, 915 tests |
+| G | G3 Gallery (11 clusters, sandboxed, clear removes only what it placed), G4 capture harness (+7 shots) | Done | Nine cells, 929 tests incl. a byte-identical isolation test |
+| H | H1–H3 Link schema 2 in the mod: 11 sections, 4 topics, 16 actions (all but vault deposit/withdraw work offline), daily remote spend limit, alerts | Done | Nine cells; 23 golden samples + contract and privacy tests |
+| H | H4 bridge `wiki/API.md` documents schema 2 (no bridge code change needed); H6 relay payload and rate-limit check (no change, not deployed) | Done | Read-only checks; worst-case frame 0.45 MiB of 1 MiB |
+| H | H5 app, H7 offline proof | Not started | — |
 | I | I1–I2 Public API, handover documents | Not started | — |
 | J | J1–J2 Abuse proof and independent red-team | Not started | — |
 | K | K1–K6 Release preparation | Not started | — |
@@ -88,6 +92,9 @@ smoke test.
   switched off by it.
 
 ## Known gaps to close before release
+
+- (Closed) A false invariant alarm seen in a test came from the fuzzer's own escrow bookkeeping, not
+  the game; the fuzzer now asserts the store's own `checkInvariants()` after every step.
 
 - Unvested starting credits can buy shares and come back unlocked on sale. Harmless at the
   defaults (hold 60 minutes, vest 30), but a shortcut if `shareHoldMinutes` is set below the vest

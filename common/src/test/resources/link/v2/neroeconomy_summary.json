@@ -1,0 +1,42 @@
+{
+  "ok": true,
+  "data": {
+    "amount": 1380,
+    "balance": 1380,
+    "symbol": "cr",
+    "currency": "nerolandcore:credits",
+    "waitingCredits": 64,
+    "vault": {
+      "stacks": 12,
+      "cap": 54,
+      "full": false
+    },
+    "orders": {
+      "sell": 2,
+      "buy": 1
+    },
+    "rules": {
+      "count": 3,
+      "max": 8
+    },
+    "offers": {
+      "incoming": 1,
+      "outgoing": 2
+    },
+    "portfolio": {
+      "value": 2150,
+      "cost": 2000,
+      "difference": 150,
+      "bonds": 1
+    },
+    "remote": {
+      "enabled": true,
+      "spentToday": 1200,
+      "dailyLimit": 5000,
+      "leftToday": 3800
+    },
+    "marketOpen": true,
+    "frozen": false,
+    "asOf": 1791000000000
+  }
+}

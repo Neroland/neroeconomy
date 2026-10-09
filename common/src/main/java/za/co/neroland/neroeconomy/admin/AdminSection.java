@@ -29,7 +29,7 @@ public final class AdminSection extends EconomySection {
 
     /** The operator actions that are counted. Stored by name; constants are only ever appended. */
     public enum Action {
-        GRANT, TAKE, SET, SIM_STEP, MARKET_CLOSE, MARKET_OPEN, FRESH_START, EXPORT, ERASE;
+        GRANT, TAKE, SET, SIM_STEP, MARKET_CLOSE, MARKET_OPEN, FRESH_START, EXPORT, ERASE, GALLERY_BUILD, GALLERY_CLEAR;
 
         /** The lang key of the action's name on the admin page. */
         public String key() { return "gui.neroeconomy.hub.admin.action." + name().toLowerCase(Locale.ROOT); }

@@ -740,6 +740,9 @@ public final class BookSection extends EconomySection implements LotHolder, Escr
     /** A resting sell order sold {@code quantity}: it shrinks, or leaves the book when nothing is left. */
     private void afterSellFill(TradeEnv env, SellOrder ask, int quantity) {
         removeSell(ask);
+        // A rule reports through its own status; anyone else is told their standing order traded.
+        if (ask.source() != OrderSource.RULE)
+            env.alerts().raise(ask.owner(), za.co.neroland.neroeconomy.link.EconomyAlerts.Kind.ORDER_FILLED);
         int left = ask.lot().count() - quantity;
         if (left > 0) {
             putSell(ask.withCount(left));
@@ -753,6 +756,8 @@ public final class BookSection extends EconomySection implements LotHolder, Escr
     /** A resting buy order bought {@code quantity}: it shrinks, or leaves the book when it is complete. */
     private void afterBuyFill(TradeEnv env, EconomyStore store, BuyOrder bid, int quantity) {
         removeBuy(bid);
+        if (bid.source() != OrderSource.RULE)
+            env.alerts().raise(bid.owner(), za.co.neroland.neroeconomy.link.EconomyAlerts.Kind.ORDER_FILLED);
         int left = bid.remaining() - quantity;
         long escrow = bid.escrow() - bid.unitPrice() * quantity;
         if (left > 0) {

@@ -1,0 +1,31 @@
+{
+  "ok": true,
+  "data": {
+    "currency": "nerolandcore:credits",
+    "balance": 1380,
+    "recentTrend": [
+      {
+        "at": 1790999400000,
+        "amount": 120,
+        "reason": "MARKET_PURCHASE"
+      },
+      {
+        "at": 1790902200000,
+        "amount": 1500,
+        "reason": "STARTING_BALANCE"
+      }
+    ],
+    "amount": 1380,
+    "symbol": "cr",
+    "history": [
+      0,
+      1500,
+      1380
+    ],
+    "asOf": 1791000000000,
+    "action": "rules_pause",
+    "message": "Paused 2 rules.",
+    "paused": true,
+    "rules": 2
+  }
+}

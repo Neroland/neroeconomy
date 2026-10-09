@@ -72,6 +72,8 @@ public final class NeroEconomyCommon {
         //    player's goods are destroyed, and the prototypes only they referred to with them.
         PlayerDataErasure.register(VaultSection::eraseFor);
         PlayerDataErasure.register(LedgerExportFiles::delete);
+        //    What the erased player spent through the companion app today.
+        PlayerDataErasure.register(za.co.neroland.neroeconomy.link.RemoteSpendSection::eraseFor);
         PlayerDataErasure.register((server, player) -> za.co.neroland.neroeconomy.link.EconomyAlerts.forget(player));
         // 2. Configuration and the real Core currency provider.
         EconomyConfig.init();

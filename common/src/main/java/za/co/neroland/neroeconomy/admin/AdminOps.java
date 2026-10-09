@@ -49,6 +49,16 @@ public final class AdminOps {
         EconomyStore.get(server).admin().record(action);
     }
 
+    /** Counts a gallery build. The gallery moves no value; this keeps it on the audited operator path. */
+    public static void galleryBuilt(MinecraftServer server) {
+        if (server != null) count(server, AdminSection.Action.GALLERY_BUILD);
+    }
+
+    /** Counts a gallery clear. */
+    public static void galleryCleared(MinecraftServer server) {
+        if (server != null) count(server, AdminSection.Action.GALLERY_CLEAR);
+    }
+
     /**
      * Grants, takes or sets credits on one account. Refused while the economy is frozen, and when
      * a grant would overflow or a take is more than the balance.

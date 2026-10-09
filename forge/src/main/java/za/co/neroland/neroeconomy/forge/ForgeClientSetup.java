@@ -1,5 +1,6 @@
 package za.co.neroland.neroeconomy.forge;
 
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.MenuScreens;
 import net.minecraftforge.client.event.RegisterClientCommandsEvent;
 import net.minecraftforge.event.TickEvent;
@@ -12,6 +13,7 @@ import za.co.neroland.neroeconomy.client.EconomyHubScreen;
 import za.co.neroland.neroeconomy.client.GalleryCaptureHarness;
 import za.co.neroland.neroeconomy.client.PlayerShopScreen;
 import za.co.neroland.neroeconomy.client.VaultScreen;
+import za.co.neroland.neroeconomy.client.handbook.HandbookScreen;
 import za.co.neroland.neroeconomy.registry.ModMenuTypes;
 
 final class ForgeClientSetup {
@@ -24,6 +26,15 @@ final class ForgeClientSetup {
             MenuScreens.register(ModMenuTypes.AUTO_TRADER.get(), AutoTraderScreen::new);
             MenuScreens.register(ModMenuTypes.ECONOMY_HUB.get(), EconomyHubScreen::new);
         }));
+        // The Trader's Handbook: the item opens it on this client, and the book goes to and from its
+        // demos, through the way this game version shows a screen.
+        HandbookScreen.install(screen -> {
+            //? if >=26.2 {
+            Minecraft.getInstance().gui.setScreen(screen);
+            //?} else {
+            /*Minecraft.getInstance().setScreen(screen);
+            *///?}
+        });
         // The capture tooling exists in a development environment only; a release jar wires up
         // neither the tick hook nor the command.
         if (!GalleryCaptureHarness.available()) {

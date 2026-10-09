@@ -96,9 +96,8 @@ final class LifecycleOperations {
                 world.destroyedInStore(lot.key(), lot.count());
                 destroyed += lot.count();
             }
+            // What the market's claims hold for them is swept to the Reserve with the market's own erasure below.
             long owed = world.owed(player);
-            assertEquals(owed, ledger.sweepErasedEscrow(owed));
-            world.owe(player, -owed);
             // A direct trade they have open ends first, so the other side gets its goods back.
             destroyed += DirectTradeOperations.erased(world, player);
             // The obligations go before the book and the market's claims, as in the game: a standing

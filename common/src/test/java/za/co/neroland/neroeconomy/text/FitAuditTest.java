@@ -21,6 +21,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 import za.co.neroland.neroeconomy.client.demo.DemoScript;
+import za.co.neroland.neroeconomy.handbook.Handbook;
 import za.co.neroland.neroeconomy.hub.HubTab;
 
 /**
@@ -181,6 +182,43 @@ class FitAuditTest {
         }
         assertTrue(steps >= 50, "too few demo steps: " + steps);
         assertTrue(over.isEmpty(), "demo text too long: " + over);
+    }
+
+    /**
+     * The Trader's Handbook ({@code HandbookScreen}), with its slots read from the screen's constants:
+     * every chapter name fits its list button, every heading the page width, every page wraps to the
+     * lines the page has room for, the page counter fits between Back and Next, and the buttons' words
+     * fit the buttons.
+     */
+    @Test void everyHandbookLineFitsItsSlot() throws IOException {
+        Map<String, Integer> slot = constants(Files.readString(client.resolve("handbook/HandbookScreen.java"),
+                StandardCharsets.UTF_8));
+        int pageWidth = slot.get("PAGE_W");
+        int lines = slot.get("TEXT_LINES");
+        List<String> over = new ArrayList<>();
+        int pages = 0;
+        for (Handbook.Chapter chapter : Handbook.CHAPTERS_IN_ORDER) {
+            fit(over, chapter.nameKey(), slot.get("LIST_W") - 4);
+            fit(over, chapter.titleKey(), pageWidth);
+            for (int page = 0; page < chapter.pages(); page++) {
+                pages++;
+                int taken = wrappedLines(lang.get(chapter.pageKey(page)).getAsString(), pageWidth);
+                if (taken > lines) over.add(chapter.pageKey(page) + " takes " + taken + " of " + lines + " lines");
+            }
+        }
+        fit(over, Handbook.PAGE, slot.get("COUNTER_W"));
+        fit(over, Handbook.DEMO, slot.get("DEMO_W") - 4);
+        fit(over, Handbook.PREVIOUS, slot.get("PAGING_W") - 4);
+        fit(over, Handbook.NEXT, slot.get("PAGING_W") - 4);
+        fit(over, Handbook.TITLE, slot.get("PANEL_W") - 16);
+        assertTrue(slot.get("TEXT_Y") + lines * 9 <= slot.get("DEMO_Y"), "the words run into the Open demo button");
+        assertTrue(pages >= 30, "too few pages: " + pages);
+        assertTrue(over.isEmpty(), "handbook text too long: " + over);
+    }
+
+    private static void fit(List<String> over, String key, int slot) {
+        int width = width(lang.get(key).getAsString());
+        if (width > slot) over.add(key + " is " + width + " of " + slot);
     }
 
     /** How many lines {@code value} wraps to at {@code width} pixels, breaking between words. */

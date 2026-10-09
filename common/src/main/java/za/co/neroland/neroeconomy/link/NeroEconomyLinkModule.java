@@ -10,11 +10,8 @@ import java.util.concurrent.TimeoutException;
 import java.util.function.Supplier;
 
 import com.google.gson.JsonObject;
-import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.resources.Identifier;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.world.item.ItemStack;
 
 import za.co.neroland.nerolandcore.data.PlayerDataErasure;
 import za.co.neroland.nerolandcore.economy.CurrencyEvents;
@@ -28,69 +25,79 @@ import za.co.neroland.neroeconomy.NeroEconomyCommon;
 import za.co.neroland.neroeconomy.config.EconomyConfig;
 import za.co.neroland.neroeconomy.economy.EconomyHealth;
 import za.co.neroland.neroeconomy.economy.EconomySavedData;
-import za.co.neroland.neroeconomy.market.FillOutcome;
-import za.co.neroland.neroeconomy.market.ListingSource;
-import za.co.neroland.neroeconomy.market.MarketBuyOffer;
-import za.co.neroland.neroeconomy.market.MarketListing;
+import za.co.neroland.neroeconomy.economy.EconomyStore;
 import za.co.neroland.neroeconomy.market.MarketSavedData;
-import za.co.neroland.neroeconomy.market.PostResult;
-import za.co.neroland.neroeconomy.market.Posted;
-import za.co.neroland.neroeconomy.market.PurchaseOutcome;
-import za.co.neroland.neroeconomy.market.PurchaseResult;
 import za.co.neroland.neroeconomy.network.IntentGuard;
 import za.co.neroland.neroeconomy.network.RateLimiter;
 import za.co.neroland.neroeconomy.platform.Services;
+import za.co.neroland.neroeconomy.vault.VaultStacks;
 
 /**
- * Player-scoped NeroLink module; the bridge stores no economy state. This class only gathers values
- * from the stores and runs trades: every JSON shape is built by {@link LinkPayloads}.
+ * Player-scoped NeroLink module, link schema 2; the bridge stores no economy state. This class
+ * checks every request and hands it on: {@link LinkReads} reads the stores, {@link LinkActions}
+ * runs actions, and every JSON shape is built by {@link LinkPayloads} (the schema-1 sections and
+ * {@code trade}) or {@link LinkViews} (everything added in schema 2).
  *
  * <p><b>Threading.</b> Core's contract is that a snapshot provider and an action handler are called
  * on the server thread, and the bridge does so for both its REST and its WebSocket paths. The work
  * therefore runs inline. A guard remains for a caller that breaks the contract, because a market
- * read expires listings and a trade moves goods and credits: off the server thread the work is
+ * read expires listings and an action moves goods and credits: off the server thread the work is
  * handed to it and awaited for a bounded time, never run where it was called.
  *
- * <p><b>Sections</b> — {@code balance}, {@code transactions} ({@code cursor}, {@code limit}) and
- * {@code market} ({@code q}, {@code page}). Each read takes one token from the player's
- * {@code QUERY} budget; over budget, the last snapshot served for the same query comes back with
- * {@code "throttled": true}.
+ * <p><b>Sections</b>, all scoped to the requesting player and bounded in size: {@code balance},
+ * {@code transactions} ({@code cursor}, {@code limit}) and {@code market} ({@code q}, {@code page})
+ * as in schema 1, and with {@code view=book} and {@code item} one item's order book as price
+ * levels ({@link LinkViews#book}); {@code summary}, {@code orders}, {@code vault}, {@code stocks},
+ * {@code portfolio}, {@code offers}, {@code jobs} ({@code view}: open, contracts, deliveries,
+ * bounties or mine) and {@code auctions} ({@code view}: all or mine). Each read takes one token
+ * from the player's {@code QUERY} budget; over budget, the last snapshot served for the same query
+ * comes back with {@code "throttled": true}.
  *
- * <p><b>Action</b> — {@code trade}, one object, taking one token from the {@code VALUE} budget:
- * <ul>
- *   <li>{@code requestId} (required): a UUID. A missing or malformed one is refused, and one that
- *       was already acted on in the last ten minutes is refused as a duplicate.</li>
- *   <li>{@code op} (required): {@code "buy"} or {@code "sell"}.</li>
- *   <li>{@code listingId} (required unless posting): the market row's id.</li>
- *   <li>{@code qty} (optional, default 1): a whole number from 1 to 64.</li>
- *   <li>{@code quotedUnitPrice} (buy, optional): the most the buyer agreed to pay per item. Without
- *       it the server quotes at execution.</li>
- *   <li>{@code unitPrice} (sell, optional): given, the main-hand stack is posted as a new Market
- *       Board listing at that price; absent, {@code listingId} must name a standing buy offer, which
- *       is filled from the main hand.</li>
- * </ul>
- * A buy works while the player is logged out: the goods are delivered to their vault and wait at a
- * Bank Terminal (the result still names that delivery {@code "claim"}, the schema 1 word). A sell always
- * takes the main-hand stack, so it needs the player in game.
+ * <p><b>Actions</b> — see {@link LinkActions}. Each one needs {@code remoteTradeEnabled}, an
+ * economy that is not frozen, a token from the player's shared {@code VALUE} budget and from the
+ * action's own limit ({@link LinkActionLimits}), and a {@code requestId} (a UUID; one already acted
+ * on is refused as a duplicate). Every action but {@code vault_deposit} and {@code vault_withdraw}
+ * also runs for a player who is away ({@link #allowOffline}). What an action spends counts against
+ * {@code remoteDailySpendLimit} ({@link RemoteSpendSection}).
  *
- * <p><b>Event</b> — topic {@code balance}, player-scoped, carrying the balance object; see
- * {@link BalancePulse} for when one is published.
+ * <p><b>Events</b>, player-scoped and only for a player whose app asked recently: {@code balance}
+ * (see {@link BalancePulse}), and {@code orders}, {@code offers}, {@code portfolio} and
+ * {@code alerts} (see {@link LinkTopics}), each at most once a second per player.
  */
 public final class NeroEconomyLinkModule implements LinkSnapshotProvider, LinkActionHandler {
     public static final String MODULE_ID = "neroeconomy";
-    public static final int SCHEMA_VERSION = 1;
-    private static final String BALANCE = "balance";
-    private static final String TRANSACTIONS = "transactions";
-    private static final String MARKET = "market";
-    private static final String TRADE = "trade";
-    private static final List<String> SECTIONS = List.of(BALANCE, TRANSACTIONS, MARKET);
-    private static final List<String> ACTIONS = List.of(TRADE);
+    public static final int SCHEMA_VERSION = 2;
+    static final String BALANCE = "balance";
+    static final String TRANSACTIONS = "transactions";
+    static final String MARKET = "market";
+    static final String SUMMARY = "summary";
+    static final String ORDERS = "orders";
+    static final String VAULT = "vault";
+    static final String STOCKS = "stocks";
+    static final String PORTFOLIO = "portfolio";
+    static final String OFFERS = "offers";
+    static final String JOBS = "jobs";
+    static final String AUCTIONS = "auctions";
+    /** The live topics besides {@code balance}. */
+    static final String ALERTS = "alerts";
+    static final List<String> SECTIONS = List.of(BALANCE, TRANSACTIONS, MARKET, SUMMARY, ORDERS, VAULT, STOCKS,
+            PORTFOLIO, OFFERS, JOBS, AUCTIONS);
+    static final List<String> ACTIONS = LinkActions.ALL;
+    static final List<String> TOPICS = List.of(BALANCE, ORDERS, OFFERS, PORTFOLIO, ALERTS);
+    private static final List<String> JOB_VIEWS = List.of("open", "contracts", "deliveries", "bounties", "mine");
     private static final int MAX_QUERY_LENGTH = 64;
+    /**
+     * Starts the cache key of a {@code market} book view. A market search never contains a space
+     * (spaces become underscores), so the two can never share a key.
+     */
+    private static final String BOOK_VIEW = "book ";
     /** How long a caller off the server thread waits for the server thread to do the work. */
     private static final long MARSHAL_TIMEOUT_SECONDS = 5L;
 
     private static final LinkSnapshotCache CACHE = new LinkSnapshotCache();
     private static final BalancePulse PULSE = new BalancePulse();
+    private static final LinkTopics LIVE = new LinkTopics();
+    private static final LinkActionLimits LIMITS = new LinkActionLimits(System::nanoTime);
 
     public static void register() {
         NeroEconomyLinkModule module = new NeroEconomyLinkModule();
@@ -100,8 +107,10 @@ public final class NeroEconomyLinkModule implements LinkSnapshotProvider, LinkAc
         NeroLinkRegistry.registerActionHandler(module, info);
         // Live balance: Core reports every change, the economy tick publishes what is due.
         CurrencyEvents.onChange(NeroEconomyLinkModule::onBalanceChange);
-        NeroEconomyCommon.CURRENCY_PROVIDER.setLifecycleHooks(NeroEconomyLinkModule::publishDueBalances,
+        NeroEconomyCommon.CURRENCY_PROVIDER.setLifecycleHooks(NeroEconomyLinkModule::publishDue,
                 NeroEconomyLinkModule::reset);
+        // Every alert that goes out also becomes an alerts event for a player whose app is open.
+        EconomyAlerts.listen((player, kind) -> LIVE.mark(player, ALERTS, kind.id()));
         PlayerDataErasure.register((server, player) -> forget(player));
     }
 
@@ -110,8 +119,8 @@ public final class NeroEconomyLinkModule implements LinkSnapshotProvider, LinkAc
     @Override public List<String> sections() { return SECTIONS; }
     @Override public List<String> actionIds() { return ACTIONS; }
 
-    /** The handler decides per operation: a buy may run for a logged-out player, a sell may not. */
-    @Override public boolean allowOffline(String actionId) { return TRADE.equals(actionId); }
+    /** Every action but the two that touch a live inventory runs for a player who is away. */
+    @Override public boolean allowOffline(String actionId) { return LinkActions.OFFLINE.contains(actionId); }
 
     // --- snapshots ---------------------------------------------------------------------------
 
@@ -130,7 +139,9 @@ public final class NeroEconomyLinkModule implements LinkSnapshotProvider, LinkAc
         int page = 0;
         int cursor = 0;
         int limit = LinkPayloads.DEFAULT_PAGE_SIZE;
-        if (MARKET.equals(section)) {
+        if (MARKET.equals(section) && "book".equals(params.get("view"))) {
+            query = BOOK_VIEW + LinkReads.itemId(params.get("item"));
+        } else if (MARKET.equals(section)) {
             query = params.getOrDefault("q", "");
             if (query == null) query = "";
             if (query.length() > MAX_QUERY_LENGTH) query = query.substring(0, MAX_QUERY_LENGTH);
@@ -141,19 +152,43 @@ public final class NeroEconomyLinkModule implements LinkSnapshotProvider, LinkAc
             cursor = LinkPayloads.bounded(params.get("cursor"), 0, 0, 1_000_000);
             limit = LinkPayloads.bounded(params.get("limit"), LinkPayloads.DEFAULT_PAGE_SIZE, 1,
                     LinkPayloads.MAX_PAGE_SIZE);
+        } else if (JOBS.equals(section)) {
+            query = jobView(params.get("view"));
+        } else if (AUCTIONS.equals(section)) {
+            query = "mine".equals(params.get("view")) ? "mine" : "all";
         }
         String variant = variant(query, page, cursor, limit);
         if (!IntentGuard.withinBudget(player, RateLimiter.Budget.QUERY)) {
             JsonObject last = CACHE.get(player, section, variant);
-            return LinkPayloads.throttled(last != null ? last : placeholder(player, section, page));
+            return LinkPayloads.throttled(last != null ? last : placeholder(server, player, section, page, query));
         }
         JsonObject fresh = switch (section) {
             case BALANCE -> balance(player);
             case TRANSACTIONS -> transactions(player, cursor, limit);
-            default -> market(server, player, query, page);
+            case MARKET -> query.startsWith(BOOK_VIEW)
+                    ? LinkViews.book(LinkReads.book(server, query.substring(BOOK_VIEW.length())))
+                    : market(server, player, query, page);
+            default -> schema2(server, player, section, query);
         };
         CACHE.put(player, section, variant, fresh);
         return fresh;
+    }
+
+    private static String jobView(String asked) { return asked != null && JOB_VIEWS.contains(asked) ? asked : "open"; }
+
+    /** A schema-2 section, read fresh. */
+    private static JsonObject schema2(MinecraftServer server, UUID player, String section, String view) {
+        return switch (section) {
+            case SUMMARY -> LinkViews.summary(LinkReads.summary(server, player));
+            case ORDERS -> LinkViews.orders(LinkReads.orders(server, player));
+            case VAULT -> LinkViews.vault(LinkReads.vault(server, player));
+            case STOCKS -> LinkViews.stocks(LinkReads.stocks(server));
+            case PORTFOLIO -> LinkViews.portfolio(LinkReads.portfolio(server, player));
+            case OFFERS -> LinkViews.offers(LinkReads.offers(server, player));
+            case JOBS -> LinkViews.jobs(LinkReads.jobs(server, player, view));
+            default -> LinkViews.auctions(LinkReads.auctions(server, player,
+                    server.getPlayerList().getPlayer(player), view));
+        };
     }
 
     /** The cache key for one section's query; a section that takes no parameters always has the same one. */
@@ -163,19 +198,47 @@ public final class NeroEconomyLinkModule implements LinkSnapshotProvider, LinkAc
 
     /**
      * What an over-budget player gets when nothing was served for this query before. It does no
-     * search and no ledger scan; the balance itself is one map lookup, so it is still the real one.
+     * search and no scan: an empty section of the right shape, except the balance, which is one map
+     * lookup and so still the real one.
      */
-    private static JsonObject placeholder(UUID player, String section, int page) {
+    private static JsonObject placeholder(MinecraftServer server, UUID player, String section, int page, String view) {
         long asOf = wallNow();
-        if (TRANSACTIONS.equals(section)) return LinkPayloads.transactions(List.of(), 0, 1, asOf);
-        if (MARKET.equals(section))
-            return LinkPayloads.market(List.of(), List.of(), page, LinkPayloads.DEFAULT_PAGE_SIZE, 0, 0, asOf);
-        EconomySavedData data = dataOrNull();
-        return LinkPayloads.balance(NeroEconomyCommon.CREDITS.id().toString(),
-                data == null ? 0L : data.getBalance(player, NeroEconomyCommon.CREDITS), List.of(), asOf);
+        return switch (section) {
+            case TRANSACTIONS -> LinkPayloads.transactions(List.of(), 0, 1, asOf);
+            case MARKET -> view.startsWith(BOOK_VIEW)
+                    ? LinkViews.book(new LinkViews.ItemBook(view.substring(BOOK_VIEW.length()), "", List.of(), List.of(), asOf))
+                    : LinkPayloads.market(List.of(), List.of(), page, LinkPayloads.DEFAULT_PAGE_SIZE, 0, 0, asOf);
+            case ORDERS -> LinkViews.orders(new LinkViews.Orders(List.of(), List.of(), List.of(), List.of(),
+                    EconomyConfig.MAX_RULES_PER_PLAYER.get(), 0L, EconomyConfig.RULE_DAILY_VALUE_CAP.get(), false, asOf));
+            case VAULT -> {
+                // Presence is one lookup, so even an empty vault says truly whether the live moves can run.
+                ServerPlayer online = server.getPlayerList().getPlayer(player);
+                yield LinkViews.vault(new LinkViews.VaultView(List.of(), 0, VaultStacks.cap(), online != null,
+                        LinkReads.liveVaultActions(online), asOf));
+            }
+            case STOCKS -> LinkViews.stocks(LinkReads.noStocks(asOf));
+            case PORTFOLIO -> {
+                LinkViews.Book empty = new LinkViews.Book(List.of(), List.of(), 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0, 0L,
+                        100, false, 0L, false);
+                yield LinkViews.portfolio(new LinkViews.Portfolio(empty, empty, asOf));
+            }
+            case OFFERS -> LinkViews.offers(new LinkViews.Offers(List.of(), List.of(), false,
+                    EconomyConfig.MAX_OFFERS_PER_PLAYER.get(), asOf));
+            case JOBS -> LinkViews.jobs(new LinkViews.Jobs(view, List.of(), 0, EconomyConfig.MAX_JOBS_PER_PLAYER.get(),
+                    asOf));
+            case AUCTIONS -> LinkViews.auctions(new LinkViews.Auctions(view, List.of(), asOf));
+            default -> {
+                // The balance and the summary: the balance is the real one, everything else empty.
+                EconomySavedData data = dataOrNull();
+                JsonObject out = LinkPayloads.balance(NeroEconomyCommon.CREDITS.id().toString(),
+                        data == null ? 0L : data.getBalance(player, NeroEconomyCommon.CREDITS), List.of(), asOf);
+                yield out;
+            }
+        };
     }
 
-    private static JsonObject balance(UUID player) {
+    /** The balance object: the {@code balance} section, the {@code balance} event and the base of every action result. */
+    static JsonObject balance(UUID player) {
         EconomySavedData data = dataOrNull();
         if (data == null) {
             JsonObject out = new JsonObject();
@@ -206,143 +269,53 @@ public final class NeroEconomyLinkModule implements LinkSnapshotProvider, LinkAc
         MarketSavedData.SearchPage found = MarketSavedData.get(server).searchPage(query, page,
                 LinkPayloads.DEFAULT_PAGE_SIZE, NeroEconomyCommon.CURRENCY_PROVIDER.now(), false, true);
         List<LinkPayloads.Row> listings = found.listings().stream().map(listing -> new LinkPayloads.Row(
-                listing.listingId().toString(), listing.itemId().toString(), itemName(listing.stock()),
+                listing.listingId().toString(), listing.itemId().toString(), LinkReads.itemName(listing.stock()),
                 listing.availableQuantity(), MarketSavedData.buyerUnitPrice(listing, player),
                 listing.seller().equals(player), MarketSavedData.pristine(listing.stock()))).toList();
         List<LinkPayloads.Row> offers = found.buyOffers().stream().map(offer -> new LinkPayloads.Row(
-                offer.offerId().toString(), offer.itemId().toString(), itemName(offer.itemId()),
+                offer.offerId().toString(), offer.itemId().toString(), LinkReads.itemName(offer.itemId().toString()),
                 offer.remaining(), offer.unitPrice(), offer.buyer().equals(player), true)).toList();
         return LinkPayloads.market(listings, offers, page, LinkPayloads.DEFAULT_PAGE_SIZE, found.listingTotal(),
                 found.buyOfferTotal(), wallNow());
     }
 
-    /**
-     * The item's own name. Deliberately not the hover name: a stack renamed on an anvil carries
-     * text a player typed, and a snapshot must not carry that to other players' phones.
-     */
-    private static String itemName(ItemStack stack) {
-        try {
-            return stack.getItemName().getString();
-        } catch (RuntimeException unresolved) {
-            return "";
-        }
-    }
-
-    private static String itemName(Identifier itemId) {
-        return BuiltInRegistries.ITEM.getOptional(itemId).map(item -> itemName(new ItemStack(item))).orElse("");
-    }
-
-    // --- trade -------------------------------------------------------------------------------
+    // --- actions -----------------------------------------------------------------------------
 
     @Override public LinkActionResult execute(UUID playerId, String actionId, JsonObject params) {
-        if (!TRADE.equals(actionId)) return invalid("Unknown action.");
-        if (!EconomyConfig.REMOTE_TRADE_ENABLED.get())
-            return LinkActionResult.error(LinkActionResult.Error.ACTION_DISABLED, LinkPayloads.TRADE_DISABLED);
-        MinecraftServer server = serverOrNull();
-        if (server == null || playerId == null) return invalid("No active server.");
         // One plain sentence, and nothing is touched: a frozen economy moves no value from anywhere.
-        if (EconomyHealth.frozen())
-            return LinkActionResult.error(LinkActionResult.Error.ACTION_DISABLED, LinkPayloads.ECONOMY_FROZEN);
+        LinkGate.Refusal early = LinkGate.early(actionId, EconomyConfig.REMOTE_TRADE_ENABLED.get(), EconomyHealth.frozen());
+        if (early != LinkGate.Refusal.NONE) return LinkGate.result(early);
+        MinecraftServer server = serverOrNull();
+        if (server == null || playerId == null) return LinkActions.invalid(LinkText.get("link.neroeconomy.no_server"));
         JsonObject safeParams = params == null ? new JsonObject() : params;
-        return onServerThread(server, () -> trade(server, playerId, safeParams), LinkActionResult.error(
-                LinkActionResult.Error.INTERNAL, "The server could not run the trade. Check your balance before retrying."));
+        return onServerThread(server, () -> act(server, playerId, actionId, safeParams), LinkActionResult.error(
+                LinkActionResult.Error.INTERNAL, LinkText.get("link.neroeconomy.action_failed")));
     }
 
-    private static LinkActionResult trade(MinecraftServer server, UUID playerId, JsonObject params) {
+    private static LinkActionResult act(MinecraftServer server, UUID playerId, String actionId, JsonObject params) {
         PULSE.interested(playerId, System.nanoTime());
-        if (!IntentGuard.withinBudget(playerId, RateLimiter.Budget.VALUE)) return invalid(LinkPayloads.TOO_MANY_REQUESTS);
+        boolean budget = IntentGuard.withinBudget(playerId, RateLimiter.Budget.VALUE);
+        boolean actionLimit = budget && LIMITS.tryAcquire(playerId, actionId);
         // Never generated here: an id the client did not send cannot make its retry idempotent.
         UUID request = LinkPayloads.requestId(params);
-        if (request == null) return invalid(LinkPayloads.REQUEST_ID_REQUIRED);
-        int quantity = LinkPayloads.quantity(params);
-        if (quantity < LinkPayloads.MIN_QUANTITY) return invalid(LinkPayloads.QUANTITY_OUT_OF_RANGE);
-        MarketSavedData store = MarketSavedData.get(server);
+        // The bridge checks presence too; a handler never relies on it.
         ServerPlayer online = server.getPlayerList().getPlayer(playerId);
+        EconomyStore store = EconomyStore.get(server);
+        LinkGate.Refusal refusal = LinkGate.check(new LinkGate.Request(actionId, EconomyConfig.REMOTE_TRADE_ENABLED.get(),
+                EconomyHealth.frozen(), budget, actionLimit, request != null, online != null, store.marketClosed()));
+        if (refusal != LinkGate.Refusal.NONE) return LinkGate.result(refusal);
         try {
-            return switch (LinkPayloads.text(params, "op")) {
-                case "buy" -> buy(server, store, playerId, online, params, quantity, request);
-                case "sell" -> sell(store, playerId, online, params, quantity, request);
-                default -> invalid(LinkPayloads.UNKNOWN_OPERATION);
-            };
+            return LinkActions.run(actionId, new LinkActions.Call(server, store, playerId, online,
+                    params, request, NeroEconomyLinkModule::balance));
         } catch (RuntimeException failure) {
             // The type only: a message could echo client input.
-            NeroEconomyCommon.LOGGER.warn("[NeroEconomy] A Link trade failed unexpectedly ({}).",
+            NeroEconomyCommon.LOGGER.warn("[NeroEconomy] A Link action failed unexpectedly ({}).",
                     failure.getClass().getName());
-            return LinkActionResult.error(LinkActionResult.Error.INTERNAL, "The trade could not be completed.");
+            return LinkActionResult.error(LinkActionResult.Error.INTERNAL, LinkText.get("link.neroeconomy.action_failed"));
         }
     }
 
-    /** Buys from a sell listing; the store consumes the request id and re-prices at execution. */
-    private static LinkActionResult buy(MinecraftServer server, MarketSavedData store, UUID playerId,
-            ServerPlayer online, JsonObject params, int quantity, UUID request) {
-        UUID listingId = LinkPayloads.uuid(params, "listingId");
-        if (listingId == null) return invalid(LinkPayloads.LISTING_ID_REQUIRED);
-        MarketListing listing = store.listing(listingId);
-        if (listing == null) return invalid(store.buyOffer(listingId) != null ? LinkPayloads.BUY_NEEDS_LISTING
-                : LinkPayloads.purchaseMessage(PurchaseResult.NOT_FOUND));
-        // The quoted price is a ceiling. With none sent, the ceiling is the server's own quote now.
-        long quoted = LinkPayloads.wholeNumber(params, "quotedUnitPrice", 0L);
-        long ceiling = quoted >= 1L ? quoted : MarketSavedData.buyerUnitPrice(listing, playerId);
-        PurchaseOutcome outcome = online != null
-                ? store.purchaseOutcome(online, listingId, quantity, ceiling, request, null)
-                : store.purchaseToClaimOutcome(server, playerId, listingId, quantity, ceiling, request);
-        if (!outcome.success()) return invalid(LinkPayloads.purchaseMessage(outcome.result()));
-        // What the buyer was actually charged, as the ledger settled it rather than as it was quoted.
-        long total = outcome.paid();
-        return LinkActionResult.ok(LinkPayloads.tradeResult(balance(playerId), new LinkPayloads.Trade("buy",
-                listingId.toString(), quantity, total / quantity, total, true, outcome.toVault() ? "claim" : "inventory")));
-    }
-
-    /**
-     * With {@code unitPrice}: posts the main-hand stack as a new listing (schema 1). Without it:
-     * fills the standing buy offer {@code listingId} names from the main hand.
-     */
-    private static LinkActionResult sell(MarketSavedData store, UUID playerId, ServerPlayer online,
-            JsonObject params, int quantity, UUID request) {
-        long now = NeroEconomyCommon.CURRENCY_PROVIDER.now();
-        long asking = LinkPayloads.wholeNumber(params, "unitPrice", 0L);
-        if (asking >= 1L) {
-            if (online == null) return offline();
-            long expires = now + EconomyConfig.DEFAULT_LISTING_DURATION_HOURS.get() * 3_600_000L;
-            Posted<MarketListing> posted = store.postFromHandChecked(online, quantity, asking, expires,
-                    ListingSource.MARKET_BOARD, "link", request);
-            if (posted.result() != PostResult.SUCCESS) return invalid(LinkPayloads.postMessage(posted.result()));
-            return LinkActionResult.ok(LinkPayloads.tradeResult(balance(playerId), new LinkPayloads.Trade("sell",
-                    posted.row().listingId().toString(), quantity, asking, saturatingTotal(asking, quantity), false,
-                    "listed", posted.feeCharged(), 0L)));
-        }
-        // No id, a sell listing or an unknown id: there is nothing here the player's items could fill.
-        UUID offerId = LinkPayloads.uuid(params, "listingId");
-        if (offerId == null) return invalid(LinkPayloads.SELL_NEEDS_BUY_OFFER);
-        MarketBuyOffer offer = store.buyOffer(offerId);
-        if (offer == null) return invalid(LinkPayloads.SELL_NEEDS_BUY_OFFER);
-        if (online == null) return offline();
-        FillOutcome filled = store.fillBuyOfferOutcome(online, offerId, quantity, request);
-        if (!filled.success()) return invalid(LinkPayloads.fillMessage(filled.result()));
-        // The proceeds, less the market fee, are booked to the seller's credit claim, so the balance
-        // itself has not moved yet.
-        return LinkActionResult.ok(LinkPayloads.tradeResult(balance(playerId), new LinkPayloads.Trade("sell",
-                offerId.toString(), quantity, offer.unitPrice(), filled.gross(), true, "credit_claim",
-                filled.fee(), filled.net())));
-    }
-
-    private static long saturatingTotal(long unitPrice, int quantity) {
-        try {
-            return Math.multiplyExact(unitPrice, quantity);
-        } catch (ArithmeticException overflow) {
-            return Long.MAX_VALUE;
-        }
-    }
-
-    private static LinkActionResult invalid(String message) {
-        return LinkActionResult.error(LinkActionResult.Error.VALIDATION, message);
-    }
-
-    private static LinkActionResult offline() {
-        return LinkActionResult.error(LinkActionResult.Error.PLAYER_OFFLINE_REQUIRED, LinkPayloads.SELL_NEEDS_PLAYER);
-    }
-
-    // --- live balance ------------------------------------------------------------------------
+    // --- live events -------------------------------------------------------------------------
 
     /**
      * Core runs this inside the ledger call that changed the balance and does not catch what a
@@ -358,33 +331,73 @@ public final class NeroEconomyLinkModule implements LinkSnapshotProvider, LinkAc
         }
     }
 
-    /** Economy tick, server thread: publishes one {@code balance} event per player whose change is due. */
-    private static void publishDueBalances() {
-        if (!PULSE.hasPending() || dataOrNull() == null) return;
-        for (UUID player : PULSE.due(System.nanoTime())) {
+    /** Economy tick, server thread: publishes every event that is due. */
+    private static void publishDue() {
+        if (dataOrNull() == null) return;
+        long now = System.nanoTime();
+        if (PULSE.hasPending()) for (UUID player : PULSE.due(now)) {
             JsonObject payload = balance(player);
             CACHE.put(player, BALANCE, variant("", 0, 0, LinkPayloads.DEFAULT_PAGE_SIZE), payload);
             NeroLinkRegistry.eventBus().publish(LinkEvent.forPlayer(MODULE_ID, BALANCE, player, payload));
         }
+        MinecraftServer server = serverOrNull();
+        if (server == null) return;
+        try {
+            observe(server, now);
+            if (!LIVE.hasPending()) return;
+            for (LinkTopics.Due due : LIVE.due(now, PULSE::isInterested)) {
+                JsonObject payload = topic(server, due);
+                if (!ALERTS.equals(due.topic()))
+                    CACHE.put(due.player(), due.topic(), variant("", 0, 0, LinkPayloads.DEFAULT_PAGE_SIZE), payload);
+                NeroLinkRegistry.eventBus().publish(LinkEvent.forPlayer(MODULE_ID, due.topic(), due.player(), payload));
+            }
+        } catch (RuntimeException failure) {
+            // A missed live event is harmless: the next snapshot carries the same state.
+            NeroEconomyCommon.LOGGER.debug("[NeroEconomy] A Link event could not be built ({}).",
+                    failure.getClass().getName());
+        }
+    }
+
+    /** Reads the cheap signatures of each interested player's topics, at most once a second each. */
+    private static void observe(MinecraftServer server, long now) {
+        if (EconomyHealth.frozen()) return;
+        EconomyStore store = EconomyStore.get(server);
+        for (UUID player : PULSE.interestedNow(now)) {
+            if (!LIVE.checkDue(player, now)) continue;
+            LIVE.observe(player, ORDERS, LinkSignatures.orders(store, player), now);
+            LIVE.observe(player, OFFERS, LinkSignatures.offers(store, player), now);
+            LIVE.observe(player, PORTFOLIO, LinkSignatures.portfolio(server, player), now);
+        }
+    }
+
+    private static JsonObject topic(MinecraftServer server, LinkTopics.Due due) {
+        return switch (due.topic()) {
+            case ORDERS -> LinkViews.orders(LinkReads.orders(server, due.player()));
+            case OFFERS -> LinkViews.offers(LinkReads.offers(server, due.player()));
+            case PORTFOLIO -> LinkViews.portfolio(LinkReads.portfolio(server, due.player()));
+            default -> LinkViews.alert(due.detail(), wallNow());
+        };
     }
 
     /** Erasure: nothing this module holds in memory for the player survives it. */
     private static void forget(UUID player) {
         CACHE.forget(player);
         PULSE.forget(player);
+        LIVE.forget(player);
+        LIMITS.forget(player);
     }
 
     /** Server unbind: no per-player state outlives the world it came from. */
     private static void reset() {
         CACHE.clear();
         PULSE.clear();
+        LIVE.clear();
+        LIMITS.clear();
     }
 
     // --- plumbing ----------------------------------------------------------------------------
 
-    private static long wallNow() {
-        return NeroEconomyCommon.CURRENCY_PROVIDER.toWallMillis(NeroEconomyCommon.CURRENCY_PROVIDER.now());
-    }
+    private static long wallNow() { return LinkReads.wallNow(); }
 
     /**
      * Runs the work inline on the server thread, which is where Core's contract has every call

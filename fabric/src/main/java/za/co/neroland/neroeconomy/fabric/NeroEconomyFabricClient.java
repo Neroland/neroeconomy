@@ -3,6 +3,7 @@ package za.co.neroland.neroeconomy.fabric;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.MenuScreens;
 
 import za.co.neroland.neroeconomy.NeroEconomyCommon;
@@ -14,6 +15,7 @@ import za.co.neroland.neroeconomy.client.PlayerShopScreen;
 import za.co.neroland.neroeconomy.registry.ModMenuTypes;
 import za.co.neroland.neroeconomy.platform.Services;
 import za.co.neroland.neroeconomy.client.VaultScreen;
+import za.co.neroland.neroeconomy.client.handbook.HandbookScreen;
 
 /** Fabric client entry point for NeroEconomy. */
 public final class NeroEconomyFabricClient implements ClientModInitializer {
@@ -27,6 +29,15 @@ public final class NeroEconomyFabricClient implements ClientModInitializer {
         MenuScreens.register(ModMenuTypes.DIRECT_TRADE.get(), DirectTradeScreen::new);
         MenuScreens.register(ModMenuTypes.AUTO_TRADER.get(), AutoTraderScreen::new);
         MenuScreens.register(ModMenuTypes.ECONOMY_HUB.get(), EconomyHubScreen::new);
+        // The Trader's Handbook: the item opens it on this client, and the book goes to and from its
+        // demos, through the way this game version shows a screen.
+        HandbookScreen.install(screen -> {
+            //? if >=26.2 {
+            Minecraft.getInstance().gui.setScreen(screen);
+            //?} else {
+            /*Minecraft.getInstance().setScreen(screen);
+            *///?}
+        });
         // The capture tooling exists in a development environment only; a release jar wires up
         // neither the tick hook nor the command.
         if (!GalleryCaptureHarness.available()) {

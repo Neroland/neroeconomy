@@ -1,0 +1,32 @@
+{
+  "ok": true,
+  "data": {
+    "currency": "nerolandcore:credits",
+    "balance": 1380,
+    "recentTrend": [
+      {
+        "at": 1790999400000,
+        "amount": 120,
+        "reason": "MARKET_PURCHASE"
+      },
+      {
+        "at": 1790902200000,
+        "amount": 1500,
+        "reason": "STARTING_BALANCE"
+      }
+    ],
+    "amount": 1380,
+    "symbol": "cr",
+    "history": [
+      0,
+      1500,
+      1380
+    ],
+    "asOf": 1791000000000,
+    "action": "rule_delete",
+    "message": "Rule deleted.",
+    "ruleId": "6a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c41",
+    "refunded": 952,
+    "refundedToClaim": false
+  }
+}

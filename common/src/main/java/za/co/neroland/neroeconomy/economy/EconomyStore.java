@@ -34,11 +34,13 @@ import za.co.neroland.neroeconomy.book.RuleOrders;
 import za.co.neroland.neroeconomy.book.SellOrder;
 import za.co.neroland.neroeconomy.config.EconomyConfig;
 import za.co.neroland.neroeconomy.direct.TradeEscrowSection;
+import za.co.neroland.neroeconomy.gallery.GallerySandbox;
 import za.co.neroland.neroeconomy.exchange.ExchangeSection;
 import za.co.neroland.neroeconomy.goods.GoodsSection;
 import za.co.neroland.neroeconomy.goods.Lot;
 import za.co.neroland.neroeconomy.goods.LotHolder;
 import za.co.neroland.neroeconomy.house.HouseSection;
+import za.co.neroland.neroeconomy.link.RemoteSpendSection;
 import za.co.neroland.neroeconomy.market.ListingSource;
 import za.co.neroland.neroeconomy.market.MarketBuyOffer;
 import za.co.neroland.neroeconomy.market.MarketListing;
@@ -129,13 +131,15 @@ public final class EconomyStore extends SavedData {
 
     /**
      * The trading sections, added from the order book on; every one optional, so an older store loads
-     * them empty. Eight fields: room for eight more sections before a third group is needed.
+     * them empty. Ten fields: room for six more sections before a third group is needed.
      */
     private record Markets(Optional<BookSection> book, Optional<OffersSection> offers, Optional<RulesSection> rules,
             Optional<TradeEscrowSection> tradeEscrow, Optional<AutoTraderSection> autoTraders,
-            Optional<ExchangeSection> exchange, Optional<HouseSection> houses, Optional<AdminSection> admin) {
+            Optional<ExchangeSection> exchange, Optional<HouseSection> houses, Optional<AdminSection> admin,
+            Optional<GallerySandbox> gallery, Optional<RemoteSpendSection> remoteSpend) {
         static final Markets EMPTY = new Markets(Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
-                Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty());
+                Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
+                Optional.empty());
 
         static final MapCodec<Markets> CODEC = RecordCodecBuilder.mapCodec(instance -> instance.group(
                 // An older store loads the book empty and its Market Board rows, still in the market
@@ -153,13 +157,17 @@ public final class EconomyStore extends SavedData {
                 // The Merchant Houses: an older store loads with no House state yet.
                 HouseSection.CODEC.optionalFieldOf("houses").forGetter(Markets::houses),
                 // The Admin tab: an older store loads with the market open.
-                AdminSection.CODEC.optionalFieldOf("admin").forGetter(Markets::admin))
+                AdminSection.CODEC.optionalFieldOf("admin").forGetter(Markets::admin),
+                // The gallery's sandbox: an older store loads with no gallery standing.
+                GallerySandbox.CODEC.optionalFieldOf("gallery").forGetter(Markets::gallery),
+                // What each account spent through the companion app today: an older store loads with none.
+                RemoteSpendSection.CODEC.optionalFieldOf("remote_spend").forGetter(Markets::remoteSpend))
                 .apply(instance, Markets::new));
 
         static Markets of(EconomyStore store) {
             return new Markets(present(store.book), present(store.offers), present(store.rules),
                     present(store.tradeEscrow), present(store.autoTraders), present(store.exchange),
-                    present(store.houses), present(store.admin));
+                    present(store.houses), present(store.admin), present(store.gallery), present(store.remoteSpend));
         }
     }
 
@@ -193,6 +201,8 @@ public final class EconomyStore extends SavedData {
     private final ExchangeSection exchange;
     private final HouseSection houses;
     private final AdminSection admin;
+    private final GallerySandbox gallery;
+    private final RemoteSpendSection remoteSpend;
 
     public EconomyStore() {
         this(Core.EMPTY, Markets.EMPTY, false);
@@ -220,6 +230,8 @@ public final class EconomyStore extends SavedData {
         this.exchange = adopt(trading.exchange().orElseGet(ExchangeSection::new));
         this.houses = adopt(trading.houses().orElseGet(HouseSection::new));
         this.admin = adopt(trading.admin().orElseGet(AdminSection::new));
+        this.gallery = adopt(trading.gallery().orElseGet(GallerySandbox::new));
+        this.remoteSpend = adopt(trading.remoteSpend().orElseGet(RemoteSpendSection::new));
         // A store written before the vault existed still holds item claims in its market section.
         adoptItemClaims(false);
         // And one written before the order book existed still holds its Market Board rows there.
@@ -273,6 +285,12 @@ public final class EconomyStore extends SavedData {
     /** The operators' section: the market freeze switch and the counts of operator actions. */
     public AdminSection admin() { return admin; }
 
+    /** The gallery's sandbox: sample rows and what the gallery placed, apart from the real economy. */
+    public GallerySandbox gallery() { return gallery; }
+
+    /** What each account spent through the companion app today, against {@code remoteDailySpendLimit}. */
+    public RemoteSpendSection remoteSpend() { return remoteSpend; }
+
     /**
      * Whether an operator has closed the market: player trading, the Merchant Houses' orders and the
      * exchange refuse, while reads, collecting and refunds carry on. Not the corruption freeze.
@@ -306,7 +324,7 @@ public final class EconomyStore extends SavedData {
      */
     private List<EconomySection> sections() {
         return List.of(ledger, market, obligations, shopOwners, goods, vault, simulation, book, offers, rules,
-                tradeEscrow, autoTraders, exchange, houses, admin);
+                tradeEscrow, autoTraders, exchange, houses, admin, gallery, remoteSpend);
     }
 
     /** The names of the sections that hold anything, for the health report. */
@@ -327,6 +345,8 @@ public final class EconomyStore extends SavedData {
         if (!exchange.isEmpty()) names.add("exchange");
         if (!houses.isEmpty()) names.add("houses");
         if (!admin.isEmpty()) names.add("admin");
+        if (!gallery.isEmpty()) names.add("gallery");
+        if (!remoteSpend.isEmpty()) names.add("remote_spend");
         return names;
     }
 

@@ -1,0 +1,39 @@
+{
+  "ok": true,
+  "data": {
+    "currency": "nerolandcore:credits",
+    "balance": 1380,
+    "recentTrend": [
+      {
+        "at": 1790999400000,
+        "amount": 120,
+        "reason": "MARKET_PURCHASE"
+      },
+      {
+        "at": 1790902200000,
+        "amount": 1500,
+        "reason": "STARTING_BALANCE"
+      }
+    ],
+    "amount": 1380,
+    "symbol": "cr",
+    "history": [
+      0,
+      1500,
+      1380
+    ],
+    "asOf": 1791000000000,
+    "action": "offer_send",
+    "message": "Offer sent.",
+    "offerId": "8d7c6b5a-4f3e-4d2c-9b1a-0f9e8d7c6b53",
+    "credits": 100,
+    "items": 8,
+    "expiresIn": 172800000,
+    "remote": {
+      "enabled": true,
+      "spentToday": 1200,
+      "dailyLimit": 5000,
+      "leftToday": 3800
+    }
+  }
+}

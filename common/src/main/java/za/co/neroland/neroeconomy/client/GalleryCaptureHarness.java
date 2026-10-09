@@ -20,6 +20,7 @@ import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.phys.Vec3;
 
+import za.co.neroland.neroeconomy.gallery.GalleryLayout;
 import za.co.neroland.neroeconomy.platform.Services;
 
 /**
@@ -29,8 +30,11 @@ import za.co.neroland.neroeconomy.platform.Services;
  * release build carries no capture command and adds no dimension to anyone's world.
  *
  * <p>An automated, fully-reproducible screenshot pass over the
- * {@code /neroeconomy gallery} scene — the four listing shots the Modrinth gallery sync consumes
- * ({@code bank_terminal}, {@code player_shop}, {@code trading_terminal}, {@code market_board}).
+ * {@code /neroeconomy gallery} scene — one shot per cluster: the four original listing shots
+ * ({@code bank_terminal}, {@code player_shop}, {@code trading_terminal}, {@code market_board}), then
+ * one per cluster added since ({@code exchange_floor}, {@code auto_trader}, {@code jobs_board},
+ * {@code bank_vault}, {@code direct_trade}, {@code merchant_stall}, {@code auction_podium}). The
+ * Modrinth gallery sync orders the original four by name and appends any other shot by name.
  * {@code /neroeconomy gallery} builds the scene server-side; this harness then drives the camera,
  * hides every overlay and writes a PNG per shot via {@link Screenshot#grab}, so the gallery can be
  * re-rendered identically after texture/model changes instead of hand-framing every shot.
@@ -52,7 +56,7 @@ import za.co.neroland.neroeconomy.platform.Services;
  *       {@code neroeconomy:capture} dimension at a fixed origin (identical backdrop every run),
  *       rebuilds the gallery there from scratch ({@code gallery clear} then {@code gallery} — so a
  *       rerun never leaves lingering blocks, entities or stale market listings), freezes
- *       time/weather/clouds, then shoots the four framed cluster shots.</li>
+ *       time/weather/clouds, then shoots every framed cluster shot.</li>
  *   <li>{@code /necgallery capture shot <name>} — capture the CURRENT view once (overlays hidden) to
  *       {@code neroeconomy/<name>.png}. Use this to grab a hand-framed money shot.</li>
  * </ul>
@@ -60,10 +64,10 @@ import za.co.neroland.neroeconomy.platform.Services;
  * <p>{@code time} accepts {@code day}/{@code noon}/{@code night}/{@code midnight} or a tick number.
  * The capture dimension is overworld-type, so it has a clock and accepts {@code time set}.
  *
- * <p><b>Coordinate contract with the server-side builder.</b> {@code EconomyCommands.buildGallery}
- * lays four clusters out on separate compass bearings, {@link #CLUSTER_RADIUS} blocks from the
- * gallery origin, each with its own backdrop wall on the far side so no other cluster is ever in
- * frame. The camera poses below mirror those bearings exactly — <b>tune the two together</b>:
+ * <p><b>Coordinate contract with the server-side builder.</b> Both sides read it from
+ * {@link GalleryLayout}: the builder ({@code command/GalleryBuilder}) places each cluster on its
+ * bearing and radius, and {@link GalleryLayout#shots} gives the camera pose for each, so the two
+ * cannot drift apart. The four original poses are unchanged:
  *
  * <pre>
  *   shot               bearing  cluster centre          backdrop      camera                       target
@@ -72,6 +76,10 @@ import za.co.neroland.neroeconomy.platform.Services;
  *   trading_terminal   SOUTH    (ox,   oy+2, oz+24)     z = oz+26     (ox-2.5, oy+3.8, oz+19.5)    (ox,    oy+2.6, oz+24.5)
  *   market_board       WEST     (ox-24,oy+1, oz)        x = ox-26     (ox-19.5,oy+2.6, oz+3)       (ox-24.5,oy+1.7, oz-0.5)
  * </pre>
+ *
+ * <p>The seven added clusters stand further out on the NORTH and WEST bearings, every 20 blocks
+ * from radius 44, each behind the walls of the ones nearer the origin; see the table in
+ * {@link GalleryLayout}.
  *
  * <p>{@code oy} is the gallery FLOOR level: the harness stands (and therefore builds) at
  * {@link #ORIGIN_Y}, and the builder lays its pads at exactly that y with the display blocks one
@@ -103,12 +111,6 @@ public final class GalleryCaptureHarness {
     private static final int ORIGIN_X = 0;
     private static final int ORIGIN_Y = 64;
     private static final int ORIGIN_Z = 0;
-
-    /**
-     * Distance from the gallery origin to each cluster centre. MUST match
-     * {@code EconomyCommands.GALLERY_RADIUS} — the two sides of the coordinate contract.
-     */
-    private static final int CLUSTER_RADIUS = 24;
 
     /**
      * One framed capture. {@code setup} = server commands run pre-warmup (teleport into the dimension,
@@ -511,36 +513,21 @@ public final class GalleryCaptureHarness {
     }
 
     // ------------------------------------------------------------------------------------------------
-    // Gallery shot list. The names here are the CONTRACT with .github/workflows/modrinth-gallery.yml
-    // (its ORDER/TITLE/DESC maps are keyed on exactly these four) and the coordinates are the contract
-    // with EconomyCommands.buildGallery — see the table in the class javadoc. Tune the two together.
+    // Gallery shot list. The four original names are the CONTRACT with
+    // .github/workflows/modrinth-gallery.yml (its ORDER/TITLE/DESC maps are keyed on exactly those);
+    // any further shot is synced after them by name. The poses come from GalleryLayout, the contract
+    // with the builder.
     // ------------------------------------------------------------------------------------------------
 
     private static List<Shot> buildShots(int ox, int oy, int oz) {
-        List<Shot> shots = new ArrayList<>();
-        int r = CLUSTER_RADIUS;
-
         // Framing principles: get CLOSE so the subject fills the frame; aim at the subject's MID-height
-        // so the horizon sits high and there is little empty sky/floor; shoot rows DOWN THE LINE from
-        // near one end at near-eye height so they recede with perspective. Every cluster carries its own
+        // so the horizon sits high and there is little empty sky/floor. Every cluster carries its own
         // backdrop wall on the far side, so each shot lands against a clean, empty surface.
-
-        // BANK KIOSK — NORTH bearing (oz - r). Quartz pad + deepslate back wall at oz-26, the Bank
-        // Terminal dead centre between two quartz pillars. Slight 3/4 from the south-east.
-        shots.add(shot("bank_terminal", ox + 2.5, oy + 2.6, oz - r + 4.5, ox, oy + 1.6, oz - r - 0.5));
-
-        // PLAYER SHOP ROW — EAST bearing (ox + r). Three shops in a north-south line at z-2/z/z+2, back
-        // wall at ox+26. Shot down the line from the north-west so the primed near shop reads large.
-        shots.add(shot("player_shop", ox + r - 3, oy + 2.4, oz - 5.5, ox + r, oy + 1.6, oz + 0.5));
-
-        // TRADING TERMINAL DAIS — SOUTH bearing (oz + r). Trading Terminal + Bank Terminal paired on a
-        // one-block deepslate dais (so they sit at oy+2), back wall at oz+26. Elevated 3/4 from the north-west.
-        shots.add(shot("trading_terminal", ox - 2.5, oy + 3.8, oz + r - 4.5, ox, oy + 2.6, oz + r + 0.5));
-
-        // MARKET BOARD — WEST bearing (ox - r). Two boards at z-1/z+1 against a wall at ox-26, seeded
-        // with live listings + standing buy offers. Near 3/4 from the south-east.
-        shots.add(shot("market_board", ox - r + 4.5, oy + 2.6, oz + 3, ox - r - 0.5, oy + 1.7, oz - 0.5));
-
+        List<Shot> shots = new ArrayList<>();
+        for (GalleryLayout.Pose pose : GalleryLayout.shots(ox, oy, oz)) {
+            shots.add(shot(pose.shot(), pose.cameraX(), pose.cameraY(), pose.cameraZ(), pose.targetX(),
+                    pose.targetY(), pose.targetZ()));
+        }
         return shots;
     }
 

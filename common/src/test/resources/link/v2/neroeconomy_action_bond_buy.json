@@ -1,0 +1,42 @@
+{
+  "ok": true,
+  "data": {
+    "currency": "nerolandcore:credits",
+    "balance": 1380,
+    "recentTrend": [
+      {
+        "at": 1790999400000,
+        "amount": 120,
+        "reason": "MARKET_PURCHASE"
+      },
+      {
+        "at": 1790902200000,
+        "amount": 1500,
+        "reason": "STARTING_BALANCE"
+      }
+    ],
+    "amount": 1380,
+    "symbol": "cr",
+    "history": [
+      0,
+      1500,
+      1380
+    ],
+    "asOf": 1791000000000,
+    "action": "bond_buy",
+    "message": "Savings Bond bought.",
+    "bondId": "1f2e3d4c-5b6a-4978-8a6b-5c4d3e2f1a02",
+    "term": "7d",
+    "principal": 500,
+    "interest": 10,
+    "paid": 500,
+    "maturesIn": 604800000,
+    "practice": false,
+    "remote": {
+      "enabled": true,
+      "spentToday": 1200,
+      "dailyLimit": 5000,
+      "leftToday": 3800
+    }
+  }
+}

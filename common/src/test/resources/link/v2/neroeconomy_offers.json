@@ -1,0 +1,41 @@
+{
+  "ok": true,
+  "data": {
+    "inbox": [
+      {
+        "offerId": "8d7c6b5a-4f3e-4d2c-9b1a-0f9e8d7c6b51",
+        "from": "A player",
+        "goods": [
+          {
+            "item": "minecraft:emerald",
+            "displayName": "Emerald",
+            "qty": 8,
+            "modified": false
+          }
+        ],
+        "credits": 0,
+        "ask": {
+          "item": "minecraft:wheat",
+          "displayName": "Wheat",
+          "qty": 64,
+          "modified": false
+        },
+        "askCredits": 50,
+        "expiresIn": 86400000
+      }
+    ],
+    "outbox": [
+      {
+        "offerId": "8d7c6b5a-4f3e-4d2c-9b1a-0f9e8d7c6b52",
+        "to": "A player",
+        "goods": [],
+        "credits": 200,
+        "askCredits": 0,
+        "expiresIn": 3600000
+      }
+    ],
+    "muted": false,
+    "maxOffers": 16,
+    "asOf": 1791000000000
+  }
+}

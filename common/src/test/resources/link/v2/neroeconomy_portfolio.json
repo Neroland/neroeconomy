@@ -1,0 +1,83 @@
+{
+  "ok": true,
+  "data": {
+    "holdings": [
+      {
+        "stockId": "neroeconomy:redstone_works",
+        "displayName": "Redstone Works",
+        "units": 10,
+        "cost": 1200,
+        "value": 1225,
+        "difference": 25,
+        "sellableUnits": 6,
+        "sellableIn": 1800000,
+        "status": ""
+      }
+    ],
+    "bonds": [
+      {
+        "bondId": "1f2e3d4c-5b6a-4978-8a6b-5c4d3e2f1a01",
+        "term": "7d",
+        "displayName": "Seven-day Savings Bond",
+        "days": 7,
+        "principal": 800,
+        "interest": 16,
+        "maturesIn": 432000000,
+        "matured": false
+      }
+    ],
+    "cost": 1200,
+    "value": 1225,
+    "difference": 25,
+    "bondPrincipal": 800,
+    "bondInterest": 16,
+    "invested": 2000,
+    "portfolioLimit": 50000,
+    "positionLimit": 10000,
+    "bondLimit": 5,
+    "dividends": {
+      "last": 12,
+      "factorPercent": 62,
+      "scaled": true
+    },
+    "practice": {
+      "holdings": [
+        {
+          "stockId": "neroeconomy:redstone_works",
+          "displayName": "Redstone Works",
+          "units": 10,
+          "cost": 1200,
+          "value": 1225,
+          "difference": 25,
+          "sellableUnits": 6,
+          "sellableIn": 1800000,
+          "status": ""
+        }
+      ],
+      "bonds": [
+        {
+          "bondId": "1f2e3d4c-5b6a-4978-8a6b-5c4d3e2f1a01",
+          "term": "7d",
+          "displayName": "Seven-day Savings Bond",
+          "days": 7,
+          "principal": 800,
+          "interest": 16,
+          "maturesIn": 432000000,
+          "matured": false
+        }
+      ],
+      "cost": 1200,
+      "value": 1225,
+      "difference": 25,
+      "bondPrincipal": 800,
+      "bondInterest": 16,
+      "invested": 2000,
+      "portfolioLimit": 50000,
+      "positionLimit": 10000,
+      "bondLimit": 5,
+      "playBalance": 9000,
+      "canReset": true
+    },
+    "asOf": 1791000000000
+  }
+}

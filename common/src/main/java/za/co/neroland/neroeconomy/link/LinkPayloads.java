@@ -42,27 +42,22 @@ public final class LinkPayloads {
     /** Longest display name sent; an item name is short, and anything longer is cut. */
     public static final int MAX_NAME_LENGTH = 64;
 
-    public static final String REQUEST_ID_REQUIRED = "requestId is required";
-    public static final String DUPLICATE_REQUEST = "Duplicate request: this trade was already handled.";
+    // Every sentence below is read from the lang file (see LinkText): the app shows it as it arrives.
+    public static final String REQUEST_ID_REQUIRED = LinkText.get("link.neroeconomy.request_id_required");
+    public static final String DUPLICATE_REQUEST = LinkText.get("link.neroeconomy.duplicate_request");
     public static final String QUANTITY_OUT_OF_RANGE =
-            "qty must be a whole number from " + MIN_QUANTITY + " to " + MAX_QUANTITY + ".";
-    public static final String TOO_MANY_REQUESTS = "Too many requests. Try again shortly.";
-    public static final String TRADE_DISABLED = "Remote trading is turned off on this server.";
-    public static final String UNKNOWN_OPERATION = "Unknown trade operation. Use buy or sell.";
-    public static final String LISTING_ID_REQUIRED = "listingId is required.";
-    public static final String SELL_NEEDS_BUY_OFFER = "Selling from the app needs a buy offer to fill. Pick a "
-            + "market row marked sell, or list your items at a Trading Terminal in game.";
-    public static final String SELL_NEEDS_PLAYER =
-            "Selling takes the items from your main hand, so you need to be in the game.";
+            LinkText.get("link.neroeconomy.quantity_out_of_range", MIN_QUANTITY, MAX_QUANTITY);
+    public static final String TOO_MANY_REQUESTS = LinkText.get("link.neroeconomy.too_many_requests");
+    public static final String TRADE_DISABLED = LinkText.get("link.neroeconomy.trade_disabled");
+    public static final String UNKNOWN_OPERATION = LinkText.get("link.neroeconomy.unknown_operation");
+    public static final String LISTING_ID_REQUIRED = LinkText.get("link.neroeconomy.listing_id_required");
+    public static final String SELL_NEEDS_BUY_OFFER = LinkText.get("link.neroeconomy.sell_needs_buy_offer");
+    public static final String SELL_NEEDS_PLAYER = LinkText.get("link.neroeconomy.sell_needs_player");
     /** An operator closed the market for now. */
-    public static final String MARKET_CLOSED = "The market on this server is closed by an operator for now. "
-            + "You can still look around and collect what is waiting for you.";
-    public static final String ECONOMY_FROZEN = "The economy on this server is paused, so nothing can be "
-            + "traded right now. Ask a server operator.";
-    public static final String CREATIVE_SOURCE =
-            "Items cannot be sold from creative mode or spectator mode. Switch to survival first.";
-    public static final String BUY_NEEDS_LISTING =
-            "That row is a request to buy, so there is nothing to buy from it. Switch to sell to fill it.";
+    public static final String MARKET_CLOSED = LinkText.get("link.neroeconomy.market_closed");
+    public static final String ECONOMY_FROZEN = LinkText.get("link.neroeconomy.economy_frozen");
+    public static final String CREATIVE_SOURCE = LinkText.get("link.neroeconomy.creative_source");
+    public static final String BUY_NEEDS_LISTING = LinkText.get("link.neroeconomy.buy_needs_listing");
 
     /** A translation key that was never resolved, such as {@code item.minecraft.diamond}. */
     private static final Pattern UNTRANSLATED = Pattern.compile("[a-z0-9_]+(\\.[a-z0-9_/-]+)+");
@@ -460,61 +455,30 @@ public final class LinkPayloads {
 
     public static String purchaseMessage(PurchaseResult result) {
         return switch (result) {
-            case SUCCESS -> "Purchase completed.";
             case STALE_REQUEST -> DUPLICATE_REQUEST;
-            case NOT_FOUND -> "That offer is no longer available.";
-            case OWN_LISTING -> "You cannot buy your own offer.";
-            case INVALID_QUANTITY -> "That quantity is not valid.";
-            case OUT_OF_STOCK -> "There is not enough stock left.";
-            case PRICE_MOVED -> "The price went up since you looked. Refresh the market and try again.";
-            case INSUFFICIENT_FUNDS -> "You do not have enough credits.";
-            case INVENTORY_FULL -> "Neither your inventory nor your vault has room for it.";
-            case INTERNAL_ERROR -> "The sale could not be settled.";
-            case ITEM_CHANGED -> "The item on offer changed since you looked.";
-            case CLAIMS_FULL -> "Your vault is full. Take some items out at a Bank Terminal first.";
-            case FUNDS_LOCKED -> "Your starting credits cannot be spent with other players until you have played a little longer.";
             case FROZEN -> ECONOMY_FROZEN;
             case MARKET_CLOSED -> MARKET_CLOSED;
+            default -> LinkText.get("link.neroeconomy.purchase." + result.name().toLowerCase(Locale.ROOT));
         };
     }
 
     public static String fillMessage(FillResult result) {
         return switch (result) {
-            case SUCCESS -> "Buy offer filled. Your proceeds are ready to collect at a Trading Terminal.";
-            case INVALID -> "That request was not valid.";
             case STALE_REQUEST -> DUPLICATE_REQUEST;
-            case NOT_FOUND -> "That buy offer is no longer open.";
-            case OWN_OFFER -> "You cannot fill your own buy offer.";
-            case WRONG_ITEM -> "Hold the requested item in your main hand in game, then try again.";
-            case NOT_ENOUGH -> "You hold fewer than that in your main hand, or the offer wants fewer.";
-            case MODIFIED_ITEM -> "Only unmodified items are accepted, not renamed, enchanted, filled or damaged ones.";
-            case UNTRADEABLE -> "That item cannot be traded on this server.";
-            case CLAIMS_FULL -> "The buyer's vault is full, so the offer cannot be filled right now.";
-            case PAYOUT_BLOCKED -> "Collect your waiting credits at a Trading Terminal first.";
             case FROZEN -> ECONOMY_FROZEN;
             case CREATIVE -> CREATIVE_SOURCE;
             case MARKET_CLOSED -> MARKET_CLOSED;
+            default -> LinkText.get("link.neroeconomy.fill." + result.name().toLowerCase(Locale.ROOT));
         };
     }
 
     public static String postMessage(PostResult result) {
         return switch (result) {
-            case SUCCESS -> "Listing posted.";
-            case INVALID -> "The quantity or price is not valid.";
             case STALE_REQUEST -> DUPLICATE_REQUEST;
-            case NOT_HOLDING -> "Hold the item in your main hand in game, in at least the quantity you are offering.";
-            case LIMIT_REACHED -> "You already have as many open listings as this server allows.";
-            case UNTRADEABLE -> "That item cannot be traded on this server.";
-            case OVERSIZED -> "That stack holds too much data to be listed.";
-            case UNKNOWN_ITEM -> "There is no such item.";
-            case INSUFFICIENT_FUNDS -> "You do not have enough credits.";
-            case FEE_UNPAID -> "You do not have enough credits to pay the listing fee.";
-            case FUNDS_LOCKED -> "Your starting credits cannot be offered to other players until you have played a little longer.";
             case FROZEN -> ECONOMY_FROZEN;
-            case STORAGE_FULL -> "Neither your inventory nor your vault has room for what the order would buy at once.";
-            case PAYOUT_BLOCKED -> "Collect your waiting credits at a Trading Terminal first.";
             case CREATIVE -> CREATIVE_SOURCE;
             case MARKET_CLOSED -> MARKET_CLOSED;
+            default -> LinkText.get("link.neroeconomy.post." + result.name().toLowerCase(Locale.ROOT));
         };
     }
 }

@@ -9,16 +9,25 @@ import java.util.UUID;
  * {@code chipDay}/{@code chipCount} are the Credit Chip counter (both zero when none is stored).
  * {@code lockedStartingBalance} is what is left of a starting grant that has not vested yet, and
  * {@code vested} whether the account has reached the play time that ends that lock.
+ * {@code handbookGiven} is whether the account was given the Trader's Handbook on joining.
  */
 public record PlayerLedgerExport(UUID player, long balance, String currency, boolean transactionLoggingOptOut,
         List<TransactionRecord> transactions, String accountReference, long chipDay, int chipCount,
-        long lockedStartingBalance, boolean vested) {
+        long lockedStartingBalance, boolean vested, boolean handbookGiven) {
     public PlayerLedgerExport { transactions = List.copyOf(transactions); }
+
+    /** An export for an account that was not given the Trader's Handbook. */
+    public PlayerLedgerExport(UUID player, long balance, String currency, boolean transactionLoggingOptOut,
+            List<TransactionRecord> transactions, String accountReference, long chipDay, int chipCount,
+            long lockedStartingBalance, boolean vested) {
+        this(player, balance, currency, transactionLoggingOptOut, transactions, accountReference, chipDay,
+                chipCount, lockedStartingBalance, vested, false);
+    }
 
     /** An export for an account with nothing locked. */
     public PlayerLedgerExport(UUID player, long balance, String currency, boolean transactionLoggingOptOut,
             List<TransactionRecord> transactions, String accountReference, long chipDay, int chipCount) {
         this(player, balance, currency, transactionLoggingOptOut, transactions, accountReference, chipDay,
-                chipCount, 0L, true);
+                chipCount, 0L, true, false);
     }
 }

@@ -1,0 +1,45 @@
+{
+  "ok": true,
+  "data": {
+    "currency": "nerolandcore:credits",
+    "balance": 1380,
+    "recentTrend": [
+      {
+        "at": 1790999400000,
+        "amount": 120,
+        "reason": "MARKET_PURCHASE"
+      },
+      {
+        "at": 1790902200000,
+        "amount": 1500,
+        "reason": "STARTING_BALANCE"
+      }
+    ],
+    "amount": 1380,
+    "symbol": "cr",
+    "history": [
+      0,
+      1500,
+      1380
+    ],
+    "asOf": 1791000000000,
+    "action": "order_place",
+    "message": "Buy order placed.",
+    "orderId": "3c9e1f20-7b4a-4d8e-9f10-2a3b4c5d6e75",
+    "side": "buy",
+    "item": "minecraft:wheat",
+    "qty": 64,
+    "unitPrice": 4,
+    "filledNow": 16,
+    "resting": 48,
+    "listingFee": 1,
+    "escrowed": 256,
+    "delivery": "vault",
+    "remote": {
+      "enabled": true,
+      "spentToday": 1200,
+      "dailyLimit": 5000,
+      "leftToday": 3800
+    }
+  }
+}

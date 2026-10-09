@@ -1,0 +1,42 @@
+{
+  "ok": true,
+  "data": {
+    "currency": "nerolandcore:credits",
+    "balance": 1380,
+    "recentTrend": [
+      {
+        "at": 1790999400000,
+        "amount": 120,
+        "reason": "MARKET_PURCHASE"
+      },
+      {
+        "at": 1790902200000,
+        "amount": 1500,
+        "reason": "STARTING_BALANCE"
+      }
+    ],
+    "amount": 1380,
+    "symbol": "cr",
+    "history": [
+      0,
+      1500,
+      1380
+    ],
+    "asOf": 1791000000000,
+    "action": "stock_sell",
+    "message": "Sold.",
+    "stockId": "neroeconomy:redstone_works",
+    "side": "sell",
+    "units": 4,
+    "unitPriceCents": 12250,
+    "total": 490,
+    "fee": 2,
+    "net": 488,
+    "costBasis": 480,
+    "gain": 10,
+    "gainForfeited": 0,
+    "loss": 0,
+    "practice": false,
+    "sold": true
+  }
+}

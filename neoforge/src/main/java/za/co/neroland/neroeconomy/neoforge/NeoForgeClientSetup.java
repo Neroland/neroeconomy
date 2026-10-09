@@ -1,5 +1,6 @@
 package za.co.neroland.neroeconomy.neoforge;
 
+import net.minecraft.client.Minecraft;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.neoforge.client.event.ClientTickEvent;
 import net.neoforged.neoforge.client.event.RegisterClientCommandsEvent;
@@ -12,12 +13,22 @@ import za.co.neroland.neroeconomy.client.EconomyHubScreen;
 import za.co.neroland.neroeconomy.client.GalleryCaptureHarness;
 import za.co.neroland.neroeconomy.client.PlayerShopScreen;
 import za.co.neroland.neroeconomy.client.VaultScreen;
+import za.co.neroland.neroeconomy.client.handbook.HandbookScreen;
 import za.co.neroland.neroeconomy.registry.ModMenuTypes;
 
 final class NeoForgeClientSetup {
     private NeoForgeClientSetup() { }
     static void init(IEventBus bus) {
         bus.addListener(NeoForgeClientSetup::screens);
+        // The Trader's Handbook: the item opens it on this client, and the book goes to and from its
+        // demos, through the way this game version shows a screen.
+        HandbookScreen.install(screen -> {
+            //? if >=26.2 {
+            Minecraft.getInstance().gui.setScreen(screen);
+            //?} else {
+            /*Minecraft.getInstance().setScreen(screen);
+            *///?}
+        });
         // The capture tooling exists in a development environment only; a release jar wires up
         // neither the tick hook nor the command.
         if (!GalleryCaptureHarness.available()) {

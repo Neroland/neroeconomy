@@ -56,6 +56,7 @@ import za.co.neroland.neroeconomy.economy.EscrowMath;
 import za.co.neroland.neroeconomy.economy.LedgerPlan;
 import za.co.neroland.neroeconomy.economy.LedgerResult;
 import za.co.neroland.neroeconomy.economy.TransactionType;
+import za.co.neroland.neroeconomy.gallery.GallerySandbox;
 import za.co.neroland.neroeconomy.goods.GoodsSection;
 import za.co.neroland.neroeconomy.goods.GoodsSource;
 import za.co.neroland.neroeconomy.link.EconomyAlerts;
@@ -362,9 +363,16 @@ public final class MarketSavedData extends EconomySection implements EscrowHolde
     /** Every open buy order on the book, and the gallery's demo rows when asked for, by item id and price. */
     private List<MarketBuyOffer> wanted(String needle, long now, boolean includeDemo) {
         List<MarketBuyOffer> rows = new ArrayList<>();
-        if (includeDemo) for (MarketBuyOffer value : buyOffers.values())
-            if (value.demo() && matches(value.itemId(), needle)) rows.add(value);
         EconomyStore store = owner();
+        if (includeDemo) {
+            // Rows a gallery from before the sandbox left here, then the sandbox's own.
+            for (MarketBuyOffer value : buyOffers.values())
+                if (value.demo() && matches(value.itemId(), needle)) rows.add(value);
+            if (store != null) for (GallerySandbox.Row row : store.gallery().rows(false, needle)) {
+                MarketBuyOffer view = sampleOfferView(row);
+                if (view != null) rows.add(view);
+            }
+        }
         if (store != null) for (BuyOrder order : store.book().buysMatching(item -> matches(item, needle), now)) {
             MarketBuyOffer view = offerView(order);
             if (view != null) rows.add(view);
@@ -552,6 +560,11 @@ public final class MarketSavedData extends EconomySection implements EscrowHolde
             if (row.availableQuantity() > 0 && (includeDemo || !row.demo()) && matches(row.itemId(), needle))
                 rows.add(new Offered(row.itemId().toString(), row.baseUnitPrice(), 0L, row, null));
         EconomyStore store = owner();
+        // The gallery's sample rows are read from its sandbox, for a viewer allowed to see them only.
+        if (includeDemo && store != null) for (GallerySandbox.Row row : store.gallery().rows(true, needle)) {
+            MarketListing view = sampleListingView(row);
+            if (view != null) rows.add(new Offered(view.itemId().toString(), view.baseUnitPrice(), 0L, view, null));
+        }
         if (store != null) {
             GoodsSection goods = store.goods();
             for (SellOrder order : store.book().sellsMatching(item -> matches(item, needle), now))
@@ -1031,32 +1044,30 @@ public final class MarketSavedData extends EconomySection implements EscrowHolde
     }
 
     /**
-     * Seeds a showcase sell row for the admin gallery. Nothing is escrowed from anyone and the row
-     * names no player: it is unbuyable, invisible to ordinary searches, and vanishes without a claim
-     * when it expires or the gallery is cleared.
+     * A gallery sample sell row as the listing the terminal shows. It is built fresh for each
+     * search and never stored here: nothing can look it up by id, so nothing can buy it. Null for
+     * an item the game cannot name.
      */
-    public synchronized MarketListing postDemoListing(ItemStack stock, long price, long expiresAt, String location) {
-        if (stock == null || stock.isEmpty() || price < 1L || expiresAt <= now() || location == null) return null;
-        UUID id = freshId();
-        MarketListing listing = new MarketListing(id, DEMO_ACCOUNT, ListingSource.MARKET_BOARD, stock, price,
-                expiresAt, location, true, now());
-        listings.put(id, listing);
-        setDirty();
-        return listing;
+    private static MarketListing sampleListingView(GallerySandbox.Row row) {
+        Identifier id = Identifier.tryParse(row.itemId());
+        Item item = id == null ? null : BuiltInRegistries.ITEM.getOptional(id).orElse(null);
+        ItemStack stock = item == null ? ItemStack.EMPTY : new ItemStack(item, row.quantity());
+        if (stock.isEmpty()) return null;
+        return new MarketListing(row.id(), DEMO_ACCOUNT, ListingSource.MARKET_BOARD, stock, row.unitPrice(),
+                Long.MAX_VALUE, "", true, 0L);
     }
 
-    /** Seeds a showcase buy row for the admin gallery: no escrow, nothing minted, never fillable. */
-    public synchronized MarketBuyOffer postDemoBuyOffer(Identifier itemId, int quantity, long unitPrice,
-            long expiresAt) {
-        if (itemId == null || quantity < 1 || unitPrice < 1L || expiresAt <= now()) return null;
-        UUID id = freshId();
-        MarketBuyOffer offer = new MarketBuyOffer(id, DEMO_ACCOUNT, itemId, quantity, unitPrice, 0L, expiresAt, true);
-        buyOffers.put(id, offer);
-        setDirty();
-        return offer;
+    /** A gallery sample buy row as the buy offer the terminal shows: no escrow, never fillable. */
+    private static MarketBuyOffer sampleOfferView(GallerySandbox.Row row) {
+        Identifier id = Identifier.tryParse(row.itemId());
+        if (id == null) return null;
+        return new MarketBuyOffer(row.id(), DEMO_ACCOUNT, id, row.quantity(), row.unitPrice(), 0L, Long.MAX_VALUE, true);
     }
 
-    /** Removes every demo row, shop listings included, without creating a claim. @return rows removed */
+    /**
+     * Removes every demo row held here — demo shop listings, and board rows a gallery built before
+     * the sandbox left behind — without creating a claim. @return rows removed
+     */
     public synchronized int clearDemo() {
         int before = listings.size() + buyOffers.size();
         listings.values().removeIf(MarketListing::demo);

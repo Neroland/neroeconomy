@@ -109,6 +109,15 @@ public final class VaultStacks {
         Vault.Delivery delivery = store.vault().deliver(account(player), List.of(lot), cap(), hardBound(),
                 goods.limits());
         if (delivery.overBound()) warnOverBound();
+        if (delivery.overCap()) {
+            try {
+                za.co.neroland.neroeconomy.link.EconomyAlerts.raise(NeroEconomyCommon.CURRENCY_PROVIDER.serverOrNull(),
+                        player, za.co.neroland.neroeconomy.link.EconomyAlerts.Kind.VAULT_FULL,
+                        za.co.neroland.nerolandcore.link.LinkAlert.Severity.INFO);
+            } catch (RuntimeException | LinkageError failure) {
+                // An alert is a courtesy; the goods are booked whatever happens to it.
+            }
+        }
     }
 
     /** One aggregate warning every ten minutes at most; it names no player and no item. */

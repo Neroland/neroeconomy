@@ -30,7 +30,9 @@ public final class EconomyAlerts {
         RULE_FILLED("rule_filled", "One of your auto-trade rules is complete."),
         BOND_MATURED("bond_matured", "A Savings Bond matured and was paid into your balance."),
         DIVIDEND_PAID("dividend_paid", "Your shares paid a dividend."),
-        STOCK_DELISTED("stock_delisted", "A company you held shares in left the exchange, and you were paid out.");
+        STOCK_DELISTED("stock_delisted", "A company you held shares in left the exchange, and you were paid out."),
+        ORDER_FILLED("order_filled", "One of your market orders was filled."),
+        VAULT_FULL("vault_full", "Your vault is full. Take some items out before more can arrive.");
 
         private final String id;
         private final String text;
@@ -45,12 +47,27 @@ public final class EconomyAlerts {
 
         /** The sentence stored and shown; a constant, so nothing about a player or a trade can reach it. */
         public String text() { return text; }
+
+        /** The kind with this {@link #id()}, or null. */
+        public static Kind byId(String id) {
+            for (Kind kind : values()) if (kind.id.equals(id)) return kind;
+            return null;
+        }
     }
 
     private static final long MIN_INTERVAL_MS = 30_000L;
     private static final int MAX_TRACKED_KEYS = 256;
     private static final Map<String, Long> LAST = new ConcurrentHashMap<>();
+    /** Told of every alert that went out, so the companion-app module can publish its alerts topic. */
+    private static volatile java.util.function.BiConsumer<UUID, Kind> listener = (player, kind) -> { };
+
     private EconomyAlerts() { }
+
+    /** Sets the one listener told of each alert that goes out; null removes it. */
+    static void listen(java.util.function.BiConsumer<UUID, Kind> next) {
+        listener = next == null ? (player, kind) -> { } : next;
+    }
+
     public static void raise(MinecraftServer server, UUID player, Kind kind, LinkAlert.Severity severity) {
         if (server == null || player == null || kind == null) return;
         // A rate limiter measures real elapsed time, so this is the wall clock, not economy time.
@@ -58,6 +75,11 @@ public final class EconomyAlerts {
         if (!allow(key(player, kind.id()), now)) return;
         LinkAlerts.get(server).raise(server, player,
                 LinkAlert.raise(alertId(kind.id()), "neroeconomy", severity, kind.text()));
+        try {
+            listener.accept(player, kind);
+        } catch (RuntimeException ignored) {
+            // A missed live event is harmless; the alert itself is stored.
+        }
     }
 
     /**

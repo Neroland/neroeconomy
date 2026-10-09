@@ -146,6 +146,23 @@ class EconomySavedDataTest {
         assertFalse(data.export(ALICE).transactionLoggingOptOut());
     }
 
+    @Test void theHandbookFlagPersistsAndAnOlderSaveLoadsWithNone() {
+        EconomySavedData data = new EconomySavedData();
+        assertTrue(data.isEmpty());
+        data.markHandbookGiven(ALICE);
+        assertFalse(data.isEmpty(), "a ledger holding only the flag is still saved");
+        var encoded = EconomySavedData.CODEC.encodeStart(JsonOps.INSTANCE, data).getOrThrow();
+        EconomySavedData restored = EconomySavedData.CODEC.parse(JsonOps.INSTANCE, encoded).getOrThrow();
+        assertTrue(restored.handbookGiven(ALICE));
+        assertFalse(restored.handbookGiven(BOB));
+        // A save from before the handbook has no such field: nobody is marked, so nothing breaks.
+        JsonObject old = encoded.getAsJsonObject().deepCopy();
+        old.remove("handbook_given");
+        EconomySavedData older = EconomySavedData.CODEC.parse(JsonOps.INSTANCE, old).getOrThrow();
+        assertFalse(older.handbookGiven(ALICE));
+        assertEquals(0, older.handbookGivenCount());
+    }
+
     @Test void exportIsNotCutAtTheHistoryLimit() {
         EconomySavedData data = Ledgers.seeded();
         for (int i = 0; i < 150; i++) assertTrue(data.deposit(ALICE, NeroEconomyCommon.CREDITS, 1));

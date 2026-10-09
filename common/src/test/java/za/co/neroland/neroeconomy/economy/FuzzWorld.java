@@ -63,13 +63,15 @@ import za.co.neroland.neroeconomy.trader.TraderRules;
 import za.co.neroland.neroeconomy.vault.VaultSection;
 
 /**
- * Everything one fuzz run works on: the real store, and beside it three small models of what must
+ * Everything one fuzz run works on: the real store, and beside it two small models of what must
  * be true, each kept from the outcomes of the operations alone and never read back from the store.
  *
  * <ul>
  *   <li>{@link #supply} — minted less burned. <b>Invariant A:</b> every balance together equals it.</li>
- *   <li>{@link #escrow} — who is owed what out of the escrow account. <b>Invariant B:</b> the escrow
- *       balance equals the sum of it plus whatever the store's own sections record.</li>
+ *   <li><b>Invariant B</b> needs no model: every credit in the escrow account is recorded as owed
+ *       by a section of the store, and nothing moves a credit into or out of it without the
+ *       section that records it — the fuzzer's own escrow operations book their claims in the
+ *       market's credit claims, as the game does.</li>
  *   <li><b>Invariant C</b> needs no model: the exchange account holds exactly what the exchange
  *       section records for open positions — share cost, bond principal, reserved bond interest —
  *       and nothing but the exchange's own operations ever moves a credit into or out of it.</li>
@@ -100,8 +102,8 @@ final class FuzzWorld {
         default -> 64;
     };
     /**
-     * Every system account an ordinary ledger operation may touch. Escrow moves only through the
-     * escrow model, and the exchange account only through the exchange's own operations.
+     * Every system account an ordinary ledger operation may touch. Escrow moves only with a record
+     * of who it is owed to, and the exchange account only through the exchange's own operations.
      */
     static final SystemAccountId[] SYSTEM = {SystemAccountId.RESERVE, SystemAccountId.house("quarry"),
             SystemAccountId.house("ironworks"), SystemAccountId.house("granary")};
@@ -134,8 +136,6 @@ final class FuzzWorld {
      */
     static final TradingTerms EXCHANGE_TERMS = new TradingTerms(true, 100, 100, 200, 100, 120_000L, 4_000L, 8_000L, 3,
             80, 300, 800, 2_000L, 3);
-    /** Who the escrow of a server-funded job is recorded for. */
-    static final UUID SYSTEM_ISSUER = new UUID(0L, 0L);
     private static final long START_WALL = 1_800_000_000_000L;
     private static final Map<String, Integer> ITEM_INDEX = itemIndex();
 
@@ -161,8 +161,6 @@ final class FuzzWorld {
     /** The wall clock the ledger reads; only operations move it. */
     long wall = START_WALL;
     long supply;
-    final Map<UUID, Long> escrow = new LinkedHashMap<>();
-    long escrowTotal;
     final Map<Lot.Key, Long> goods = new LinkedHashMap<>();
     final Map<Lot.Key, Long> outside = new LinkedHashMap<>();
     /** A rolling hash of every operation's outcome: two runs that did the same things agree on it. */
@@ -371,16 +369,8 @@ final class FuzzWorld {
 
     // --- the models --------------------------------------------------------------------------
 
-    long owed(UUID player) { return escrow.getOrDefault(player, 0L); }
-
-    /** Records that the escrow account now holds {@code change} more (or less) for {@code player}. */
-    void owe(UUID player, long change) {
-        long next = owed(player) + change;
-        assertTrue(next >= 0L, "escrow model went negative");
-        if (next == 0L) escrow.remove(player);
-        else escrow.put(player, next);
-        escrowTotal += change;
-    }
+    /** What the market's credit claims record as owed to {@code player} out of the escrow account. */
+    long owed(UUID player) { return store.market().creditClaimTotal(player); }
 
     long outside(Lot.Key kind) { return outside.getOrDefault(kind, 0L); }
 
@@ -441,10 +431,13 @@ final class FuzzWorld {
         assertEquals(supply, ledger.totalBalancesForTest(), where);
         assertTrue(ledger.supplyBalanced(), where);
         assertTrue(ledger.balance(SystemAccountId.RESERVE) >= 0L, where);
-        // Invariant B: the escrow account holds exactly what is recorded as owed from it.
-        assertEquals(escrowTotal + store.escrowObligations(), ledger.balance(SystemAccountId.ESCROW), where);
+        // Invariant B: the escrow account holds exactly what the store's sections record as owed from it.
+        assertEquals(store.escrowObligations(), ledger.balance(SystemAccountId.ESCROW), where);
         // Invariant C: the exchange account holds exactly the open share cost, bond principal and reserved interest.
         assertEquals(store.exchangeObligations(), ledger.balance(SystemAccountId.EXCHANGE), where);
+        // And the store's own check, the one operators see in /eco admin supply and health, agrees.
+        assertTrue(store.checkInvariants(), where);
+        assertTrue(store.supplyReport().healthy(), where);
         // Item conservation: for every kind, in the store plus outside equals what exists.
         // Counted into a plain array: this walks every lot in the store after every operation.
         long[] held = new long[ITEMS.length * PAYLOADS];
@@ -539,7 +532,7 @@ final class FuzzWorld {
         out.append(ledger.balance(SystemAccountId.EXCHANGE)).append(';').append(exchangeAlerts).append(';')
                 .append(listed.size()).append(';').append(ExchangeSection.CODEC.encodeStart(
                         com.mojang.serialization.JsonOps.INSTANCE, store.exchange()).getOrThrow()).append(';');
-        out.append(ledger.balance(SystemAccountId.ESCROW)).append(';').append(owed(SYSTEM_ISSUER)).append(';');
+        out.append(ledger.balance(SystemAccountId.ESCROW)).append(';').append(store.escrowObligations()).append(';');
         for (BudgetKind kind : BudgetKind.values()) out.append(ledger.budgetUsed(kind)).append(';');
         out.append(supply).append(';').append(store.simulation().lastStep()).append(';').append(outside).append(';')
                 .append(goods).append(';').append(ledger.now()).append(';').append(stepsRun).append(';')

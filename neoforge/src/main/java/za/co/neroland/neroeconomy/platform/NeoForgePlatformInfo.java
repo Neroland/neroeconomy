@@ -33,6 +33,7 @@ import za.co.neroland.neroeconomy.command.EconomyCommands;
 import za.co.neroland.neroeconomy.commodity.CommodityData;
 import za.co.neroland.neroeconomy.direct.DirectTrades;
 import za.co.neroland.neroeconomy.exchange.StockData;
+import za.co.neroland.neroeconomy.handbook.HandbookGift;
 import za.co.neroland.neroeconomy.network.IntentGuard;
 
 public final class NeoForgePlatformInfo implements PlatformInfo {
@@ -74,6 +75,10 @@ public final class NeoForgePlatformInfo implements PlatformInfo {
         // watches: it never cancels the event, so the game and every other mod see it as it was.
         NeoForge.EVENT_BUS.addListener((PlayerInteractEvent.EntityInteract event) ->
                 DirectTrades.useEntity(event.getEntity(), event.getTarget(), event.getHand()));
+        // First join: the Trader's Handbook, once per account (see HandbookGift for the rule).
+        NeoForge.EVENT_BUS.addListener((PlayerEvent.PlayerLoggedInEvent event) -> {
+            if (event.getEntity() instanceof net.minecraft.server.level.ServerPlayer joined) HandbookGift.joined(joined);
+        });
         // The packet limiter keys on the player id in memory; the entry leaves with the player,
         // and so do their trade requests and a trade they had open.
         NeoForge.EVENT_BUS.addListener((PlayerEvent.PlayerLoggedOutEvent event) -> {

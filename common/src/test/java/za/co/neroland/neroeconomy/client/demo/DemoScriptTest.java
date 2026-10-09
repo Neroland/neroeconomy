@@ -30,7 +30,8 @@ import za.co.neroland.neroeconomy.text.SourceTree;
  * The "Show me" walkthroughs: every tab has one of the right length on its own sample pages, every
  * place a step points at, presses or types into is laid out by that tab's view, every word is in
  * the lang file, and nothing a demo runs can reach the server — checked in the sources and in the
- * compiled classes of the demo package, the demo runner and the tab views.
+ * compiled classes of the demo package, the demo runner, the tab views and the Trader's Handbook,
+ * whose Open demo runs a walkthrough with no hub on the server at all.
  */
 class DemoScriptTest {
     private static final int BODY_W = 256;
@@ -46,11 +47,13 @@ class DemoScriptTest {
             HubTab.INVEST, "HubInvestView", HubTab.TRADE, "HubTradeView", HubTab.JOBS, "HubJobsView",
             HubTab.AUCTIONS, "HubAuctionsView", HubTab.SHOP, "HubShopView", HubTab.ADMIN, "HubAdminView");
 
+    private static Path java;
     private static Path client;
     private static JsonObject lang;
 
     @BeforeAll static void read() throws IOException {
         Path main = SourceTree.main();
+        java = main.resolve("java");
         client = main.resolve("java/za/co/neroland/neroeconomy/client");
         lang = JsonParser.parseString(Files.readString(main.resolve("resources/assets/neroeconomy/lang/en_us.json"),
                 StandardCharsets.UTF_8)).getAsJsonObject();
@@ -158,7 +161,24 @@ class DemoScriptTest {
         assertEquals(1, count, "the hub calls its own send only through its live sender");
     }
 
-    /** The sources the demo runs: its package, its runner, and every tab view and their base. */
+    @Test void theHandbookRunsDemosWithoutAHubAndThoseCannotSend() throws IOException {
+        String book = Files.readString(client.resolve("handbook/HandbookScreen.java"), StandardCharsets.UTF_8)
+                .replaceAll("\\s+", " ");
+        String hub = Files.readString(client.resolve("EconomyHubScreen.java"), StandardCharsets.UTF_8)
+                .replaceAll("//[^\n]*", "").replaceAll("\\s+", " ");
+        assertTrue(book.contains("EconomyHubScreen.demoOnly("), "the handbook opens the demo-only hub");
+        assertFalse(book.contains("new EconomyHubScreen("), "the handbook never makes a live hub");
+        assertTrue(hub.contains("new EconomyHubMenu(DEMO_ONLY_CONTAINER, inventory)"), "a client-made menu");
+        assertTrue(hub.contains("private static final int DEMO_ONLY_CONTAINER = -1;"), "an id the server never opens");
+        assertTrue(hub.contains("String text) { if (this.leave != null) return; NeroEconomyNetwork.sendToServer("),
+                "a demo-only hub refuses to send before anything else");
+        assertTrue(hub.contains("HubPage update = this.leave != null ? null : ClientHubPage.poll("),
+                "a demo-only hub reads no page");
+        assertTrue(hub.contains("public void onClose() { if (this.leave != null) { this.leave.run(); return; }"),
+                "leaving a demo-only hub closes no container");
+    }
+
+    /** The sources the demo runs: its package, its runner, every tab view and their base, and the handbook. */
     private static List<Path> demoSources() throws IOException {
         List<Path> files = new ArrayList<>(SourceTree.files(client.resolve("demo"), path -> path.toString().endsWith(".java")));
         files.addAll(SourceTree.files(client, path -> {
@@ -166,12 +186,16 @@ class DemoScriptTest {
             return path.getParent().equals(client) && (name.equals("HubDemo.java") || name.equals("HubIntents.java")
                     || name.matches("Hub\\w*View\\.java"));
         }));
+        files.addAll(SourceTree.files(client.resolve("handbook"), path -> path.toString().endsWith(".java")));
+        files.addAll(SourceTree.files(java.resolve("za/co/neroland/neroeconomy/handbook"),
+                path -> path.toString().endsWith(".java")));
         return files;
     }
 
     @Test void noDemoSourceNamesAnythingServerbound() throws IOException {
         List<Path> files = demoSources();
-        assertTrue(files.size() >= 18, "sources found: " + files.size());
+        assertTrue(files.size() >= 22, "sources found: " + files.size());
+        assertTrue(files.stream().anyMatch(file -> file.endsWith("HandbookScreen.java")), "the handbook is scanned");
         List<String> found = new ArrayList<>();
         for (Path file : files) {
             String source = Files.readString(file, StandardCharsets.UTF_8);
@@ -185,8 +209,7 @@ class DemoScriptTest {
         Pattern nested = Pattern.compile("(?:class|enum|record|interface) (\\w+)");
         for (Path file : demoSources()) {
             String outer = file.getFileName().toString().replace(".java", "");
-            String pkg = file.getParent().equals(client) ? "za/co/neroland/neroeconomy/client/"
-                    : "za/co/neroland/neroeconomy/client/demo/";
+            String pkg = java.relativize(file.getParent()).toString().replace('\\', '/') + "/";
             Matcher inner = nested.matcher(Files.readString(file, StandardCharsets.UTF_8));
             while (inner.find())
                 classes.add(pkg + (inner.group(1).equals(outer) ? outer : outer + "$" + inner.group(1)) + ".class");
@@ -202,7 +225,8 @@ class DemoScriptTest {
                 for (String banned : SERVERBOUND) if (bytes.contains(banned)) found.add(name + ": " + banned);
             }
         }
-        assertTrue(read >= 25, "compiled classes read: " + read + " of " + classes);
+        assertTrue(read >= 30, "compiled classes read: " + read + " of " + classes);
+        assertTrue(classes.contains("za/co/neroland/neroeconomy/client/handbook/HandbookScreen.class"), "handbook class");
         assertTrue(found.isEmpty(), "compiled demo code that can reach the server: " + found);
     }
 }

@@ -45,9 +45,10 @@ class OperationFuzzTest {
         assertEquals(OPERATIONS, result.calls().values().stream().mapToInt(Integer::intValue).sum());
         // The run was not a run of refusals: credits really were minted, burned, escrowed and paid.
         EconomySavedData ledger = world.ledger();
-        // What is owed from escrow: the model's share, and what the store's own sections record
-        // (open buy orders, credit claims).
-        long owedFromEscrow = world.escrowTotal + world.store.escrowObligations();
+        // What is owed from escrow: everything the store's own sections record (open buy orders,
+        // credit claims, obligations, offers, rule budgets).
+        long owedFromEscrow = world.store.escrowObligations();
+        assertTrue(world.store.checkInvariants());
         SupplyReport report = ledger.supplyReport(owedFromEscrow);
         assertTrue(report.healthy());
         assertTrue(report.mintedAllTime() > Ledgers.RESERVE);

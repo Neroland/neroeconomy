@@ -137,6 +137,8 @@ public final class ServerCurrencyProvider implements CurrencyProvider {
         za.co.neroland.neroeconomy.house.Houses.tick(currentServer);
         // Trade requests lapse, open direct trades are checked, and a swap that is due is made.
         za.co.neroland.neroeconomy.direct.DirectTrades.tick(currentServer);
+        // The gallery's sample tickers and Auto-Trader loop move on their labels; nothing else is touched.
+        za.co.neroland.neroeconomy.command.GalleryBuilder.tick(currentServer);
         flushRequestedSave(currentServer);
         runHook(tickHook);
     }
@@ -157,6 +159,8 @@ public final class ServerCurrencyProvider implements CurrencyProvider {
             za.co.neroland.neroeconomy.network.IntentGuard.clear();
             // Trade requests and open trade windows belong to the players of the world that stopped.
             za.co.neroland.neroeconomy.direct.DirectTrades.clear();
+            // The gallery's label refresh starts counting afresh in the next world.
+            za.co.neroland.neroeconomy.command.GalleryBuilder.reset();
             // And the exchange's per-account rate limits.
             za.co.neroland.neroeconomy.exchange.Investing.clear();
             // A new session reports each failing simulation handler once again.

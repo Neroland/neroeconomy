@@ -45,7 +45,9 @@ public final class VaultGoods {
     /** A system delivery to a vault: always booked, whatever the cap. */
     public static void deliver(EconomyStore store, TradeEnv env, AccountId account, Lot lot) {
         if (lot == null) return;
-        store.vault().deliver(account, List.of(lot), env.settings().vaultCap(), env.settings().vaultHardBound(),
-                env.limit());
+        var delivery = store.vault().deliver(account, List.of(lot), env.settings().vaultCap(),
+                env.settings().vaultHardBound(), env.limit());
+        // Booked anyway; the owner is told the vault is past its cap, at most once per alert window.
+        if (delivery.overCap()) env.alerts().raise(account, za.co.neroland.neroeconomy.link.EconomyAlerts.Kind.VAULT_FULL);
     }
 }

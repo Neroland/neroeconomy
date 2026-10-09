@@ -57,6 +57,8 @@ public final class PlayerDataExport {
         // What the subject traded with the Merchant Houses today, and what of their trade with other
         // players counted toward reference prices today.
         json.add("merchant_houses", EconomyStore.get(server).houses().exportFor(player));
+        // What the subject spent through the companion app in the current economy-day.
+        json.add("remote_spend", EconomyStore.get(server).remoteSpend().exportFor(player));
         return json;
     }
 
@@ -76,6 +78,8 @@ public final class PlayerDataExport {
         vesting.addProperty("locked_starting_balance", export.lockedStartingBalance());
         vesting.addProperty("vested", export.vested());
         json.add("starting_balance_vesting", vesting);
+        // Whether the Trader's Handbook was given on joining: kept only so it is never given twice.
+        json.addProperty("handbook_given", export.handbookGiven());
         JsonArray transactions = new JsonArray();
         export.transactions().forEach(row -> {
             JsonObject value = new JsonObject();

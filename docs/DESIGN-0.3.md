@@ -259,8 +259,15 @@ shipped app; schema 1 keys stay for one release. The `balance` topic is publishe
 | `stock_buy`, `stock_sell`, `bond_buy` | yes | Holding period and limits apply |
 | `pay` | yes | Currency to another account |
 | `offer_send`, `offer_accept`, `offer_decline` | yes | Items, blocks and currency through vault and escrow |
+| `offer_cancel` | yes | The sender takes back an open offer: goods to the vault, credits to the balance |
 | `claim_collect` | yes | Proceeds to the balance, goods to the vault |
 | `vault_deposit`, `vault_withdraw` | no | They touch a live inventory |
+
+Additions found while building the app screens (all optional keys inside schema 2): `market` with
+`view=book&item=<id>` returns the item's book as price levels (at most 10 a side, counts only, no owners);
+`stocks` carries `feeBps` and `holdMinutes`; `vault` carries `inGame` and `liveActions`; `stock_sell` with
+`structuredRefusal: true` returns a reduced-gain refusal as an ok result (`sold: false`, `payable`,
+`acceptParam`, `acceptValue`), accepted with a new `requestId`.
 
 Every action needs a `requestId`, is re-validated and re-priced on the server, honours
 `remoteTradeEnabled`, counts against `remoteDailySpendLimit` (5000 credits per account per day)

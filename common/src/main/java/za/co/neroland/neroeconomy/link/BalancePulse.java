@@ -78,6 +78,16 @@ final class BalancePulse {
         return out;
     }
 
+    /** The players whose app asked this module for anything within the interest window. */
+    synchronized List<UUID> interestedNow(long now) {
+        List<UUID> out = new ArrayList<>();
+        interest.forEach((player, at) -> { if (now - at < INTEREST_WINDOW_NANOS) out.add(player); });
+        return out;
+    }
+
+    /** Whether the player's app asked this module for anything within the interest window. */
+    synchronized boolean isInterested(UUID player, long now) { return player != null && interestedAt(player, now); }
+
     private boolean interestedAt(UUID player, long now) {
         Long at = interest.get(player);
         return at != null && now - at < INTEREST_WINDOW_NANOS;

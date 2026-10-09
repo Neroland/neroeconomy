@@ -1,0 +1,37 @@
+{
+  "ok": true,
+  "data": {
+    "view": "all",
+    "auctions": [
+      {
+        "item": "minecraft:netherite_ingot",
+        "displayName": "Netherite Ingot",
+        "qty": 2,
+        "modified": false,
+        "auctionId": "4d5e6f70-8192-4a3b-8c4d-5e6f7a8b9c01",
+        "highestBid": 900,
+        "nextBid": 945,
+        "endsIn": 1200000,
+        "mine": false,
+        "leading": true,
+        "house": false,
+        "interplanetary": false
+      },
+      {
+        "item": "minecraft:elytra",
+        "displayName": "Elytra",
+        "qty": 1,
+        "modified": false,
+        "auctionId": "4d5e6f70-8192-4a3b-8c4d-5e6f7a8b9c02",
+        "highestBid": 0,
+        "nextBid": 2000,
+        "endsIn": 5400000,
+        "mine": false,
+        "leading": false,
+        "house": true,
+        "interplanetary": true
+      }
+    ],
+    "asOf": 1791000000000
+  }
+}

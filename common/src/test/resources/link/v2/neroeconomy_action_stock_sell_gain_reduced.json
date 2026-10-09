@@ -1,0 +1,38 @@
+{
+  "ok": true,
+  "data": {
+    "currency": "nerolandcore:credits",
+    "balance": 1380,
+    "recentTrend": [
+      {
+        "at": 1790999400000,
+        "amount": 120,
+        "reason": "MARKET_PURCHASE"
+      },
+      {
+        "at": 1790902200000,
+        "amount": 1500,
+        "reason": "STARTING_BALANCE"
+      }
+    ],
+    "amount": 1380,
+    "symbol": "cr",
+    "history": [
+      0,
+      1500,
+      1380
+    ],
+    "asOf": 1791000000000,
+    "action": "stock_sell",
+    "message": "The exchange can pay only 40 of your 100 gain today. To sell anyway, send acceptedGain 40, or sell fewer, or wait for tomorrow.",
+    "sold": false,
+    "refusal": "gain_reduced",
+    "stockId": "neroeconomy:redstone_works",
+    "units": 10,
+    "gain": 100,
+    "payable": 40,
+    "gainForfeited": 60,
+    "acceptParam": "acceptedGain",
+    "acceptValue": 40
+  }
+}

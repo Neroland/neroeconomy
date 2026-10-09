@@ -77,6 +77,8 @@ public final class EconomySavedData extends EconomySection implements CurrencyPr
     private final Map<AccountId, Long> balances = new LinkedHashMap<>();
     private final Set<AccountId> initialized = new LinkedHashSet<>();
     private final Set<AccountId> loggingOptOut = new LinkedHashSet<>();
+    /** Accounts that were given the Trader's Handbook on joining; it is never given twice. */
+    private final Set<AccountId> handbookGiven = new LinkedHashSet<>();
     /** Salted pseudonyms of erased accounts. Never a raw id, so the tombstone carries no identity. */
     private final Set<String> erased = new LinkedHashSet<>();
     private final List<TransactionRecord> transactions = new ArrayList<>();
@@ -642,6 +644,21 @@ public final class EconomySavedData extends EconomySection implements CurrencyPr
         if (changed) setDirty();
     }
 
+    /** Whether {@code player} has already been given the Trader's Handbook on joining. */
+    public synchronized boolean handbookGiven(UUID player) {
+        return player != null && handbookGiven.contains(new PlayerAccountId(player));
+    }
+
+    /** How many accounts have been given the Trader's Handbook; the gift stops at its bound. */
+    public synchronized int handbookGivenCount() { return handbookGiven.size(); }
+
+    /** Records that {@code player} was given the Trader's Handbook. @return false when it already was */
+    public synchronized boolean markHandbookGiven(UUID player) {
+        if (player == null || !handbookGiven.add(new PlayerAccountId(player))) return false;
+        setDirty();
+        return true;
+    }
+
     /**
      * The data subject's whole ledger record. Unlike {@link #history} it is not cut at
      * {@code historyLimitPerPlayer}: every row still inside the retention window is included. The
@@ -659,7 +676,7 @@ public final class EconomySavedData extends EconomySection implements CurrencyPr
         ChipCount chips = chipRedemptions.get(account);
         return new PlayerLedgerExport(player, balance, CREDITS_ID, loggingOptOut.contains(account), rows, ref,
                 chips == null ? 0L : chips.day(), chips == null ? 0 : chips.count(), lockedOf(account),
-                !unvested.contains(account));
+                !unvested.contains(account), handbookGiven.contains(account));
     }
 
     /** Empty stays empty (a mint or burn side); the subject's own pseudonym and system accounts are kept as-is. */
@@ -727,6 +744,7 @@ public final class EconomySavedData extends EconomySection implements CurrencyPr
         boolean changed = held != null;
         changed |= initialized.remove(account);
         changed |= loggingOptOut.remove(account);
+        changed |= handbookGiven.remove(account);
         changed |= chipRedemptions.remove(account) != null;
         changed |= locked.remove(account) != null;
         changed |= unvested.remove(account);
@@ -790,7 +808,8 @@ public final class EconomySavedData extends EconomySection implements CurrencyPr
 
     /** Nothing about any account, and a clock that was never corrected: nothing worth carrying over. */
     @Override public synchronized boolean isEmpty() {
-        return balances.isEmpty() && initialized.isEmpty() && loggingOptOut.isEmpty() && erased.isEmpty()
+        return balances.isEmpty() && initialized.isEmpty() && loggingOptOut.isEmpty() && handbookGiven.isEmpty()
+                && erased.isEmpty()
                 && transactions.isEmpty() && chipRedemptions.isEmpty() && clock.offsetMillis() == 0L;
     }
 
@@ -994,7 +1013,10 @@ public final class EconomySavedData extends EconomySection implements CurrencyPr
                 Codec.STRING.listOf().optionalFieldOf("unvested", List.of()).forGetter(EconomySavedData::unvestedRows),
                 // Absent in a save from before supply was counted: that ledger is adopted on migration.
                 SupplyRows.CODEC.optionalFieldOf("supply").forGetter(EconomySavedData::supplyRows),
-                ReserveRows.CODEC.optionalFieldOf("reserve").forGetter(EconomySavedData::reserveRows))
+                ReserveRows.CODEC.optionalFieldOf("reserve").forGetter(EconomySavedData::reserveRows),
+                // Added with the Trader's Handbook: absent in an older save, which gave no handbook.
+                Codec.STRING.listOf().optionalFieldOf("handbook_given", List.of())
+                        .forGetter(EconomySavedData::handbookRows))
                 .apply(instance, EconomySavedData::fromData));
     }
 
@@ -1004,6 +1026,7 @@ public final class EconomySavedData extends EconomySection implements CurrencyPr
     }
     private List<String> initializedRows() { return initialized.stream().map(AccountId::stableKey).toList(); }
     private List<String> optOutRows() { return loggingOptOut.stream().map(AccountId::stableKey).toList(); }
+    private List<String> handbookRows() { return handbookGiven.stream().map(AccountId::stableKey).toList(); }
     private List<String> erasedRows() { return List.copyOf(erased); }
     private List<String> unvestedRows() { return unvested.stream().map(AccountId::stableKey).toList(); }
     private List<ChipRow> chipRows() {
@@ -1034,7 +1057,7 @@ public final class EconomySavedData extends EconomySection implements CurrencyPr
     private static EconomySavedData fromData(List<BalanceRow> balances, List<String> initialized,
             List<String> optOut, List<AuditRow> transactions, String salt, List<String> erased,
             long clockOffset, long clockLastWall, List<ChipRow> chips, List<LockRow> locks, List<String> unvested,
-            Optional<SupplyRows> supplyRows, Optional<ReserveRows> reserveRows) {
+            Optional<SupplyRows> supplyRows, Optional<ReserveRows> reserveRows, List<String> handbook) {
         EconomySavedData data = new EconomySavedData();
         if (!salt.isBlank()) data.pseudonymSalt = salt;
         // An old save has neither clock field: offset 0, and the first observation becomes "last".
@@ -1056,6 +1079,8 @@ public final class EconomySavedData extends EconomySection implements CurrencyPr
                 .forEach(data.initialized::add);
         optOut.stream().map(EconomySavedData::parseStableAccount).filter(PlayerAccountId.class::isInstance)
                 .forEach(data.loggingOptOut::add);
+        handbook.stream().map(EconomySavedData::parseStableAccount).filter(PlayerAccountId.class::isInstance)
+                .forEach(data.handbookGiven::add);
         for (LockRow row : locks) {
             AccountId account = parseStableAccount(row.account());
             if (account instanceof PlayerAccountId && row.amount() > 0L) data.locked.put(account, row.amount());

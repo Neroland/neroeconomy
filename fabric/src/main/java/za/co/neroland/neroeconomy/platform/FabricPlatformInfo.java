@@ -23,6 +23,7 @@ import za.co.neroland.neroeconomy.command.EconomyCommands;
 import za.co.neroland.neroeconomy.commodity.CommodityData;
 import za.co.neroland.neroeconomy.direct.DirectTrades;
 import za.co.neroland.neroeconomy.exchange.StockData;
+import za.co.neroland.neroeconomy.handbook.HandbookGift;
 import za.co.neroland.neroeconomy.network.IntentGuard;
 
 public final class FabricPlatformInfo implements PlatformInfo {
@@ -55,6 +56,8 @@ public final class FabricPlatformInfo implements PlatformInfo {
             DirectTrades.useEntity(player, entity, hand);
             return net.minecraft.world.InteractionResult.PASS;
         });
+        // First join: the Trader's Handbook, once per account (see HandbookGift for the rule).
+        ServerPlayConnectionEvents.JOIN.register((handler, sender, server) -> HandbookGift.joined(handler.player));
         // The packet limiter keys on the player id in memory; the entry leaves with the player,
         // and so do their trade requests and a trade they had open.
         ServerPlayConnectionEvents.DISCONNECT.register((handler, server) -> {

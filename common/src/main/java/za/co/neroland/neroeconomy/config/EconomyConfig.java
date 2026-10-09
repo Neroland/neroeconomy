@@ -333,6 +333,15 @@ public final class EconomyConfig {
             "Allow bounties on a named player. Posting one also requires permission level 2.");
     public static final ConfigValue<Boolean> REMOTE_TRADE_ENABLED = SCHEMA.bool(
             "remoteTradeEnabled", true, true, "Allow validated NeroLink trade actions.");
+    public static final ConfigValue<Long> REMOTE_DAILY_SPEND_LIMIT = SCHEMA.longRange(
+            "remoteDailySpendLimit", 5_000L, 0L, 1_000_000_000_000L, true,
+            "Credits one account may spend per economy day through companion-app actions, all of them "
+                    + "together: purchases, buy-order escrow, rule budgets, shares, bonds, payments and offers. "
+                    + "It is the most a stolen app token can cost a player in a day. 0 allows no spending from the app.");
+    public static final ConfigValue<Boolean> GIVE_HANDBOOK_ON_FIRST_JOIN = SCHEMA.bool(
+            "giveHandbookOnFirstJoin", true, true,
+            "Give each player one Trader's Handbook the first time they join (never in spectator mode, "
+                    + "never twice); with a full inventory it goes to their vault. The book is craftable either way.");
     public static final ConfigValue<Boolean> TELEMETRY_ENABLED = SCHEMA.bool(
             "telemetryEnabled", true, false,
             "Send anonymous NeroEconomy-only crash reports; false opts out. No player data is sent.");
