@@ -6,6 +6,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.function.Consumer;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
@@ -26,6 +27,8 @@ import net.minecraft.world.item.Items;
 import net.minecraft.world.level.saveddata.SavedDataType;
 
 import za.co.neroland.nerolandcore.progression.CoreGates;
+import za.co.neroland.neroeconomy.api.PlayerAccountId;
+import za.co.neroland.neroeconomy.api.SystemAccountId;
 import za.co.neroland.nerolandcore.progression.ProgressionGates;
 import za.co.neroland.neroeconomy.NeroEconomyCommon;
 import za.co.neroland.neroeconomy.config.EconomyConfig;
@@ -35,15 +38,20 @@ import za.co.neroland.neroeconomy.economy.EconomySection;
 import za.co.neroland.neroeconomy.economy.EconomyStore;
 import za.co.neroland.neroeconomy.economy.EscrowHolder;
 import za.co.neroland.neroeconomy.economy.EscrowMath;
+import za.co.neroland.neroeconomy.economy.LedgerPlan;
 import za.co.neroland.neroeconomy.economy.LedgerResult;
 import za.co.neroland.neroeconomy.economy.TransactionType;
 import za.co.neroland.neroeconomy.market.CancelResult;
 import za.co.neroland.neroeconomy.market.MarketLimits;
 import za.co.neroland.neroeconomy.goods.GoodsSource;
+import za.co.neroland.neroeconomy.goods.Lot;
+import za.co.neroland.neroeconomy.goods.LotHolder;
 import za.co.neroland.neroeconomy.market.MarketSavedData;
 import za.co.neroland.neroeconomy.market.Settlement;
 import za.co.neroland.neroeconomy.market.StoredStacks;
 import za.co.neroland.neroeconomy.link.EconomyAlerts;
+import za.co.neroland.neroeconomy.trade.TradeEnv;
+import za.co.neroland.neroeconomy.trade.Trading;
 import za.co.neroland.neroeconomy.vault.VaultStacks;
 import za.co.neroland.nerolandcore.link.LinkAlert;
 
@@ -55,8 +63,19 @@ import za.co.neroland.nerolandcore.link.LinkAlert;
  * ledger's escrow account is holding for that row. Posting a job or placing a bid is a transfer
  * into the escrow account; settling one turns the number into a credit claim (the credits stay in
  * escrow until collected) or sends it back where it came from.
+ *
+ * <p><b>Merchant Houses.</b> A House's auctions ({@link HouseAuction}) are kept here beside the
+ * players' ones, with their lot as plain goods taken from the House's stock; players bid on them
+ * through {@link #bid}, and the pure rules ({@link #bidHouseAuction}, {@link #settleHouseAuctions})
+ * run without a server. A House's jobs are ordinary server-funded jobs (issuer
+ * {@link #SYSTEM_ACCOUNT}) that also record which House posted them ({@link #houseOf}); what a worker
+ * delivers for one goes into that House's stock. This section reports the House auction lots as the
+ * goods it holds; a player's auction lot is an item stack and is not a lot.
+ *
+ * <p><b>Bounds.</b> At most {@link #MAX_HOUSE_AUCTIONS} House auction rows and
+ * {@link #MAX_SYSTEM_JOBS} unsettled server-funded jobs; settled rows go with the audit window.
  */
-public final class ObligationSavedData extends EconomySection implements EscrowHolder {
+public final class ObligationSavedData extends EconomySection implements EscrowHolder, LotHolder {
     /** The id this section was stored under when it was a store of its own; read once, on migration. */
     public static final Identifier ID = Identifier.fromNamespaceAndPath(NeroEconomyCommon.MOD_ID, "obligations");
     /** Resolved on first use: the rows hold item stacks, whose codec needs the game's registries. */
@@ -72,6 +91,11 @@ public final class ObligationSavedData extends EconomySection implements EscrowH
     private static final long RETRY_INTERVAL_MILLIS = 60_000L;
     /** What an erased player's bounty target becomes when the bounty cannot be closed at once. */
     private static final String ERASED_TARGET = JobTargets.PLAYER_PREFIX + "erased";
+    /** The most House auction rows kept, running and settled. */
+    public static final int MAX_HOUSE_AUCTIONS = 1_024;
+    /** The most unsettled server-funded jobs at once. */
+    public static final int MAX_SYSTEM_JOBS = 256;
+    private static final long NO_DAY = Long.MIN_VALUE;
 
     private final Map<UUID, EconomyJob> jobs = new LinkedHashMap<>();
     private final Map<UUID, AuctionRecord> auctions = new LinkedHashMap<>();
@@ -79,6 +103,19 @@ public final class ObligationSavedData extends EconomySection implements EscrowH
     private final Map<UUID, Map<UUID, Integer>> bountyProgress = new LinkedHashMap<>();
     /** Earliest economy-clock millisecond at which {@link #tick} can have anything to do. */
     private long nextEventAt;
+    private final Map<UUID, HouseAuction> houseAuctions = new LinkedHashMap<>();
+    /** Job id to the id of the Merchant House that posted it. */
+    private final Map<UUID, String> houseJobs = new LinkedHashMap<>();
+    /** The economy-day the two counts below are for. */
+    private long dealDay = NO_DAY;
+    private int npcAuctionsToday;
+    private int bountiesToday;
+    /**
+     * Counts the rows the simulation makes for the Houses and the server. Their ids come from it, not
+     * from a random source, so a step replayed after a pause makes the very same rows.
+     */
+    private long dealSequence;
+    private static final long DEAL_ID_HIGH = 0x4E45524F4445414CL;
 
     public ObligationSavedData() { }
 
@@ -172,7 +209,7 @@ public final class ObligationSavedData extends EconomySection implements EscrowH
             NeroEconomyCommon.LOGGER.debug("[NeroEconomy] System job refused: system jobs are disabled.");
             return null;
         }
-        LedgerResult escrowed = NeroEconomyCommon.CURRENCY_PROVIDER.execute(Settlement.systemJobEscrow(payout));
+        LedgerResult escrowed = execute(Settlement.systemJobEscrow(payout));
         if (!escrowed.ok()) {
             NeroEconomyCommon.LOGGER.debug("[NeroEconomy] System job refused: the Reserve or its daily "
                     + "job budget cannot cover the payout.");
@@ -184,9 +221,11 @@ public final class ObligationSavedData extends EconomySection implements EscrowH
         jobs.put(id, job); invalidateSchedule(); setDirty(); return job;
     }
 
-    public synchronized boolean claim(UUID id, UUID player) {
+    public synchronized boolean claim(UUID id, UUID player) { return claim(id, player, now()); }
+
+    /** {@link #claim(UUID, UUID)} at economy time {@code now}: the rule itself, without a server. */
+    public synchronized boolean claim(UUID id, UUID player, long now) {
         EconomyJob job = jobs.get(id);
-        long now = now();
         if (EconomyHealth.frozen()) return false;
         if (job == null || player == null || job.state() != JobState.OPEN || job.issuer().equals(player)
                 || job.expiresAt() <= now) return false;
@@ -253,6 +292,23 @@ public final class ObligationSavedData extends EconomySection implements EscrowH
             int perStack = Math.max(1, new ItemStack(item).getMaxStackSize());
             for (int left = count; left > 0; left -= perStack) goods.add(new ItemStack(item, Math.min(perStack, left)));
         });
+        // A House's job: the goods go into that House's stock, settled by the same rule the tests run.
+        if (houseJobs.containsKey(id)) {
+            List<Lot> lots = new ArrayList<>();
+            taken.forEach((item, count) -> lots.add(Lot.of(BuiltInRegistries.ITEM.getKey(item).toString(), count)));
+            FulfillResult settled = fulfilHouseJob(id, player.getUUID(), lots);
+            if (settled != FulfillResult.SUCCESS) return settled;
+            remaining = job.quantity();
+            for (ItemStack stack : slots) {
+                if (remaining == 0) break;
+                if (!matches(stack, job.target()) || !MarketSavedData.pristine(stack)) continue;
+                int take = Math.min(remaining, stack.getCount());
+                stack.shrink(take);
+                remaining -= take;
+            }
+            NeroEconomyCommon.CURRENCY_PROVIDER.requestSave();
+            return FulfillResult.SUCCESS;
+        }
         // System jobs consume the goods; a vault for the system account could never be emptied.
         boolean system = SYSTEM_ACCOUNT.equals(job.issuer());
         if (!system && !VaultStacks.canAccept(store, job.issuer(), goods)) return FulfillResult.ISSUER_CLAIMS_FULL;
@@ -324,6 +380,7 @@ public final class ObligationSavedData extends EconomySection implements EscrowH
     }
 
     public synchronized boolean bid(ServerPlayer bidder, UUID id, long amount) {
+        if (bidder != null && id != null && houseAuctions.containsKey(id)) return bidHouse(bidder, id, amount);
         AuctionRecord auction = auctions.get(id);
         long now = now();
         if (EconomyHealth.frozen()) return false;
@@ -364,6 +421,8 @@ public final class ObligationSavedData extends EconomySection implements EscrowH
      * @return the amount, or -1 when there is no such running auction
      */
     public synchronized long minimumNextBid(UUID id) {
+        HouseAuction house = id == null ? null : houseAuctions.get(id);
+        if (house != null) return minimumNextHouseBid(house, now(), EconomyConfig.AUCTION_MIN_INCREMENT_PERCENT.get());
         AuctionRecord auction = id == null ? null : auctions.get(id);
         if (auction == null || auction.state() != JobState.OPEN || auction.endsAt() <= now()) return -1L;
         return ObligationRules.minimumNextBid(auction.minimumBid(), auction.highestBid(),
@@ -380,6 +439,11 @@ public final class ObligationSavedData extends EconomySection implements EscrowH
         boolean changed = expireJobs(market, now);
         changed |= releaseStaleClaims(now);
         changed |= settleAuctions(server, market, now);
+        // The Houses' lots settle by the same rule the simulation runs; it marks the section itself.
+        EconomyStore store = owner();
+        if (store != null) settleHouseAuctions(Trading.env(store), AuctionTerms.fromConfig(), now)
+                .forEach(winner -> EconomyAlerts.raise(server, winner, EconomyAlerts.Kind.AUCTION_WON,
+                        LinkAlert.Severity.INFO));
         changed |= pruneTerminal(now);
         nextEventAt = nextEventAt(now);
         if (changed) setDirty();
@@ -392,6 +456,7 @@ public final class ObligationSavedData extends EconomySection implements EscrowH
             // The escrow has to land somewhere before the row can be closed off: a player's goes to
             // their credit claim, a system job's goes back to the Reserve it came from.
             if (!releasePayout(market, job)) continue;
+            // A House's job is closed; the House may post another for the same goods.
             bountyProgress.remove(job.id());
             jobs.put(job.id(), job.withState(JobState.EXPIRED));
             changed = true;
@@ -403,11 +468,19 @@ public final class ObligationSavedData extends EconomySection implements EscrowH
      * Hands an unsettled job's escrowed payout back to whoever funded it. @return false when it
      * could not be booked, in which case the job must keep it
      */
-    private static boolean releasePayout(MarketSavedData market, EconomyJob job) {
+    private boolean releasePayout(MarketSavedData market, EconomyJob job) {
         if (!SYSTEM_ACCOUNT.equals(job.issuer()))
             return market != null && market.addCreditClaim(job.issuer(), job.payout(), TransactionType.ESCROW_REFUND);
-        return NeroEconomyCommon.CURRENCY_PROVIDER.execute(
-                Settlement.escrowToReserve(job.payout(), TransactionType.ESCROW_REFUND)).ok();
+        return execute(Settlement.escrowToReserve(job.payout(), TransactionType.ESCROW_REFUND)).ok();
+    }
+
+    /**
+     * Applies a plan to the ledger of the store this section belongs to: the same path as the
+     * currency provider's in the game, and the store's own ledger in a test.
+     */
+    private LedgerResult execute(LedgerPlan plan) {
+        EconomyStore store = owner();
+        return store != null ? store.execute(plan) : NeroEconomyCommon.CURRENCY_PROVIDER.execute(plan);
     }
 
     /**
@@ -462,7 +535,10 @@ public final class ObligationSavedData extends EconomySection implements EscrowH
                 && entry.getValue().expiresAt() < cutoff);
         changed |= auctions.entrySet().removeIf(entry -> terminal(entry.getValue().state())
                 && entry.getValue().endsAt() < cutoff);
+        changed |= houseAuctions.entrySet().removeIf(entry -> !entry.getValue().open()
+                && entry.getValue().endsAt() < cutoff);
         changed |= bountyProgress.keySet().removeIf(id -> !jobs.containsKey(id));
+        changed |= houseJobs.keySet().removeIf(id -> !jobs.containsKey(id));
         return changed;
     }
 
@@ -477,6 +553,8 @@ public final class ObligationSavedData extends EconomySection implements EscrowH
         }
         for (AuctionRecord auction : auctions.values())
             if (auction.state() == JobState.OPEN && auction.endsAt() < next) next = auction.endsAt();
+        for (HouseAuction auction : houseAuctions.values())
+            if (auction.open() && auction.endsAt() < next) next = auction.endsAt();
         // A due row that could not settle this pass is retried, but not once per tick.
         return next <= now ? now + RETRY_INTERVAL_MILLIS : next;
     }
@@ -486,6 +564,295 @@ public final class ObligationSavedData extends EconomySection implements EscrowH
     private static boolean terminal(JobState state) {
         return state == JobState.FULFILLED || state == JobState.EXPIRED;
     }
+
+    // --- Merchant Houses: auctions and jobs ----------------------------------------------------
+
+    /** A player's bid on a House's lot, through the ordinary auction flow: the orbit gate here, the rule below. */
+    private boolean bidHouse(ServerPlayer bidder, UUID id, long amount) {
+        HouseAuction auction = houseAuctions.get(id);
+        EconomyStore store = owner();
+        if (auction == null || store == null) return false;
+        boolean orbit = !auction.interplanetary() || ProgressionGates.isOpen(bidder, ORBIT_GATE);
+        HouseBid placed = bidHouseAuction(Trading.env(store), AuctionTerms.fromConfig(), bidder.getUUID(), id, amount,
+                now(), orbit);
+        if (placed.displaced() != null)
+            EconomyAlerts.raise(bidder.level().getServer(), placed.displaced(), EconomyAlerts.Kind.OUTBID,
+                    LinkAlert.Severity.WARN);
+        return placed.ok();
+    }
+
+    private static long minimumNextHouseBid(HouseAuction auction, long now, int incrementPercent) {
+        if (!auction.open() || auction.endsAt() <= now) return -1L;
+        return ObligationRules.minimumNextBid(auction.minimumBid(), auction.highestBid(), incrementPercent);
+    }
+
+    private void rollDealDay(long now) {
+        long day = EconomySavedData.economyDay(now);
+        if (dealDay != NO_DAY && day <= dealDay) return;
+        dealDay = day;
+        npcAuctionsToday = 0;
+        bountiesToday = 0;
+    }
+
+    /** The auctions the Houses started on the economy-day of {@code now}. */
+    public synchronized int npcAuctionsOn(long now) {
+        return dealDay != NO_DAY && EconomySavedData.economyDay(now) <= dealDay ? npcAuctionsToday : 0;
+    }
+
+    /** The server-funded bounties posted on the economy-day of {@code now}. */
+    public synchronized int bountiesOn(long now) {
+        return dealDay != NO_DAY && EconomySavedData.economyDay(now) <= dealDay ? bountiesToday : 0;
+    }
+
+    /**
+     * Starts an auction for a House. The caller has already taken {@code lot} out of the House's
+     * stock and gives it back when this refuses: when the economy is frozen, the row bound is
+     * reached, or {@code perDay} auctions were already started on this economy-day, server-wide.
+     *
+     * @return the auction, or null
+     */
+    public synchronized HouseAuction startHouseAuction(String house, Lot lot, long minimumBid, long endsAt,
+            boolean interplanetary, long now, int perDay) {
+        if (EconomyHealth.frozen() || house == null || house.isBlank() || lot == null || !lot.pristine()
+                || minimumBid < 1L || endsAt <= now || houseAuctions.size() >= MAX_HOUSE_AUCTIONS) return null;
+        rollDealDay(now);
+        if (npcAuctionsToday >= perDay) return null;
+        HouseAuction auction = new HouseAuction(dealId(), house, lot, minimumBid, 0L, "", endsAt, interplanetary,
+                JobState.OPEN);
+        houseAuctions.put(auction.id(), auction);
+        npcAuctionsToday++;
+        invalidateSchedule(); setDirty();
+        return auction;
+    }
+
+    /**
+     * A bid on a House's auction. Every refusal happens before anything moves. The bid comes out of
+     * the bidder's spendable balance into escrow (a bidder raising their own bid pays only the
+     * difference); a displaced bid becomes its bidder's credit claim; a bid inside the anti-snipe
+     * window extends the auction. The bidder's vault must have room for the lot.
+     *
+     * @param orbitOpen whether the bidder has reached orbit: an interplanetary lot needs it
+     */
+    public synchronized HouseBid bidHouseAuction(TradeEnv env, AuctionTerms terms, UUID bidder, UUID id, long amount,
+            long now, boolean orbitOpen) {
+        if (EconomyHealth.frozen()) return HouseBid.refused(HouseBid.Result.FROZEN);
+        HouseAuction auction = id == null ? null : houseAuctions.get(id);
+        EconomyStore store = owner();
+        if (auction == null || bidder == null || store == null || env == null || terms == null)
+            return HouseBid.refused(HouseBid.Result.NOT_FOUND);
+        if (!auction.open() || auction.endsAt() <= now) return HouseBid.refused(HouseBid.Result.ENDED);
+        if (amount <= auction.highestBid()
+                || amount < ObligationRules.minimumNextBid(auction.minimumBid(), auction.highestBid(), terms.minIncrementPercent()))
+            return HouseBid.refused(HouseBid.Result.TOO_LOW);
+        if (auction.interplanetary() && !orbitOpen) return HouseBid.refused(HouseBid.Result.ORBIT);
+        if (!store.vault().canAccept(new PlayerAccountId(bidder), List.of(auction.lot()), env.settings().vaultTradeCap(),
+                env.limit())) return HouseBid.refused(HouseBid.Result.VAULT_FULL);
+        UUID previous = auction.bidderId();
+        boolean same = bidder.equals(previous);
+        boolean displaces = previous != null && !same;
+        MarketSavedData market = store.market();
+        if (displaces && !market.canAcceptCreditClaim(previous, auction.highestBid()))
+            return HouseBid.refused(HouseBid.Result.REFUND_BLOCKED);
+        long debit = same ? amount - auction.highestBid() : amount;
+        // A bid is promised to the seller through escrow, so unvested starting credits cannot fund it.
+        if (!store.execute(Settlement.escrow(bidder, debit, TransactionType.AUCTION_BID)).ok())
+            return HouseBid.refused(HouseBid.Result.FUNDS);
+        if (displaces) market.addCreditClaim(previous, auction.highestBid(), TransactionType.ESCROW_REFUND);
+        long window = terms.antiSnipeMillis();
+        long end = window > 0L && auction.endsAt() - now <= window ? now + window : auction.endsAt();
+        houseAuctions.put(id, auction.withBid(amount, bidder, end));
+        invalidateSchedule(); setDirty();
+        return new HouseBid(HouseBid.Result.PLACED, displaces ? previous : null);
+    }
+
+    /**
+     * Settles every House auction that has ended by {@code now}. With no bid the lot goes back to
+     * the House's stock. Otherwise, in one ledger operation, the auction fee goes from escrow to the
+     * Reserve and the rest of the winning bid to the House's account (and from there, above its
+     * working capital, back to the Reserve with the next sweep); then the lot goes to the winner's
+     * vault, which always books. A row whose ledger operation is refused stays open and is tried again.
+     *
+     * @return the winners, for whoever raises their alerts; nobody is named to anybody else
+     */
+    public synchronized List<UUID> settleHouseAuctions(TradeEnv env, AuctionTerms terms, long now) {
+        EconomyStore store = owner();
+        if (store == null || env == null || terms == null || EconomyHealth.frozen()) return List.of();
+        List<UUID> winners = new ArrayList<>();
+        boolean changed = false;
+        for (HouseAuction auction : new ArrayList<>(houseAuctions.values())) {
+            if (!auction.open() || auction.endsAt() > now) continue;
+            UUID winner = auction.bidderId();
+            if (winner == null) store.houses().returnStock(auction.house(), auction.lot());
+            else {
+                Settlement.Sale sale = Settlement.sale(auction.highestBid(), terms.feePercent());
+                LedgerPlan plan = LedgerPlan.builder()
+                        .move(SystemAccountId.ESCROW, SystemAccountId.RESERVE, sale.fee(), TransactionType.FEE_AUCTION)
+                        .move(SystemAccountId.ESCROW, SystemAccountId.house(auction.house()), sale.proceeds(),
+                                TransactionType.AUCTION_PAYOUT).build();
+                if (!store.execute(plan).ok()) continue;
+                store.vault().deliver(new PlayerAccountId(winner), List.of(auction.lot()), env.settings().vaultCap(),
+                        env.settings().vaultHardBound(), env.limit());
+                winners.add(winner);
+            }
+            houseAuctions.put(auction.id(), auction.settled());
+            changed = true;
+        }
+        if (changed) { invalidateSchedule(); setDirty(); }
+        return winners;
+    }
+
+    /**
+     * Posts a job for a House: a contract or a delivery for goods it is short of, whose payout moves
+     * from the Reserve into escrow under the system-job budget, as every server-funded job's does.
+     * Refused (null, nothing moved) while system jobs are switched off, when the House already has
+     * {@code perHouse} open jobs or one for the same goods, at the row bound, and when the Reserve
+     * or the day's budget cannot cover the payout.
+     */
+    public synchronized EconomyJob postHouseJob(String house, JobType type, String target, int quantity,
+            String destination, long payout, long expiresAt, long now, boolean enabled, int perHouse) {
+        if (EconomyHealth.frozen() || !enabled || house == null || house.isBlank() || type == null
+                || type == JobType.BOUNTY || !JobTargets.wellFormed(target) || JobTargets.isPlayer(target)
+                || quantity < 1 || destination == null || payout < 1L || expiresAt <= now) return null;
+        int open = 0;
+        for (Map.Entry<UUID, String> entry : houseJobs.entrySet()) {
+            EconomyJob job = jobs.get(entry.getKey());
+            if (job == null || terminal(job.state()) || !entry.getValue().equals(house)) continue;
+            if (job.target().equals(target)) return null;
+            open++;
+        }
+        if (open >= perHouse || openSystemJobs() >= MAX_SYSTEM_JOBS) return null;
+        if (!execute(Settlement.systemJobEscrow(payout)).ok()) return null;
+        EconomyJob job = new EconomyJob(dealId(), type, SYSTEM_ACCOUNT, "", target, quantity, destination, payout,
+                expiresAt, JobState.OPEN);
+        jobs.put(job.id(), job);
+        houseJobs.put(job.id(), house);
+        invalidateSchedule(); setDirty();
+        return job;
+    }
+
+    /**
+     * Posts a server-funded bounty on a hostile mob, funded like any system job. At most
+     * {@code perDay} are posted per economy-day, server-wide, and at most that many are open at once,
+     * because a mob farm completes any kill bounty.
+     */
+    public synchronized EconomyJob postSystemBounty(String entity, int quantity, long payout, long expiresAt, long now,
+            boolean enabled, int perDay) {
+        if (EconomyHealth.frozen() || !enabled || !JobTargets.wellFormed(entity) || JobTargets.isPlayer(entity)
+                || JobTargets.isTag(entity) || JobTargets.PLAYER_ENTITY.equals(entity) || quantity < 1 || payout < 1L
+                || expiresAt <= now) return null;
+        rollDealDay(now);
+        if (bountiesToday >= perDay || openSystemJobs() >= MAX_SYSTEM_JOBS) return null;
+        int open = 0;
+        for (EconomyJob job : jobs.values())
+            if (job.type() == JobType.BOUNTY && SYSTEM_ACCOUNT.equals(job.issuer()) && !terminal(job.state())) open++;
+        if (open >= perDay) return null;
+        if (!execute(Settlement.systemJobEscrow(payout)).ok()) return null;
+        EconomyJob job = new EconomyJob(dealId(), JobType.BOUNTY, SYSTEM_ACCOUNT, "", entity, quantity, "", payout,
+                expiresAt, JobState.OPEN);
+        jobs.put(job.id(), job);
+        bountiesToday++;
+        invalidateSchedule(); setDirty();
+        return job;
+    }
+
+    private int openSystemJobs() {
+        int open = 0;
+        for (EconomyJob job : jobs.values()) if (SYSTEM_ACCOUNT.equals(job.issuer()) && !terminal(job.state())) open++;
+        return open;
+    }
+
+    /**
+     * Settles a House's claimed job with goods the worker hands over: the payout, already in escrow,
+     * becomes the worker's credit claim, and the goods go into the House's stock. {@code goods} must
+     * be unmodified goods of the job's item, exactly its quantity; the game takes them out of the
+     * worker's inventory only after this succeeded. Every refusal happens before anything moves.
+     */
+    public synchronized FulfillResult fulfilHouseJob(UUID id, UUID worker, List<Lot> goods) {
+        if (EconomyHealth.frozen()) return FulfillResult.FROZEN;
+        EconomyJob job = id == null ? null : jobs.get(id);
+        String house = id == null ? null : houseJobs.get(id);
+        EconomyStore store = owner();
+        if (job == null || house == null || worker == null || store == null || job.state() != JobState.CLAIMED
+                || !worker.equals(job.claimantId()) || job.type() == JobType.BOUNTY) return FulfillResult.NOT_CLAIMED;
+        if (goods == null) return FulfillResult.MISSING_ITEMS;
+        long count = 0L;
+        for (Lot lot : goods) {
+            if (lot == null || !lot.pristine() || !lot.item().equals(job.target())) return FulfillResult.MISSING_ITEMS;
+            count += lot.count();
+        }
+        if (count != job.quantity()) return FulfillResult.MISSING_ITEMS;
+        if (!store.market().addCreditClaim(worker, job.payout(), TransactionType.CONTRACT_PAYOUT))
+            return FulfillResult.PAYOUT_BLOCKED;
+        for (Lot lot : goods) store.houses().returnStock(house, lot);
+        jobs.put(id, job.withState(JobState.FULFILLED));
+        invalidateSchedule(); setDirty();
+        return FulfillResult.SUCCESS;
+    }
+
+    /**
+     * What falls due by {@code now} that needs no server: jobs past their expiry (escrow back to
+     * whoever funded it), stale claims, House auctions that have ended, and settled rows past the
+     * audit window. Players' own auctions hold item stacks and settle on the server tick. The
+     * simulation runs this every step, so a pause or a shutdown settles what fell due meanwhile.
+     *
+     * @return the winners of House auctions settled now
+     */
+    public synchronized List<UUID> settleDue(TradeEnv env, AuctionTerms terms, long now) {
+        EconomyStore store = owner();
+        if (store == null || EconomyHealth.frozen()) return List.of();
+        boolean changed = expireJobs(store.market(), now);
+        changed |= releaseStaleClaims(now);
+        List<UUID> winners = settleHouseAuctions(env, terms, now);
+        changed |= pruneTerminal(now);
+        if (changed) { invalidateSchedule(); setDirty(); }
+        return winners;
+    }
+
+    /** One House auction, running or settled; null when there is none. */
+    public synchronized HouseAuction houseAuction(UUID id) { return id == null ? null : houseAuctions.get(id); }
+
+    /**
+     * The Houses' running auctions, soonest to end first. Interplanetary lots only when
+     * {@code orbitOpen}. What the Economy Hub's Auctions tab lists beside the players' lots.
+     */
+    public synchronized List<HouseAuction> houseAuctions(boolean orbitOpen) {
+        return houseAuctions.values().stream().filter(HouseAuction::open)
+                .filter(value -> orbitOpen || !value.interplanetary())
+                .sorted(Comparator.comparingLong(HouseAuction::endsAt)).toList();
+    }
+
+    /** {@link #houseAuctions(boolean)} as {@code viewer} may see them; null (the console) sees all. */
+    public synchronized List<HouseAuction> houseAuctions(ServerPlayer viewer) {
+        return houseAuctions(viewer == null || ProgressionGates.isOpen(viewer, ORBIT_GATE));
+    }
+
+    /**
+     * Every House auction row still kept, running and settled (settled ones until the audit window
+     * passes), in the order they were started: what an operator's report or a "recent results" list reads.
+     */
+    public synchronized List<HouseAuction> houseAuctionHistory() { return List.copyOf(houseAuctions.values()); }
+
+    /** Every server-funded job row still kept, settled or not, in the order they were posted. */
+    public synchronized List<EconomyJob> systemJobHistory() {
+        return jobs.values().stream().filter(value -> SYSTEM_ACCOUNT.equals(value.issuer())).toList();
+    }
+
+    /** The id of the Merchant House that posted a job; null for any other job. */
+    public synchronized String houseOf(UUID job) { return job == null ? null : houseJobs.get(job); }
+
+    /**
+     * The unsettled server-funded jobs of one type (null: every type), soonest to expire first:
+     * the Houses' contracts and deliveries, system bounties, and jobs posted through
+     * {@code DeliveryJobApi.postSystem}. {@link #houseOf} says which House posted one.
+     */
+    public synchronized List<EconomyJob> systemJobs(JobType type) {
+        return jobs.values().stream().filter(value -> SYSTEM_ACCOUNT.equals(value.issuer()) && !terminal(value.state()))
+                .filter(value -> type == null || value.type() == type)
+                .sorted(Comparator.comparingLong(EconomyJob::expiresAt)).toList();
+    }
+
+    /** One job by id, settled or not; null when there is none. */
+    public synchronized EconomyJob job(UUID id) { return id == null ? null : jobs.get(id); }
 
     /** GUI and command views only ever want live rows; settled ones are audit history. */
     public synchronized List<EconomyJob> jobs(JobType type) {
@@ -497,9 +864,24 @@ public final class ObligationSavedData extends EconomySection implements EscrowH
     /** Interplanetary lots stay hidden from a viewer who has not reached orbit; null shows all. */
     public synchronized List<AuctionRecord> auctions(ServerPlayer viewer) {
         boolean orbit = viewer == null || ProgressionGates.isOpen(viewer, ORBIT_GATE);
-        return auctions.values().stream().filter(value -> value.state() == JobState.OPEN)
-                .filter(value -> orbit || !value.interplanetary())
-                .sorted(Comparator.comparingLong(AuctionRecord::endsAt)).toList();
+        List<AuctionRecord> out = new ArrayList<>();
+        auctions.values().stream().filter(value -> value.state() == JobState.OPEN)
+                .filter(value -> orbit || !value.interplanetary()).forEach(out::add);
+        // The Houses' lots, shown as auctions like any other. Their seller is a fixed id per House,
+        // which names nobody; it is what a viewer's own "is this mine" checks compare against.
+        EconomyStore store = owner();
+        if (store != null) for (HouseAuction house : houseAuctions(orbit)) {
+            ItemStack lot = store.goods().stackOf(house.lot());
+            if (!lot.isEmpty()) out.add(new AuctionRecord(house.id(), houseSeller(house.house()), lot, house.minimumBid(),
+                    house.highestBid(), house.highestBidder(), house.endsAt(), house.interplanetary(), house.state()));
+        }
+        out.sort(Comparator.comparingLong(AuctionRecord::endsAt));
+        return out;
+    }
+
+    /** The id a House's auctions show as their seller: derived from the House's id, never a player's. */
+    public static UUID houseSeller(String house) {
+        return UUID.nameUUIDFromBytes(("neroeconomy:house/" + house).getBytes(java.nio.charset.StandardCharsets.UTF_8));
     }
 
     /** The caller's own unsettled jobs, for {@code market mine}; never anyone else's. */
@@ -622,6 +1004,16 @@ public final class ObligationSavedData extends EconomySection implements EscrowH
                     auction.minimumBid(), 0L, "", auction.endsAt(), auction.interplanetary(), auction.state()));
             changed = true;
         }
+        for (HouseAuction auction : new ArrayList<>(houseAuctions.values())) {
+            if (!player.equals(auction.bidderId())) continue;
+            // A running bid was the erased player's own escrow: it goes to the Reserve and the lot
+            // stays up with no bid. A settled row keeps its numbers and loses the name.
+            if (auction.open()) {
+                swept = EscrowMath.total(swept, auction.highestBid());
+                houseAuctions.put(auction.id(), auction.withoutBid());
+            } else houseAuctions.put(auction.id(), auction.forgetBidder());
+            changed = true;
+        }
         for (var iterator = bountyProgress.entrySet().iterator(); iterator.hasNext();) {
             Map<UUID, Integer> kills = iterator.next().getValue();
             if (kills.remove(player) == null) continue;
@@ -646,11 +1038,19 @@ public final class ObligationSavedData extends EconomySection implements EscrowH
         for (AuctionRecord auction : auctions.values())
             if (auction.state() == JobState.OPEN && auction.bidderId() != null)
                 total = EscrowMath.total(total, auction.highestBid());
+        for (HouseAuction auction : houseAuctions.values())
+            if (auction.open() && auction.bidderId() != null) total = EscrowMath.total(total, auction.highestBid());
         return total;
     }
 
+    /** The lots of the Houses' running auctions: taken from their stock, not yet sold or returned. */
+    @Override public synchronized void forEachLot(Consumer<Lot> visitor) {
+        for (HouseAuction auction : houseAuctions.values()) if (auction.open()) visitor.accept(auction.lot());
+    }
+
     @Override public synchronized boolean isEmpty() {
-        return jobs.isEmpty() && auctions.isEmpty() && bountyProgress.isEmpty();
+        return jobs.isEmpty() && auctions.isEmpty() && bountyProgress.isEmpty() && houseAuctions.isEmpty()
+                && houseJobs.isEmpty() && dealDay == NO_DAY && dealSequence == 0L;
     }
 
     /**
@@ -702,6 +1102,23 @@ public final class ObligationSavedData extends EconomySection implements EscrowH
             auctionRows.add(row);
         }
         out.add("auctions", auctionRows);
+        JsonArray houseRows = new JsonArray();
+        for (HouseAuction auction : houseAuctions.values()) {
+            if (!player.equals(auction.bidderId())) continue;
+            JsonObject row = new JsonObject();
+            row.addProperty("id", auction.id().toString());
+            row.addProperty("role", "bidder");
+            row.addProperty("house", auction.house());
+            row.addProperty("item", auction.lot().item());
+            row.addProperty("count", auction.lot().count());
+            row.addProperty("minimum_bid", auction.minimumBid());
+            row.addProperty("highest_bid", auction.highestBid());
+            row.addProperty("ends_at", auction.endsAt());
+            row.addProperty("interplanetary", auction.interplanetary());
+            row.addProperty("state", auction.state().name());
+            houseRows.add(row);
+        }
+        out.add("house_auctions", houseRows);
         JsonArray progressRows = new JsonArray();
         bountyProgress.forEach((job, kills) -> {
             Integer count = kills.get(player);
@@ -715,7 +1132,19 @@ public final class ObligationSavedData extends EconomySection implements EscrowH
         return out;
     }
 
-    private UUID freshId() { UUID id; do id = UUID.randomUUID(); while (jobs.containsKey(id) || auctions.containsKey(id)); return id; }
+    /** The next id of a row the simulation makes: deterministic, and never one already in use. */
+    private UUID dealId() {
+        UUID id;
+        do id = new UUID(DEAL_ID_HIGH, ++dealSequence);
+        while (jobs.containsKey(id) || auctions.containsKey(id) || houseAuctions.containsKey(id));
+        return id;
+    }
+
+    private UUID freshId() {
+        UUID id;
+        do id = UUID.randomUUID(); while (jobs.containsKey(id) || auctions.containsKey(id) || houseAuctions.containsKey(id));
+        return id;
+    }
 
     private static boolean atDestination(ServerPlayer player, String destination) {
         String[] parts = destination.split("\\|", 4);
@@ -770,9 +1199,53 @@ public final class ObligationSavedData extends EconomySection implements EscrowH
                 // An older save also carries the day's system-job budget here. It is read past: that
                 // budget is one of the Reserve's now and lives in the ledger.
                 ProgressRow.CODEC.listOf().optionalFieldOf("bounty_progress", List.of())
-                        .forGetter(ObligationSavedData::progressRows))
+                        .forGetter(ObligationSavedData::progressRows),
+                // Added with the Merchant Houses' auctions and jobs, so optional: an older save has none.
+                HouseAuctionRow.CODEC.listOf().optionalFieldOf("house_auctions", List.of())
+                        .forGetter(ObligationSavedData::houseAuctionRows),
+                HouseJobRow.CODEC.listOf().optionalFieldOf("house_jobs", List.of())
+                        .forGetter(ObligationSavedData::houseJobRows),
+                DealDayRow.CODEC.optionalFieldOf("deal_day", DealDayRow.NONE).forGetter(ObligationSavedData::dealDayRow))
                 .apply(instance, ObligationSavedData::fromRows));
     }
+    private record HouseAuctionRow(String id, String house, String item, int count, long minimum, long highest,
+            String bidder, long ends, boolean interplanetary, String state) {
+        static final Codec<HouseAuctionRow> CODEC = RecordCodecBuilder.create(instance -> instance.group(
+                Codec.STRING.fieldOf("id").forGetter(HouseAuctionRow::id),
+                Codec.STRING.fieldOf("house").forGetter(HouseAuctionRow::house),
+                Codec.STRING.fieldOf("item").forGetter(HouseAuctionRow::item),
+                Codec.INT.fieldOf("count").forGetter(HouseAuctionRow::count),
+                Codec.LONG.fieldOf("minimum").forGetter(HouseAuctionRow::minimum),
+                Codec.LONG.optionalFieldOf("highest", 0L).forGetter(HouseAuctionRow::highest),
+                Codec.STRING.optionalFieldOf("bidder", "").forGetter(HouseAuctionRow::bidder),
+                Codec.LONG.fieldOf("ends").forGetter(HouseAuctionRow::ends),
+                Codec.BOOL.optionalFieldOf("interplanetary", false).forGetter(HouseAuctionRow::interplanetary),
+                Codec.STRING.fieldOf("state").forGetter(HouseAuctionRow::state)).apply(instance, HouseAuctionRow::new));
+    }
+    private record HouseJobRow(String job, String house) {
+        static final Codec<HouseJobRow> CODEC = RecordCodecBuilder.create(instance -> instance.group(
+                Codec.STRING.fieldOf("job").forGetter(HouseJobRow::job),
+                Codec.STRING.fieldOf("house").forGetter(HouseJobRow::house)).apply(instance, HouseJobRow::new));
+    }
+    private record DealDayRow(long day, int auctions, int bounties, long sequence) {
+        static final DealDayRow NONE = new DealDayRow(NO_DAY, 0, 0, 0L);
+        static final Codec<DealDayRow> CODEC = RecordCodecBuilder.create(instance -> instance.group(
+                Codec.LONG.optionalFieldOf("day", NO_DAY).forGetter(DealDayRow::day),
+                Codec.INT.optionalFieldOf("auctions", 0).forGetter(DealDayRow::auctions),
+                Codec.INT.optionalFieldOf("bounties", 0).forGetter(DealDayRow::bounties),
+                Codec.LONG.optionalFieldOf("sequence", 0L).forGetter(DealDayRow::sequence)).apply(instance, DealDayRow::new));
+    }
+    private List<HouseAuctionRow> houseAuctionRows() {
+        return houseAuctions.values().stream().map(value -> new HouseAuctionRow(value.id().toString(), value.house(),
+                value.lot().item(), value.lot().count(), value.minimumBid(), value.highestBid(), value.highestBidder(),
+                value.endsAt(), value.interplanetary(), value.state().name())).toList();
+    }
+    private List<HouseJobRow> houseJobRows() {
+        List<HouseJobRow> rows = new ArrayList<>();
+        houseJobs.forEach((job, house) -> rows.add(new HouseJobRow(job.toString(), house)));
+        return rows;
+    }
+    private DealDayRow dealDayRow() { return new DealDayRow(dealDay, npcAuctionsToday, bountiesToday, dealSequence); }
     private List<JobRow> jobRows() { return jobs.values().stream().map(value -> new JobRow(value.id().toString(),
             value.type().name(), value.issuer().toString(), value.claimant(), value.target(), value.quantity(),
             value.destination(), value.payout(), value.expiresAt(), value.state().name(), value.claimedAt())).toList(); }
@@ -786,8 +1259,20 @@ public final class ObligationSavedData extends EconomySection implements EscrowH
         return rows;
     }
     private static ObligationSavedData fromRows(List<JobRow> jobs, List<AuctionRow> auctions,
-            List<ProgressRow> progress) {
+            List<ProgressRow> progress, List<HouseAuctionRow> houseAuctions, List<HouseJobRow> houseJobs,
+            DealDayRow dealDay) {
         ObligationSavedData data = new ObligationSavedData();
+        for (HouseAuctionRow row : houseAuctions) try {
+            if (data.houseAuctions.size() >= MAX_HOUSE_AUCTIONS || !Lot.valid(row.item(), row.count(), Lot.PRISTINE))
+                continue;
+            HouseAuction value = new HouseAuction(UUID.fromString(row.id()), row.house(), Lot.of(row.item(), row.count()),
+                    row.minimum(), row.highest(), row.bidder(), row.ends(), row.interplanetary(), JobState.valueOf(row.state()));
+            data.houseAuctions.put(value.id(), value);
+        } catch (IllegalArgumentException ignored) { }
+        data.dealDay = dealDay.day();
+        data.npcAuctionsToday = Math.max(0, dealDay.auctions());
+        data.bountiesToday = Math.max(0, dealDay.bounties());
+        data.dealSequence = Math.max(0L, dealDay.sequence());
         for (JobRow row : jobs) try {
             EconomyJob value = new EconomyJob(UUID.fromString(row.id()), JobType.valueOf(row.type()),
                     UUID.fromString(row.issuer()), row.claimant(), row.target(), row.quantity(), row.destination(),
@@ -804,6 +1289,10 @@ public final class ObligationSavedData extends EconomySection implements EscrowH
             if (row.kills() > 0 && data.jobs.containsKey(job)) data.bountyProgress
                     .computeIfAbsent(job, ignored -> new LinkedHashMap<>())
                     .put(UUID.fromString(row.player()), row.kills());
+        } catch (IllegalArgumentException ignored) { }
+        for (HouseJobRow row : houseJobs) try {
+            UUID job = UUID.fromString(row.job());
+            if (data.jobs.containsKey(job) && row.house() != null && !row.house().isBlank()) data.houseJobs.put(job, row.house());
         } catch (IllegalArgumentException ignored) { }
         return data;
     }

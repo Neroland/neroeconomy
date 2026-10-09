@@ -1,0 +1,15 @@
+{
+  "commodities": [
+    { "item": "neroagriculture:territe_fragment", "reference_price": 2, "npc_daily_demand": 512, "class": "farmable", "house": "growers", "sector": "farming" },
+    { "item": "neroagriculture:forgite_fragment", "reference_price": 10, "npc_daily_demand": 128, "class": "farmable", "house": "growers", "sector": "farming" },
+    { "item": "neroagriculture:orbite_fragment", "reference_price": 40, "npc_daily_demand": 32, "class": "farmable", "house": "growers", "sector": "farming" },
+    { "item": "neroagriculture:colonite_fragment", "reference_price": 60, "npc_daily_demand": 16, "class": "farmable", "house": "growers", "sector": "farming" },
+    { "item": "neroagriculture:voidite_fragment", "reference_price": 200, "npc_daily_demand": 4, "per_account_daily_sell": 1, "class": "farmable", "house": "growers", "sector": "farming" },
+    { "item": "neroagriculture:biomass", "reference_price": 6, "npc_daily_demand": 256, "class": "crafted", "house": "growers", "sector": "farming" },
+    { "item": "neroagriculture:crop_waste", "reference_price": 2, "npc_daily_demand": 256, "class": "farmable", "house": "growers", "sector": "farming" },
+    { "item": "neroagriculture:fertiliser", "reference_price": 5, "npc_daily_demand": 256, "class": "farmable", "house": "growers", "sector": "farming" },
+    { "item": "neroagriculture:speed_fertiliser", "reference_price": 12, "npc_daily_demand": 64, "class": "crafted", "house": "growers", "sector": "farming" },
+    { "item": "neroagriculture:yield_fertiliser", "reference_price": 10, "npc_daily_demand": 64, "class": "crafted", "house": "growers", "sector": "farming" },
+    { "item": "neroagriculture:biofuel_canister", "reference_price": 6, "npc_daily_demand": 128, "class": "farmable", "house": "growers", "sector": "energy" }
+  ]
+}

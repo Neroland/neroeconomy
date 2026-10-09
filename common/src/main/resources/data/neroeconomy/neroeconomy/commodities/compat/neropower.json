@@ -1,0 +1,11 @@
+{
+  "commodities": [
+    { "item": "neropower:uranium_pellet", "reference_price": 20, "npc_daily_demand": 64, "class": "farmable", "house": "engineers", "sector": "energy" },
+    { "item": "neropower:reprocessed_pellet", "reference_price": 12, "npc_daily_demand": 64, "class": "farmable", "house": "engineers", "sector": "energy" },
+    { "item": "neropower:isotope_pellet", "reference_price": 36, "npc_daily_demand": 32, "class": "crafted", "house": "engineers", "sector": "energy" },
+    { "item": "neropower:battery_cell_basic", "reference_price": 60, "npc_daily_demand": 16, "class": "crafted", "house": "engineers", "sector": "energy" },
+    { "item": "neropower:battery_cell_elite", "reference_price": 1600, "npc_daily_demand": 2, "per_account_daily_sell": 1, "class": "rare", "house": "engineers", "sector": "energy" },
+    { "item": "neropower:spent_fuel_rod", "reference_price": 4, "npc_daily_demand": 64, "class": "staple", "house": "engineers", "sector": "energy" },
+    { "item": "neropower:spent_isotope_pellet", "reference_price": 3, "npc_daily_demand": 64, "class": "staple", "house": "engineers", "sector": "energy" }
+  ]
+}

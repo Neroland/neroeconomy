@@ -2,7 +2,9 @@ package za.co.neroland.neroeconomy.exchange;
 
 import java.io.BufferedReader;
 import java.lang.ref.WeakReference;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 import com.google.gson.JsonElement;
@@ -95,8 +97,24 @@ public final class StockData {
 
     private static WeakReference<MinecraftServer> loadedFor = new WeakReference<>(null);
     private static StockRegistry registry = StockRegistry.UNAVAILABLE;
+    /** The files the last load skipped. */
+    private static List<Problem> problems = List.of();
 
     private StockData() { }
+
+    /**
+     * One stock file that was skipped.
+     *
+     * @param id   the company id the file would have had
+     * @param word why, as a fixed word; nothing from the file itself
+     */
+    public record Problem(String id, String word) { }
+
+    /** The stock files the last load for {@code server} skipped; for {@code /eco admin reload-check}. */
+    public static synchronized List<Problem> problems(MinecraftServer server) {
+        forServer(server);
+        return problems;
+    }
 
     /** The listed companies of {@code server}'s data packs; read and cached on first use. */
     public static synchronized StockRegistry forServer(MinecraftServer server) {
@@ -145,8 +163,12 @@ public final class StockData {
                     + "exchange keeps the companies it had.", failure.getClass().getName());
             return null;
         }
-        StockRegistry loaded = StockParser.registry(files, (id, problem) -> NeroEconomyCommon.LOGGER.warn(
-                "[NeroEconomy] Stock data file {} was skipped ({}).", id, problem));
+        List<Problem> skipped = new ArrayList<>();
+        StockRegistry loaded = StockParser.registry(files, (id, problem) -> {
+            skipped.add(new Problem(id, problem));
+            NeroEconomyCommon.LOGGER.warn("[NeroEconomy] Stock data file {} was skipped ({}).", id, problem);
+        });
+        problems = List.copyOf(skipped);
         NeroEconomyCommon.LOGGER.info("[NeroEconomy] {} companies are listed on the exchange.", loaded.stocks().size());
         return loaded;
     }

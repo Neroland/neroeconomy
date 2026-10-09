@@ -1,0 +1,8 @@
+{
+  "name": "house.neroeconomy.smiths",
+  "working_capital": 8000,
+  "restock_per_day": 1.0,
+  "sectors": [
+    "mining"
+  ]
+}

@@ -62,7 +62,11 @@ public enum TransactionType {
     /** A Savings Bond's interest set aside when it is bought: Reserve to exchange account, within the exchange budget. */
     BOND_INTEREST_RESERVED,
     /** Interest set aside for a bond that was cashed in early, going back to the Reserve. */
-    BOND_INTEREST_RELEASED;
+    BOND_INTEREST_RELEASED,
+    /** A Merchant House's working capital topped up from the Reserve, within the NPC budget. */
+    HOUSE_FUNDING,
+    /** What a Merchant House holds above its working capital, swept back to the Reserve. */
+    HOUSE_SWEEP;
 
     /** Whether this reason may create credits. */
     public boolean mints() {

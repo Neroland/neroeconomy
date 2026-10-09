@@ -93,6 +93,12 @@ public final class EconomySavedData extends EconomySection implements CurrencyPr
     private EconomyClock clock = new EconomyClock();
     /** The wall-time watermark as last marked for saving, so the encoded store is stable in between. */
     private long savedWallMillis;
+    /**
+     * While a simulation step runs, the thread running it reads the step's own time from
+     * {@link #now()} instead of the clock (see {@link #runAt}). Not saved.
+     */
+    private Thread pinnedThread;
+    private long pinnedMillis;
 
     private final Reserve.Book book = new Reserve.Book() {
         @Override public long reserveBalance() { return balanceOf(SystemAccountId.RESERVE); }
@@ -132,6 +138,7 @@ public final class EconomySavedData extends EconomySection implements CurrencyPr
      * cut-off and transaction timestamp in the mod is measured against this, never the raw wall clock.
      */
     public synchronized long now() {
+        if (pinnedThread == Thread.currentThread()) return pinnedMillis;
         long wall = wallClock.getAsLong();
         long offsetBefore = clock.offsetMillis();
         long value = clock.observe(wall);
@@ -140,6 +147,32 @@ public final class EconomySavedData extends EconomySection implements CurrencyPr
             setDirty();
         }
         return value;
+    }
+
+    /**
+     * Runs {@code work} with {@link #now()} answering {@code economyMillis} on this thread: what a
+     * simulation step does, so that everything it books — a budget's day, a transaction's time, an
+     * order's expiry — follows the step's own time and a step replayed after a pause does exactly
+     * what it would have done on time. Other threads, and this one afterwards, read the clock as
+     * usual; the clock itself is not moved. A pin inside a pin keeps the outer one's time afterwards.
+     */
+    public void runAt(long economyMillis, Runnable work) {
+        Thread previousThread;
+        long previousMillis;
+        synchronized (this) {
+            previousThread = pinnedThread;
+            previousMillis = pinnedMillis;
+            pinnedThread = Thread.currentThread();
+            pinnedMillis = economyMillis;
+        }
+        try {
+            work.run();
+        } finally {
+            synchronized (this) {
+                pinnedThread = previousThread;
+                pinnedMillis = previousMillis;
+            }
+        }
     }
 
     /** See {@link EconomyClock#toWallMillis}: the form in which an economy timestamp leaves the server. */

@@ -1,0 +1,16 @@
+{
+  "commodities": [
+    { "tag": "c:dusts/copper", "reference_price": 3, "npc_daily_demand": 512, "class": "farmable", "house": "engineers", "sector": "mining" },
+    { "tag": "c:dusts/iron", "reference_price": 9, "npc_daily_demand": 256, "class": "farmable", "house": "engineers", "sector": "mining" },
+    { "tag": "c:dusts/gold", "reference_price": 16, "npc_daily_demand": 128, "class": "farmable", "house": "engineers", "sector": "mining" },
+    { "item": "nerotech:nero_coil", "reference_price": 3, "npc_daily_demand": 256, "class": "farmable", "house": "engineers", "sector": "energy" },
+    { "item": "nerotech:circuit_board", "reference_price": 8, "npc_daily_demand": 128, "class": "farmable", "house": "engineers", "sector": "energy" },
+    { "item": "nerotech:machine_frame", "reference_price": 10, "npc_daily_demand": 128, "class": "farmable", "house": "engineers", "sector": "energy" },
+    { "item": "nerotech:filter_cartridge", "reference_price": 4, "npc_daily_demand": 128, "class": "crafted", "house": "engineers", "sector": "energy" },
+    { "item": "nerotech:fusion_cell", "reference_price": 120, "npc_daily_demand": 16, "class": "crafted", "house": "engineers", "sector": "energy" },
+    { "item": "nerotech:plasma_cell", "reference_price": 300, "npc_daily_demand": 8, "class": "crafted", "house": "engineers", "sector": "energy" },
+    { "item": "nerotech:stellar_cell", "reference_price": 900, "npc_daily_demand": 4, "per_account_daily_sell": 1, "class": "rare", "house": "engineers", "sector": "energy" },
+    { "item": "nerotech:antimatter_cell", "reference_price": 2000, "npc_daily_demand": 2, "per_account_daily_sell": 1, "class": "rare", "house": "engineers", "sector": "energy" },
+    { "tag": "nerotech:bio_fuels", "reference_price": 12, "npc_daily_supply": 256, "class": "staple", "house": "engineers", "sector": "energy" }
+  ]
+}

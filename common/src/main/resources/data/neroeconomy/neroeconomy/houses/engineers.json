@@ -1,0 +1,9 @@
+{
+  "name": "house.neroeconomy.engineers",
+  "working_capital": 6000,
+  "restock_per_day": 1.0,
+  "sectors": [
+    "energy",
+    "logistics"
+  ]
+}

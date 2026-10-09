@@ -1,0 +1,5 @@
+{
+  "commodities": [
+    { "item": "neronotes:blank_disk", "reference_price": 10, "npc_daily_demand": 64, "class": "farmable", "house": "artisans", "sector": "decor" }
+  ]
+}

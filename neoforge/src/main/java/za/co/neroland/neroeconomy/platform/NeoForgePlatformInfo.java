@@ -30,6 +30,7 @@ import za.co.neroland.neroeconomy.obligation.BountyHooks;
 import za.co.neroland.nerolandcore.registry.RegistrationProvider;
 import za.co.neroland.neroeconomy.NeroEconomyCommon;
 import za.co.neroland.neroeconomy.command.EconomyCommands;
+import za.co.neroland.neroeconomy.commodity.CommodityData;
 import za.co.neroland.neroeconomy.direct.DirectTrades;
 import za.co.neroland.neroeconomy.exchange.StockData;
 import za.co.neroland.neroeconomy.network.IntentGuard;
@@ -49,10 +50,15 @@ public final class NeoForgePlatformInfo implements PlatformInfo {
         NeoForge.EVENT_BUS.addListener((RegisterCommandsEvent event) -> EconomyCommands.register(event.getDispatcher()));
         NeoForge.EVENT_BUS.addListener((ServerTickEvent.Post event) ->
                 NeroEconomyCommon.CURRENCY_PROVIDER.tick(event.getServer()));
-        // Data packs were reloaded (the event names no player then): the listed companies are read
-        // again from the new packs. The same event fires per player on login, which is not a reload.
+        // Data packs were reloaded (the event names no player then): the listed companies and the
+        // commodities are read again from the new packs. The same event fires per player on login,
+        // which is not a reload.
         NeoForge.EVENT_BUS.addListener((OnDatapackSyncEvent event) -> {
-            if (event.getPlayer() == null) StockData.reload(event.getPlayerList().getServer());
+            if (event.getPlayer() == null) {
+                StockData.reload(event.getPlayerList().getServer());
+                CommodityData.reload(event.getPlayerList().getServer());
+                za.co.neroland.neroeconomy.house.HouseData.reload(event.getPlayerList().getServer());
+            }
         });
         NeoForge.EVENT_BUS.addListener((LivingDeathEvent event) ->
                 BountyHooks.entityKilled(event.getEntity(), event.getSource()));

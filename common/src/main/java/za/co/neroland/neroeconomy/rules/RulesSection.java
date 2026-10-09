@@ -698,8 +698,9 @@ public final class RulesSection extends EconomySection implements EscrowHolder, 
     // --- days and the daily value cap --------------------------------------------------------
 
     private void rollDay(Rule rule, long today) {
-        if (rule.day == today) return;
-        // Economy time never runs backwards, so a different day is a later one.
+        // Only ever onward: a simulation step replayed after a pause runs at its own, earlier time,
+        // and what the rule filled since then must not be forgotten for it.
+        if (today <= rule.day) return;
         rule.day = today;
         rule.filledToday = 0;
         setDirty();
@@ -708,14 +709,16 @@ public final class RulesSection extends EconomySection implements EscrowHolder, 
     /** What the account's rules may still fill today, in credits. */
     private long valueLeft(TradeEnv env, AccountId owner, long today) {
         DayValue used = dayValues.get(owner);
-        long spent = used == null || used.day() != today ? 0L : used.value();
+        // A day before the one recorded is counted in the recorded one (a replayed step), never afresh.
+        long spent = used == null || used.day() < today ? 0L : used.value();
         return Math.max(0L, env.settings().ruleDailyValueCap() - spent);
     }
 
     private void addValue(AccountId owner, long today, long value) {
         DayValue used = dayValues.get(owner);
-        long before = used == null || used.day() != today ? 0L : used.value();
-        dayValues.put(owner, new DayValue(today, Long.MAX_VALUE - before < value ? Long.MAX_VALUE : before + value));
+        long before = used == null || used.day() < today ? 0L : used.value();
+        long day = used == null ? today : Math.max(today, used.day());
+        dayValues.put(owner, new DayValue(day, Long.MAX_VALUE - before < value ? Long.MAX_VALUE : before + value));
     }
 
     // --- what the book tells the rules -------------------------------------------------------
@@ -999,7 +1002,7 @@ public final class RulesSection extends EconomySection implements EscrowHolder, 
         long today = EconomySavedData.economyDay(now);
         Iterator<DayValue> values = dayValues.values().iterator();
         boolean changed = false;
-        while (values.hasNext()) if (values.next().day() != today) {
+        while (values.hasNext()) if (values.next().day() < today) {
             values.remove();
             changed = true;
         }

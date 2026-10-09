@@ -35,6 +35,7 @@ import net.minecraftforge.fml.loading.FMLEnvironment;
 import za.co.neroland.nerolandcore.registry.RegistrationProvider;
 import za.co.neroland.neroeconomy.NeroEconomyCommon;
 import za.co.neroland.neroeconomy.command.EconomyCommands;
+import za.co.neroland.neroeconomy.commodity.CommodityData;
 import za.co.neroland.neroeconomy.direct.DirectTrades;
 import za.co.neroland.neroeconomy.exchange.StockData;
 import za.co.neroland.neroeconomy.network.IntentGuard;
@@ -77,10 +78,15 @@ public final class ForgePlatformInfo implements PlatformInfo {
         ServerStoppedEvent.BUS.addListener(event -> NeroEconomyCommon.CURRENCY_PROVIDER.unbind(event.getServer()));
         RegisterCommandsEvent.BUS.addListener(event -> EconomyCommands.register(event.getDispatcher()));
         TickEvent.ServerTickEvent.Post.BUS.addListener(event -> NeroEconomyCommon.CURRENCY_PROVIDER.tick(event.server()));
-        // Data packs were reloaded (the event names no player then): the listed companies are read
-        // again from the new packs. The same event fires per player on login, which is not a reload.
+        // Data packs were reloaded (the event names no player then): the listed companies and the
+        // commodities are read again from the new packs. The same event fires per player on login,
+        // which is not a reload.
         OnDatapackSyncEvent.BUS.addListener(event -> {
-            if (event.getPlayer() == null) StockData.reload(event.getPlayerList().getServer());
+            if (event.getPlayer() == null) {
+                StockData.reload(event.getPlayerList().getServer());
+                CommodityData.reload(event.getPlayerList().getServer());
+                za.co.neroland.neroeconomy.house.HouseData.reload(event.getPlayerList().getServer());
+            }
         });
         LivingDeathEvent.BUS.addListener(event -> { BountyHooks.entityKilled(event.getEntity(), event.getSource()); });
         // Shop-break protection is otherwise Fabric-only: deny the break instead of cancelling, since

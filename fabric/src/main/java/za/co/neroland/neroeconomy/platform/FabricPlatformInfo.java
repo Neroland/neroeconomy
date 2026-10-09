@@ -20,6 +20,7 @@ import net.minecraft.core.Direction;
 
 import za.co.neroland.neroeconomy.NeroEconomyCommon;
 import za.co.neroland.neroeconomy.command.EconomyCommands;
+import za.co.neroland.neroeconomy.commodity.CommodityData;
 import za.co.neroland.neroeconomy.direct.DirectTrades;
 import za.co.neroland.neroeconomy.exchange.StockData;
 import za.co.neroland.neroeconomy.network.IntentGuard;
@@ -29,9 +30,13 @@ public final class FabricPlatformInfo implements PlatformInfo {
         ServerLifecycleEvents.SERVER_STARTED.register(NeroEconomyCommon.CURRENCY_PROVIDER::bind);
         ServerLifecycleEvents.SERVER_STOPPED.register(NeroEconomyCommon.CURRENCY_PROVIDER::unbind);
         ServerTickEvents.END_SERVER_TICK.register(NeroEconomyCommon.CURRENCY_PROVIDER::tick);
-        // Data packs were reloaded: the listed companies are read again from the new packs.
+        // Data packs were reloaded: the listed companies and the commodities are read again.
         ServerLifecycleEvents.END_DATA_PACK_RELOAD.register((server, resourceManager, success) -> {
-            if (success) StockData.reload(server);
+            if (success) {
+                StockData.reload(server);
+                CommodityData.reload(server);
+                za.co.neroland.neroeconomy.house.HouseData.reload(server);
+            }
         });
         ServerLivingEntityEvents.AFTER_DEATH.register(BountyHooks::entityKilled);
         PlayerBlockBreakEvents.BEFORE.register((level, player, pos, state, blockEntity) ->

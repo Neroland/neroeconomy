@@ -1,0 +1,23 @@
+{
+  "commodities": [
+    { "item": "minecraft:coal", "reference_price": 6, "npc_daily_supply": 256, "npc_daily_demand": 256, "class": "farmable", "house": "smiths", "sector": "mining" },
+    { "item": "minecraft:charcoal", "reference_price": 4, "npc_daily_demand": 256, "class": "farmable", "house": "smiths", "sector": "energy" },
+    { "item": "minecraft:raw_copper", "reference_price": 3, "npc_daily_demand": 512, "class": "farmable", "house": "smiths", "sector": "mining" },
+    { "item": "minecraft:copper_ingot", "reference_price": 4, "npc_daily_demand": 512, "class": "farmable", "house": "smiths", "sector": "mining" },
+    { "item": "minecraft:raw_iron", "reference_price": 9, "npc_daily_demand": 256, "class": "farmable", "house": "smiths", "sector": "mining" },
+    { "item": "minecraft:iron_ingot", "reference_price": 12, "npc_daily_demand": 256, "class": "farmable", "house": "smiths", "sector": "mining" },
+    { "item": "minecraft:raw_gold", "reference_price": 18, "npc_daily_demand": 128, "class": "farmable", "house": "smiths", "sector": "mining" },
+    { "item": "minecraft:gold_ingot", "reference_price": 24, "npc_daily_demand": 128, "class": "farmable", "house": "smiths", "sector": "mining" },
+    { "item": "minecraft:gold_nugget", "reference_price": 2, "npc_daily_demand": 512, "class": "farmable", "house": "smiths", "sector": "mining" },
+    { "item": "minecraft:redstone", "reference_price": 4, "npc_daily_demand": 512, "class": "farmable", "house": "smiths", "sector": "energy" },
+    { "item": "minecraft:glowstone_dust", "reference_price": 4, "npc_daily_demand": 256, "class": "farmable", "house": "smiths", "sector": "energy" },
+    { "item": "minecraft:lapis_lazuli", "reference_price": 6, "npc_daily_demand": 256, "class": "staple", "house": "smiths", "sector": "mining" },
+    { "item": "minecraft:quartz", "reference_price": 6, "npc_daily_demand": 256, "class": "staple", "house": "smiths", "sector": "energy" },
+    { "item": "minecraft:amethyst_shard", "reference_price": 5, "npc_daily_demand": 128, "class": "farmable", "house": "smiths", "sector": "mining" },
+    { "item": "minecraft:emerald", "reference_price": 40, "npc_daily_demand": 32, "per_account_daily_sell": 4, "class": "farmable", "house": "smiths", "sector": "mining" },
+    { "item": "minecraft:diamond", "reference_price": 400, "npc_daily_demand": 8, "per_account_daily_sell": 2, "class": "rare", "house": "smiths", "sector": "mining" },
+    { "item": "minecraft:netherite_scrap", "reference_price": 1200, "npc_daily_demand": 2, "per_account_daily_sell": 1, "class": "rare", "house": "smiths", "sector": "mining" },
+    { "item": "minecraft:echo_shard", "reference_price": 250, "npc_daily_demand": 4, "per_account_daily_sell": 1, "class": "rare", "house": "smiths", "sector": "space" },
+    { "item": "minecraft:nether_star", "reference_price": 3000, "npc_daily_demand": 1, "per_account_daily_sell": 1, "class": "rare", "house": "smiths", "sector": "space" }
+  ]
+}

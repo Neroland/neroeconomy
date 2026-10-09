@@ -1,0 +1,16 @@
+{
+  "commodities": [
+    { "tag": "c:raw_materials/nerosium", "reference_price": 6, "npc_daily_demand": 256, "class": "staple", "house": "starport", "sector": "space" },
+    { "item": "nerospace:nerosium_dust", "reference_price": 5, "npc_daily_demand": 256, "class": "staple", "house": "starport", "sector": "space" },
+    { "tag": "c:ingots/nerosium", "reference_price": 8, "npc_daily_demand": 256, "class": "staple", "house": "starport", "sector": "space" },
+    { "tag": "c:raw_materials/nerosteel", "reference_price": 16, "npc_daily_demand": 128, "class": "staple", "house": "starport", "sector": "space" },
+    { "tag": "c:ingots/nerosteel", "reference_price": 22, "npc_daily_demand": 128, "class": "staple", "house": "starport", "sector": "space" },
+    { "tag": "c:gems/xertz_quartz", "reference_price": 30, "npc_daily_demand": 64, "class": "staple", "house": "starport", "sector": "space" },
+    { "tag": "c:gems/cindrite", "reference_price": 120, "npc_daily_demand": 16, "class": "rare", "house": "starport", "sector": "space" },
+    { "tag": "c:gems/glacite", "reference_price": 120, "npc_daily_demand": 16, "class": "rare", "house": "starport", "sector": "space" },
+    { "item": "nerospace:rocket_fuel_canister", "reference_price": 14, "npc_daily_demand": 64, "class": "farmable", "house": "starport", "sector": "space" },
+    { "item": "nerospace:alien_fragment", "reference_price": 40, "npc_daily_demand": 32, "class": "staple", "house": "starport", "sector": "space" },
+    { "item": "nerospace:alien_tech_scrap", "reference_price": 150, "npc_daily_demand": 8, "class": "rare", "house": "starport", "sector": "space" },
+    { "item": "nerospace:alien_core", "reference_price": 800, "npc_daily_demand": 2, "per_account_daily_sell": 1, "class": "rare", "house": "starport", "sector": "space" }
+  ]
+}

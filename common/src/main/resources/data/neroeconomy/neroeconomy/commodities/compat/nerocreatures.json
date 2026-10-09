@@ -1,0 +1,14 @@
+{
+  "commodities": [
+    { "item": "nerocreatures:salvaged_circuitry", "reference_price": 6, "npc_daily_demand": 128, "class": "farmable", "house": "hunters", "sector": "creatures" },
+    { "item": "nerocreatures:ore_slurry", "reference_price": 4, "npc_daily_demand": 128, "class": "farmable", "house": "hunters", "sector": "creatures" },
+    { "item": "nerocreatures:stalker_hide", "reference_price": 5, "npc_daily_demand": 128, "class": "farmable", "house": "hunters", "sector": "creatures" },
+    { "item": "nerocreatures:stalker_sinew", "reference_price": 5, "npc_daily_demand": 128, "class": "farmable", "house": "hunters", "sector": "creatures" },
+    { "item": "nerocreatures:plasma_cell", "reference_price": 30, "npc_daily_demand": 32, "class": "staple", "house": "hunters", "sector": "creatures" },
+    { "item": "nerocreatures:worm_chitin", "reference_price": 25, "npc_daily_demand": 32, "class": "staple", "house": "hunters", "sector": "creatures" },
+    { "item": "nerocreatures:refined_crystal", "reference_price": 35, "npc_daily_demand": 32, "class": "staple", "house": "hunters", "sector": "creatures" },
+    { "item": "nerocreatures:contraband", "reference_price": 45, "npc_daily_demand": 16, "class": "staple", "house": "hunters", "sector": "creatures" },
+    { "item": "nerocreatures:void_essence", "reference_price": 150, "npc_daily_demand": 8, "per_account_daily_sell": 2, "elasticity": 1.5, "class": "farmable", "house": "hunters", "sector": "creatures" },
+    { "item": "nerocreatures:android_core", "reference_price": 250, "npc_daily_demand": 4, "per_account_daily_sell": 1, "class": "rare", "house": "hunters", "sector": "creatures" }
+  ]
+}

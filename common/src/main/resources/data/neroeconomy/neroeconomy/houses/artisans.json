@@ -1,0 +1,8 @@
+{
+  "name": "house.neroeconomy.artisans",
+  "working_capital": 3000,
+  "restock_per_day": 0.5,
+  "sectors": [
+    "decor"
+  ]
+}

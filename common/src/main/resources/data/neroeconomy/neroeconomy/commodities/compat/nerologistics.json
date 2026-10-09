@@ -1,0 +1,11 @@
+{
+  "commodities": [
+    { "item": "nerologistics:item_duct", "reference_price": 4, "npc_daily_demand": 128, "class": "crafted", "house": "engineers", "sector": "logistics" },
+    { "item": "nerologistics:universal_duct", "reference_price": 8, "npc_daily_demand": 128, "class": "crafted", "house": "engineers", "sector": "logistics" },
+    { "item": "nerologistics:network_module", "reference_price": 30, "npc_daily_demand": 32, "class": "crafted", "house": "engineers", "sector": "logistics" },
+    { "item": "nerologistics:drone", "reference_price": 35, "npc_daily_demand": 16, "class": "crafted", "house": "engineers", "sector": "logistics" },
+    { "item": "nerologistics:hyperspeed_card", "reference_price": 80, "npc_daily_demand": 8, "class": "crafted", "house": "engineers", "sector": "logistics" },
+    { "item": "nerologistics:wireless_terminal", "reference_price": 250, "npc_daily_demand": 4, "class": "crafted", "house": "engineers", "sector": "logistics" },
+    { "item": "nerologistics:network_controller", "reference_price": 1500, "npc_daily_demand": 2, "per_account_daily_sell": 1, "class": "rare", "house": "engineers", "sector": "logistics" }
+  ]
+}

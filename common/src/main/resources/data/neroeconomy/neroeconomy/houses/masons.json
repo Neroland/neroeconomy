@@ -1,0 +1,8 @@
+{
+  "name": "house.neroeconomy.masons",
+  "working_capital": 6000,
+  "restock_per_day": 1.0,
+  "sectors": [
+    "colonies"
+  ]
+}

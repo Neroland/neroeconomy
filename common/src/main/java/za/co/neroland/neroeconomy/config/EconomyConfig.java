@@ -95,6 +95,62 @@ public final class EconomyConfig {
             "Run the parts of the simulation that act in the market on their own (Merchant Houses, "
                     + "the exchange, system jobs). false leaves only housekeeping: the Reserve top-up, "
                     + "the day roll-over and expiry.");
+    public static final ConfigValue<Double> COMMODITY_SPREAD_PERCENT = SCHEMA.doubleRange(
+            "commoditySpreadPercent", 10.0D, 2.0D, 75.0D, true,
+            "How far above a commodity's reference price the Merchant Houses sell it and how far "
+                    + "below they buy it, as a percentage, for a commodity whose data file gives no "
+                    + "spread_percent. Applies from the next data-pack reload.");
+    public static final ConfigValue<Integer> ARBITRAGE_GUARD_DEPTH = SCHEMA.intRange(
+            "arbitrageGuardDepth", 3, 1, 6, true,
+            "How many recipes long a chain the arbitrage guard follows when it checks that goods "
+                    + "bought from the Merchant Houses cannot be crafted and sold back to them at a profit.");
+    public static final ConfigValue<Double> REFERENCE_DRIFT_STEP_PERCENT = SCHEMA.doubleRange(
+            "referenceDriftStepPercent", 1.0D, 0.0D, 10.0D, true,
+            "The most a commodity's reference price may move toward what players pay each other in "
+                    + "one simulation step, as a percentage of the reference price in its data file. "
+                    + "0 keeps every reference price where the data puts it.");
+    public static final ConfigValue<Double> REFERENCE_BAND_MIN_PERCENT = SCHEMA.doubleRange(
+            "referenceBandMinPercent", 50.0D, 1.0D, 100.0D, true,
+            "The lowest a commodity's reference price may drift to, as a percentage of the reference "
+                    + "price in its data file.");
+    public static final ConfigValue<Double> REFERENCE_BAND_MAX_PERCENT = SCHEMA.doubleRange(
+            "referenceBandMaxPercent", 200.0D, 100.0D, 1000.0D, true,
+            "The highest a commodity's reference price may drift to, as a percentage of the reference "
+                    + "price in its data file.");
+    public static final ConfigValue<Long> REFERENCE_MIN_TRADE_VALUE = SCHEMA.longRange(
+            "referenceMinTradeValue", 16L, 0L, 1_000_000_000L, true,
+            "A sale between two players worth less than this many credits does not count toward "
+                    + "reference prices.");
+    public static final ConfigValue<Long> REFERENCE_ACCOUNT_DAILY_CAP = SCHEMA.longRange(
+            "referenceAccountDailyCap", 2_000L, 0L, 1_000_000_000L, true,
+            "Credits of one player account's sales and purchases with other players that count toward "
+                    + "reference prices per economy day, so a few accounts trading with each other cannot "
+                    + "move a price far. 0 counts none.");
+    public static final ConfigValue<Integer> NPC_AUCTIONS_PER_DAY = SCHEMA.intRange(
+            "npcAuctionsPerDay", 4, 0, 64, true,
+            "Auctions the Merchant Houses start from their own stock per economy day, server-wide: "
+                    + "a few rare or valuable goods, or a bundle of a staple. 0 switches them off.");
+    public static final ConfigValue<Integer> NPC_AUCTION_HOURS = SCHEMA.intRange(
+            "npcAuctionHours", 24, 1, 168, true,
+            "How long, in hours of economy time, an auction a Merchant House starts runs.");
+    public static final ConfigValue<Double> HOUSE_JOB_PREMIUM_PERCENT = SCHEMA.doubleRange(
+            "houseJobPremiumPercent", 15.0D, 0.0D, 100.0D, true,
+            "What a Merchant House's contract or delivery job pays above the House's current buying "
+                    + "price for the goods, as a percentage. The payout comes from the Reserve within "
+                    + "systemJobDailyPayoutCap.");
+    public static final ConfigValue<Integer> HOUSE_JOBS_PER_HOUSE = SCHEMA.intRange(
+            "houseJobsPerHouse", 2, 0, 8, true,
+            "Open contract and delivery jobs one Merchant House may have for goods it is short of; "
+                    + "0 switches House jobs off.");
+    public static final ConfigValue<Integer> HOUSE_JOB_HOURS = SCHEMA.intRange(
+            "houseJobHours", 24, 1, 168, true,
+            "How long, in hours of economy time, a Merchant House's job or a server bounty stays open. "
+                    + "An expired one returns its payout to the Reserve.");
+    public static final ConfigValue<Integer> SYSTEM_BOUNTIES_PER_DAY = SCHEMA.intRange(
+            "systemBountiesPerDay", 2, 0, 32, true,
+            "Server-funded bounties on hostile mobs (listed in the bounty data files) posted per "
+                    + "economy day, and the most open at once. Mob farms complete any kill bounty, so "
+                    + "keep this small; 0 switches them off.");
     public static final ConfigValue<Boolean> DEBUG_FAST_SIM = SCHEMA.bool(
             "debugFastSim", false, true,
             "Development only: one simulation step per second of real time. Ignored, with a "

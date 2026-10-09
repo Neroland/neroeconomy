@@ -2,8 +2,6 @@ package za.co.neroland.neroeconomy.trade;
 
 import java.util.function.Function;
 
-import net.minecraft.server.MinecraftServer;
-
 import za.co.neroland.neroeconomy.rules.RulesSection;
 import za.co.neroland.neroeconomy.simulation.SimContext;
 import za.co.neroland.neroeconomy.simulation.SimPipeline;
@@ -21,8 +19,10 @@ import za.co.neroland.neroeconomy.simulation.SimStep;
  *       tick runs the same sweep on a short cadence; doing it here as well settles what fell due
  *       while the server was paused or shut down.</li>
  *   <li>{@code auto_trade} — every auto-trade rule joins the queue to be looked at again, and the
- *       queue is worked through within the tick's budget. Rules trade in real economy time: a
- *       step replayed after a pause does not trade for the time that was missed.</li>
+ *       queue is worked through within the step's own evaluation budget. A step runs at its own
+ *       economy time (see {@code SimRunner}), so a step replayed after a pause trades as it would
+ *       have on time, within that day's caps: a vault-backed rule keeps working while the server is
+ *       empty or paused.</li>
  * </ul>
  *
  * <p>A handler is handed the {@link TradeEnv} to work with by whoever registers it: the game
@@ -59,9 +59,9 @@ public final class TradingSteps {
             if (rules.size() == 0) return;
             rules.purgeDayValues(context.store().ledger().now());
             rules.enqueueAll();
-            // In game the budget is shared with the server tick's own drain: one count per tick.
-            MinecraftServer server = context.server();
-            rules.evaluatePending(env.apply(context), server != null ? server.getTickCount() : step);
+            // Each step has an evaluation budget of its own, so two steps replayed in one tick do as
+            // much as two steps on time. Negative ids never meet the server tick's own (its tick count).
+            rules.evaluatePending(env.apply(context), -1L - step);
         }
     }
 

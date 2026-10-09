@@ -98,6 +98,7 @@ public final class BookSection extends EconomySection implements LotHolder, Escr
     /** One side of a fill: who, through which order, placed how. */
     private record Party(AccountId account, UUID orderId, OrderSource source) {
         boolean rule() { return source == OrderSource.RULE; }
+        boolean house() { return source == OrderSource.HOUSE; }
     }
 
     /** One remembered change: the revision it made, and the item it was about. */
@@ -458,7 +459,7 @@ public final class BookSection extends EconomySection implements LotHolder, Escr
         Party seller = new Party(ask.owner(), ask.id(), ask.source());
         Party taker = new Party(buyer, null, OrderSource.HAND);
         if (allowed(env, taker, seller, ask.unitPrice(), quantity, now) < quantity)
-            return Traded.refused(BookResult.OUT_OF_STOCK);
+            return Traded.refused(seller.house() ? BookResult.DAILY_LIMIT : BookResult.OUT_OF_STOCK);
         BookResult[] why = new BookResult[1];
         Fill fill = settle(env, store, seller, taker, ask.item(), ask.lot().payload(), quantity, ask.unitPrice(),
                 false, ceiling, 0L, now, why);
@@ -492,7 +493,8 @@ public final class BookSection extends EconomySection implements LotHolder, Escr
         Party buyer = new Party(bid.owner(), bid.id(), bid.source());
         long base = restingBuyBase(env, giver, buyer, lot.item(), bid.unitPrice(), lot.count());
         if (base < 1L) return Traded.refused(BookResult.PRICE_MOVED);
-        if (allowed(env, giver, buyer, base, lot.count(), now) < lot.count()) return Traded.refused(BookResult.NOT_ENOUGH);
+        if (allowed(env, giver, buyer, base, lot.count(), now) < lot.count())
+            return Traded.refused(buyer.house() ? BookResult.DAILY_LIMIT : BookResult.NOT_ENOUGH);
         if (!origin.take(lot)) return Traded.refused(BookResult.NOT_HOLDING);
         BookResult[] why = new BookResult[1];
         Fill fill = settle(env, store, giver, buyer, lot.item(), Lot.PRISTINE, lot.count(), base, true,
@@ -532,7 +534,7 @@ public final class BookSection extends EconomySection implements LotHolder, Escr
         Party seller = new Party(ask.owner(), ask.id(), ask.source());
         Party taker = new Party(buyer, ruleOrderId, OrderSource.RULE);
         if (allowed(env, taker, seller, ask.unitPrice(), quantity, now) < quantity)
-            return Traded.refused(BookResult.OUT_OF_STOCK);
+            return Traded.refused(seller.house() ? BookResult.DAILY_LIMIT : BookResult.OUT_OF_STOCK);
         // The buyer's price can only be the seller's or a surcharge on it; it is the limit as well,
         // so nothing is refunded and what the fill reports as paid is what the budget loses.
         long unit = buyerUnitPrice(env, seller, taker, ask.item(), ask.unitPrice(), quantity);
@@ -616,8 +618,13 @@ public final class BookSection extends EconomySection implements LotHolder, Escr
         }
         // Counted toward the traded volume the exchange's price model reads once per step.
         volume.record(seller.account(), buyer.account(), item, quantity, base);
-        return new Fill(seller.orderId(), buyer.orderId(), seller.account(), buyer.account(), item, payload, quantity,
-                unitBase, base, paid, fee, net, refund, discountSkipped);
+        Fill fill = new Fill(seller.orderId(), buyer.orderId(), seller.account(), buyer.account(), item, payload,
+                quantity, unitBase, base, paid, fee, net, refund, discountSkipped);
+        // The Merchant Houses count their own fills toward their caps and prices, and fills between
+        // players toward the drift of reference prices.
+        HouseOrders houses = store.houseOrders();
+        if (houses != null) houses.filled(fill, now);
+        return fill;
     }
 
     private static Fill refuse(BookResult[] why, BookResult reason) {
@@ -632,7 +639,11 @@ public final class BookSection extends EconomySection implements LotHolder, Escr
         AccountId payer = buyer.account();
         // A discount is the Reserve's to pay, and it pays before the buyer does.
         if (paid < base) plan.pay(BudgetKind.UNBUDGETED, payer, base - paid, TransactionType.PRICE_ADJUSTMENT);
-        if (!fromEscrow) plan.move(payer, SystemAccountId.ESCROW, base, TransactionType.MARKET_PURCHASE);
+        // Buying from a Merchant House is spending with a system counterparty, which an unvested
+        // starting balance may do; buying from a player is not.
+        if (!fromEscrow && seller.house()) plan.moveAllowingLocked(payer, SystemAccountId.ESCROW, base,
+                TransactionType.MARKET_PURCHASE);
+        else if (!fromEscrow) plan.move(payer, SystemAccountId.ESCROW, base, TransactionType.MARKET_PURCHASE);
         if (fee > 0L) plan.move(SystemAccountId.ESCROW, SystemAccountId.RESERVE, fee, TransactionType.FEE_MARKET);
         if (paid > base) {
             // A surcharge is part of the price of buying from another player, so it is player-facing.
@@ -703,14 +714,19 @@ public final class BookSection extends EconomySection implements LotHolder, Escr
     private int allowed(TradeEnv env, Party incoming, Party resting, long unitBase, int wanted, long now) {
         EconomyStore store = owner();
         RuleOrders rules = store == null ? null : store.ruleOrders();
-        if (rules == null) return wanted;
+        HouseOrders houses = store == null ? null : store.houseOrders();
         int quantity = wanted;
-        if (incoming.rule() && incoming.orderId() != null) {
+        if (rules != null && incoming.rule() && incoming.orderId() != null) {
             quantity = Math.min(quantity, rules.allowance(env, incoming.orderId(), unitBase, quantity, now));
             if (quantity <= 0) return -1;
         }
-        if (resting.rule() && resting.orderId() != null)
+        if (rules != null && resting.rule() && resting.orderId() != null)
             quantity = Math.min(quantity, rules.allowance(env, resting.orderId(), unitBase, quantity, now));
+        // A Merchant House's daily caps, the commodity's and the other account's, hold on every fill.
+        if (incoming.house()) quantity = Math.min(quantity, houses == null || incoming.orderId() == null ? 0
+                : houses.allowance(incoming.orderId(), resting.account(), quantity, now));
+        if (resting.house()) quantity = Math.min(quantity, houses == null || resting.orderId() == null ? 0
+                : houses.allowance(resting.orderId(), incoming.account(), quantity, now));
         return Math.max(0, quantity);
     }
 

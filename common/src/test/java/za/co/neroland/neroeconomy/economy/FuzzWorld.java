@@ -29,7 +29,17 @@ import za.co.neroland.neroeconomy.exchange.ExchangeSteps;
 import za.co.neroland.neroeconomy.exchange.StockDefinition;
 import za.co.neroland.neroeconomy.exchange.StockRegistry;
 import za.co.neroland.neroeconomy.exchange.TradingTerms;
+import za.co.neroland.neroeconomy.api.CommodityClass;
+import za.co.neroland.neroeconomy.commodity.CommodityCatalog;
+import za.co.neroland.neroeconomy.commodity.CommodityDefinition;
+import za.co.neroland.neroeconomy.commodity.CommodityRegistry;
 import za.co.neroland.neroeconomy.goods.Lot;
+import za.co.neroland.neroeconomy.house.HouseDefinition;
+import za.co.neroland.neroeconomy.house.HouseEnv;
+import za.co.neroland.neroeconomy.house.HouseRegistry;
+import za.co.neroland.neroeconomy.house.HouseSettings;
+import za.co.neroland.neroeconomy.house.HouseStep;
+import za.co.neroland.neroeconomy.trade.SystemDelivery;
 import za.co.neroland.neroeconomy.goods.StackLimit;
 import za.co.neroland.neroeconomy.simulation.Housekeeping;
 import za.co.neroland.neroeconomy.simulation.SimContext;
@@ -153,7 +163,8 @@ final class FuzzWorld {
      * others, so every branch of a fill's settlement is taken.
      */
     final TradeEnv env = new TradeEnv(new TradeSettings(2.0D, 1L, 5, 4, 5L * 3_600_000L, CAP, CAP, BOUND, 3.0D,
-            4L * 3_600_000L, 4, 6, 3, 400L, 8), LIMIT, this::buyerPrice, CATALOG, (account, kind) -> this.alerts++, null,
+            4L * 3_600_000L, 4, 6, 3, 400L, 8), LIMIT, this::buyerPrice, CATALOG, (account, kind) -> this.alerts++,
+            houseDelivery(),
             TraderRules.binder(location -> this.traders.get(location)));
     /** How many alerts the trading rules raised; a count only, part of the fingerprint. */
     long alerts;
@@ -196,7 +207,49 @@ final class FuzzWorld {
             @Override public double shock(List<String> keys, long now) { return 1.0D; }
         }));
         ExchangeSteps.register(pipeline, context -> exchangeEnv());
+        // The Merchant Houses, as the game registers them: after the exchange.
+        pipeline.register(new HouseStep(context -> houseEnv()));
         store.exchange().reconcile(registry());
+    }
+
+    // --- the Merchant Houses -----------------------------------------------------------------
+
+    /**
+     * The world's commodities: logs and iron the Houses sell and buy, diamonds they only buy (a
+     * sink) and ender pearls they only sell. Small caps, so the daily caps are hit all the time.
+     */
+    static final CommodityRegistry COMMODITIES = CommodityRegistry.of(List.of(
+            new CommodityDefinition("minecraft:oak_log", CommodityDefinition.DIRECT_FILE, 4L, 256L, 256L, 32L, 32L, 0.9D,
+                    0.05D, 1_000, CommodityClass.FARMABLE, "granary", "farming", true, true),
+            new CommodityDefinition("minecraft:iron_ingot", CommodityDefinition.DIRECT_FILE, 12L, 64L, 64L, 16L, 16L,
+                    0.6D, 0.03D, 1_500, CommodityClass.CRAFTED, "ironworks", "mining", true, true),
+            new CommodityDefinition("minecraft:diamond", CommodityDefinition.DIRECT_FILE, 60L, 0L, 16L, 0L, 4L, 0.8D,
+                    0.01D, 1_000, CommodityClass.RARE, "quarry", "mining", true, true),
+            new CommodityDefinition("minecraft:ender_pearl", CommodityDefinition.DIRECT_FILE, 20L, 32L, 0L, 8L, 0L,
+                    0.8D, 0.01D, 1_000, CommodityClass.RARE, "quarry", "", true, true)),
+            CommodityCatalog.of(Set.of(), Set.of(ITEMS), Map.of(), Set.of()));
+    static final HouseRegistry HOUSES = HouseRegistry.of(List.of(
+            new HouseDefinition("granary", HouseDefinition.BUILT_IN_FILE, "house.fuzz.granary", List.of(), List.of(),
+                    600L, 6.0D),
+            new HouseDefinition("ironworks", HouseDefinition.BUILT_IN_FILE, "house.fuzz.ironworks", List.of(), List.of(),
+                    800L, 6.0D),
+            new HouseDefinition("quarry", HouseDefinition.BUILT_IN_FILE, "house.fuzz.quarry", List.of(), List.of(),
+                    1_000L, 6.0D)));
+    /** How often the daily guard re-check ran; every third one switches the log buy side off. */
+    long guardChecks;
+
+    /** What the Houses work with: small drift caps so they are hit, and a guard that sometimes fails logs. */
+    HouseEnv houseEnv() {
+        return new HouseEnv(COMMODITIES, HOUSES, env, new HouseSettings(100, 5_000, 20_000, 4L, 300L),
+                quotes -> guardChecks++ % 3 == 1 ? Set.of("minecraft:oak_log") : Set.of());
+    }
+
+    /** The book delivers the Houses' goods into the House section of whichever store is current. */
+    private SystemDelivery houseDelivery() {
+        return new SystemDelivery() {
+            @Override public boolean handles(SystemAccountId account) { return account != null && account.isHouse(); }
+            @Override public void deliver(SystemAccountId account, Lot lot) { store.houses().deliver(account, lot); }
+        };
     }
 
     /** The companies listed right now. */
@@ -350,10 +403,14 @@ final class FuzzWorld {
         // The slots of the Auto-Trader blocks are a place of their own: neither the store nor a hand.
         for (FakeSlots slots : traders.values())
             for (Lot lot : slots.held) if (lot != null) held[slotOf(lot.item(), lot.payload())] += lot.count();
+        // The Merchant Houses make goods when they restock and destroy what they cannot keep: both counted.
+        za.co.neroland.neroeconomy.house.HouseSection houses = store.houses();
         for (Map.Entry<Lot.Key, Long> kind : goods.entrySet()) {
             long out = outside(kind.getKey());
             assertTrue(out >= 0L, where);
-            assertEquals(kind.getValue(), held[slotOf(kind.getKey().item(), kind.getKey().payload())] + out,
+            long made = kind.getKey().pristine()
+                    ? houses.created(kind.getKey().item()) - houses.destroyed(kind.getKey().item()) : 0L;
+            assertEquals(kind.getValue() + made, held[slotOf(kind.getKey().item(), kind.getKey().payload())] + out,
                     () -> where.get() + ", " + kind.getKey());
         }
         // Trade escrow is only ever held for a side of a trade that is open: nothing is stranded in it.
@@ -442,7 +499,9 @@ final class FuzzWorld {
                 .append(store.rules().waiting()).append(';').append(ruleTicks).append(';').append(ruleTraded).append(';')
                 .append(store.escrowObligations()).append(';').append(alerts).append(';')
                 .append(store.autoTraders().locations()).append(';').append(trades.size()).append(';')
-                .append(slotWrites());
+                .append(slotWrites()).append(';').append(guardChecks).append(';')
+                .append(za.co.neroland.neroeconomy.house.HouseSection.CODEC.encodeStart(
+                        com.mojang.serialization.JsonOps.INSTANCE, store.houses()).getOrThrow());
         traders.forEach((location, slots) -> out.append(';').append(location).append(slots.loaded ? '+' : '-')
                 .append(java.util.Arrays.toString(slots.held)));
         return out.toString();

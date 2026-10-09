@@ -1,0 +1,20 @@
+{
+  "commodities": [
+    { "tag": "c:gems/ruby", "reference_price": 120, "npc_daily_demand": 8, "class": "rare", "house": "smiths", "sector": "mining", "required": false },
+    { "tag": "c:gems/sapphire", "reference_price": 120, "npc_daily_demand": 8, "class": "rare", "house": "smiths", "sector": "mining", "required": false },
+    { "tag": "c:gems/peridot", "reference_price": 90, "npc_daily_demand": 8, "class": "rare", "house": "smiths", "sector": "mining", "required": false },
+    { "tag": "c:gems/topaz", "reference_price": 90, "npc_daily_demand": 8, "class": "rare", "house": "smiths", "sector": "mining", "required": false },
+    { "tag": "c:gems/fluorite", "reference_price": 6, "npc_daily_demand": 128, "class": "staple", "house": "smiths", "sector": "mining", "required": false },
+    { "tag": "c:gems/cinnabar", "reference_price": 6, "npc_daily_demand": 128, "class": "staple", "house": "smiths", "sector": "mining", "required": false },
+    { "tag": "c:dusts/tin", "reference_price": 6, "npc_daily_demand": 128, "class": "farmable", "house": "smiths", "sector": "mining", "required": false },
+    { "tag": "c:dusts/lead", "reference_price": 6, "npc_daily_demand": 128, "class": "farmable", "house": "smiths", "sector": "mining", "required": false },
+    { "tag": "c:dusts/zinc", "reference_price": 6, "npc_daily_demand": 128, "class": "farmable", "house": "smiths", "sector": "mining", "required": false },
+    { "tag": "c:dusts/aluminum", "reference_price": 6, "npc_daily_demand": 128, "class": "farmable", "house": "smiths", "sector": "mining", "required": false },
+    { "tag": "c:dusts/nickel", "reference_price": 10, "npc_daily_demand": 128, "class": "farmable", "house": "smiths", "sector": "mining", "required": false },
+    { "tag": "c:dusts/silver", "reference_price": 15, "npc_daily_demand": 128, "class": "farmable", "house": "smiths", "sector": "mining", "required": false },
+    { "tag": "c:dusts/osmium", "reference_price": 13, "npc_daily_demand": 128, "class": "farmable", "house": "smiths", "sector": "mining", "required": false },
+    { "tag": "c:dusts/uranium", "reference_price": 22, "npc_daily_demand": 128, "class": "farmable", "house": "smiths", "sector": "mining", "required": false },
+    { "tag": "c:dusts/sulfur", "reference_price": 3, "npc_daily_demand": 128, "class": "farmable", "house": "smiths", "sector": "mining", "required": false },
+    { "tag": "c:dusts/saltpeter", "reference_price": 3, "npc_daily_demand": 128, "class": "farmable", "house": "smiths", "sector": "mining", "required": false }
+  ]
+}

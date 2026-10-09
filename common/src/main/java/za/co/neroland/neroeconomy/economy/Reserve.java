@@ -66,9 +66,13 @@ public final class Reserve {
 
     // --- budgets -----------------------------------------------------------------------------
 
-    /** What this kind has drawn from the Reserve in economy day {@code today}. */
+    /**
+     * What this kind has drawn from the Reserve in economy day {@code today}. A day before the one
+     * the counts are kept for is answered with that later day's counts: a simulation step replayed
+     * after a pause runs at its own, earlier time, and must never find a fresh budget there.
+     */
     public long used(BudgetKind kind, long today) {
-        return kind == null || today != budgetDay ? 0L : used.getOrDefault(kind, 0L);
+        return kind == null || today > budgetDay ? 0L : used.getOrDefault(kind, 0L);
     }
 
     /** What this kind may still draw today; {@link Long#MAX_VALUE} when it has no limit. */
@@ -99,8 +103,9 @@ public final class Reserve {
         used.put(kind, Long.MAX_VALUE - current < amount ? Long.MAX_VALUE : current + amount);
     }
 
+    /** Counts only ever move on to a later day; an earlier one is counted in the day they are kept for. */
     private void roll(long today) {
-        if (today == budgetDay) return;
+        if (today <= budgetDay) return;
         budgetDay = today;
         used.clear();
     }

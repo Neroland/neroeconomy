@@ -92,6 +92,15 @@ public final class ServerCurrencyProvider implements CurrencyProvider {
         // Export files are aged by their file-system timestamp, so that sweep runs on the wall clock.
         LedgerExportFiles.purgeExpired(nextServer, System.currentTimeMillis());
         marketSweepCountdown = MARKET_SWEEP_TICKS;
+        // The commodities are read and the arbitrage guard runs now, at start-up, so an operator
+        // sees its verdict in the log at once and the first trade does not pay for the reading.
+        try {
+            za.co.neroland.neroeconomy.commodity.CommodityData.forServer(nextServer);
+        } catch (RuntimeException | LinkageError failure) {
+            // Never a reason not to start: they are read again the first time they are asked for.
+            NeroEconomyCommon.LOGGER.warn("[NeroEconomy] The commodity data could not be read at start-up ({}).",
+                    failure.getClass().getName());
+        }
         saveCooldown = 0;
         saveRequested = false;
         unboundReported.set(false);
@@ -124,6 +133,8 @@ public final class ServerCurrencyProvider implements CurrencyProvider {
         Simulation.tick(currentServer, now);
         // Auto-trade rules waiting for their turn are looked at, a bounded number per tick.
         za.co.neroland.neroeconomy.trade.Trading.tick(currentServer);
+        // Commodities a Merchant House traded since it last quoted them are quoted again, a few per tick.
+        za.co.neroland.neroeconomy.house.Houses.tick(currentServer);
         // Trade requests lapse, open direct trades are checked, and a swap that is due is made.
         za.co.neroland.neroeconomy.direct.DirectTrades.tick(currentServer);
         flushRequestedSave(currentServer);

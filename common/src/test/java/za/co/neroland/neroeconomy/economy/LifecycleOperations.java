@@ -115,6 +115,9 @@ final class LifecycleOperations {
             assertEquals(0, world.store.offers().outgoing(FuzzWorld.account(player)));
             assertEquals(0, world.store.offers().incoming(FuzzWorld.account(player)));
             world.store.rules().forgetPlayer(player);
+            // What the Merchant Houses recorded about them today goes too.
+            world.store.houses().forgetPlayer(player);
+            assertEquals(0, world.store.houses().exportFor(player).getAsJsonArray("traded_with_houses_today").size());
             assertEquals(0, world.store.rules().count(FuzzWorld.account(player)));
             // Their Auto-Trader blocks stay in the world, ownerless and with no rule.
             TraderOperations.erased(world, player);

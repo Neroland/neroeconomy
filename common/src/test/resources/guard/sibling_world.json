@@ -1,0 +1,187 @@
+{
+  "comment": "A frozen picture of the sibling mods for the shipped-data tests: the item ids that were checked against each mod's registry in October 2026, and the tags the shipped commodity files name. thirdparty: ids stand for a mod this project has never seen.",
+  "mods": [
+    "nerotech",
+    "nerospace",
+    "neroagriculture",
+    "nerocreatures",
+    "nerocolonies",
+    "nerologistics",
+    "neropower",
+    "nerodecor",
+    "neronotes"
+  ],
+  "items": [
+    "neroagriculture:alien_produce",
+    "neroagriculture:alien_seed",
+    "neroagriculture:biofuel_canister",
+    "neroagriculture:biomass",
+    "neroagriculture:charged_seed",
+    "neroagriculture:colonite_fragment",
+    "neroagriculture:crop_waste",
+    "neroagriculture:engineered_food",
+    "neroagriculture:fertiliser",
+    "neroagriculture:food_seed",
+    "neroagriculture:forgite_fragment",
+    "neroagriculture:orbite_fragment",
+    "neroagriculture:resource_fragment",
+    "neroagriculture:resource_seed",
+    "neroagriculture:speed_fertiliser",
+    "neroagriculture:territe_fragment",
+    "neroagriculture:voidite_fragment",
+    "neroagriculture:yield_fertiliser",
+    "nerocolonies:capacity_module",
+    "nerocolonies:efficiency_module",
+    "nerocolonies:range_module",
+    "nerocolonies:speed_module",
+    "nerocreatures:android_core",
+    "nerocreatures:apex_trophy",
+    "nerocreatures:contraband",
+    "nerocreatures:ore_slurry",
+    "nerocreatures:plasma_cell",
+    "nerocreatures:refined_crystal",
+    "nerocreatures:salvaged_circuitry",
+    "nerocreatures:stalker_hide",
+    "nerocreatures:stalker_sinew",
+    "nerocreatures:void_essence",
+    "nerocreatures:worm_chitin",
+    "nerodecor:fusion_lamp",
+    "nerodecor:glass_cyan",
+    "nerodecor:hull_nero_alloy",
+    "nerodecor:hull_void_crystal",
+    "nerodecor:neon_blue",
+    "nerodecor:panel_starsteel",
+    "nerodecor:void_rift",
+    "nerodecor:xeno_bloom",
+    "nerolandcore:starsteel_dust",
+    "nerolandcore:starsteel_ingot",
+    "nerolandcore:void_crystal_dust",
+    "nerolandcore:void_crystal_shard",
+    "nerologistics:drone",
+    "nerologistics:fluid_cell_1024b",
+    "nerologistics:fluid_cell_128b",
+    "nerologistics:fluid_cell_16b",
+    "nerologistics:fluid_cell_8192b",
+    "nerologistics:hyperspeed_card",
+    "nerologistics:item_cell_1k",
+    "nerologistics:item_cell_512k",
+    "nerologistics:item_cell_64k",
+    "nerologistics:item_cell_8k",
+    "nerologistics:item_duct",
+    "nerologistics:network_controller",
+    "nerologistics:network_module",
+    "nerologistics:universal_duct",
+    "nerologistics:wireless_terminal",
+    "neronotes:blank_disk",
+    "neronotes:custom_disk",
+    "neropower:battery_cell_basic",
+    "neropower:battery_cell_elite",
+    "neropower:fuel_rod",
+    "neropower:isotope_pellet",
+    "neropower:reprocessed_pellet",
+    "neropower:spent_fuel_rod",
+    "neropower:spent_isotope_pellet",
+    "neropower:uranium_pellet",
+    "nerospace:alien_core",
+    "nerospace:alien_fragment",
+    "nerospace:alien_tech_scrap",
+    "nerospace:cindrite",
+    "nerospace:glacite",
+    "nerospace:nerosium_dust",
+    "nerospace:nerosium_ingot",
+    "nerospace:nerosteel_ingot",
+    "nerospace:raw_nerosium",
+    "nerospace:raw_nerosteel",
+    "nerospace:rocket_fuel_canister",
+    "nerospace:xertz_quartz",
+    "nerotech:antimatter_cell",
+    "nerotech:circuit_board",
+    "nerotech:copper_dust",
+    "nerotech:dirty_filter",
+    "nerotech:filter_cartridge",
+    "nerotech:fusion_cell",
+    "nerotech:gold_dust",
+    "nerotech:iron_dust",
+    "nerotech:machine_frame",
+    "nerotech:nero_coil",
+    "nerotech:plasma_cell",
+    "nerotech:stellar_cell",
+    "thirdparty:raw_tin",
+    "thirdparty:ruby",
+    "thirdparty:tin_dust",
+    "thirdparty:tin_ingot"
+  ],
+  "tags": {
+    "c:dusts/iron": [
+      "nerotech:iron_dust"
+    ],
+    "c:dusts/copper": [
+      "nerotech:copper_dust"
+    ],
+    "c:dusts/gold": [
+      "nerotech:gold_dust"
+    ],
+    "c:ingots/iron": [
+      "minecraft:iron_ingot"
+    ],
+    "c:ingots/copper": [
+      "minecraft:copper_ingot"
+    ],
+    "c:ingots/gold": [
+      "minecraft:gold_ingot"
+    ],
+    "c:ingots/starsteel": [
+      "nerolandcore:starsteel_ingot"
+    ],
+    "c:gems/void_crystal": [
+      "nerolandcore:void_crystal_shard"
+    ],
+    "nerotech:bio_fuels": [
+      "minecraft:dried_kelp_block"
+    ],
+    "nerocolonies:colony_food/staple": [
+      "minecraft:bread",
+      "minecraft:wheat",
+      "minecraft:carrot",
+      "minecraft:potato",
+      "minecraft:beetroot",
+      "minecraft:dried_kelp",
+      "minecraft:sweet_berries",
+      "minecraft:melon_slice",
+      "minecraft:apple"
+    ],
+    "c:raw_materials/nerosium": [
+      "nerospace:raw_nerosium"
+    ],
+    "c:ingots/nerosium": [
+      "nerospace:nerosium_ingot"
+    ],
+    "c:raw_materials/nerosteel": [
+      "nerospace:raw_nerosteel"
+    ],
+    "c:ingots/nerosteel": [
+      "nerospace:nerosteel_ingot"
+    ],
+    "c:gems/xertz_quartz": [
+      "nerospace:xertz_quartz"
+    ],
+    "c:gems/cindrite": [
+      "nerospace:cindrite"
+    ],
+    "c:gems/glacite": [
+      "nerospace:glacite"
+    ],
+    "c:ingots/tin": [
+      "thirdparty:tin_ingot"
+    ],
+    "c:raw_materials/tin": [
+      "thirdparty:raw_tin"
+    ],
+    "c:dusts/tin": [
+      "thirdparty:tin_dust"
+    ],
+    "c:gems/ruby": [
+      "thirdparty:ruby"
+    ]
+  }
+}

@@ -277,7 +277,7 @@ public final class LinkPayloads {
             case CAPITAL_GAIN, DIVIDEND, BOND_INTEREST -> "earnings";
             // Never part of a player's own history: they move between system accounts only.
             case RESERVE_MINT, MIGRATION, ERASURE_SWEEP, CAPITAL_LOSS, BOND_INTEREST_RESERVED,
-                    BOND_INTEREST_RELEASED -> "system";
+                    BOND_INTEREST_RELEASED, HOUSE_FUNDING, HOUSE_SWEEP -> "system";
         };
     }
 

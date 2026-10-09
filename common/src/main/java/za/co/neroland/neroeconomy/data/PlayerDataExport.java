@@ -54,6 +54,9 @@ public final class PlayerDataExport {
         json.add("vault", VaultSection.get(server).exportFor(player));
         // The subject's shares, index units and Savings Bonds, and their practice portfolio.
         json.add("exchange", EconomyStore.get(server).exchange().exportFor(player));
+        // What the subject traded with the Merchant Houses today, and what of their trade with other
+        // players counted toward reference prices today.
+        json.add("merchant_houses", EconomyStore.get(server).houses().exportFor(player));
         return json;
     }
 

@@ -1,0 +1,9 @@
+{
+  "commodities": [
+    { "tag": "nerocolonies:colony_food/staple", "reference_price": 2, "npc_daily_demand": 512, "class": "farmable", "house": "settlers", "sector": "farming" },
+    { "item": "nerocolonies:speed_module", "reference_price": 22, "npc_daily_demand": 16, "class": "crafted", "house": "settlers", "sector": "colonies" },
+    { "item": "nerocolonies:efficiency_module", "reference_price": 30, "npc_daily_demand": 16, "class": "crafted", "house": "settlers", "sector": "colonies" },
+    { "item": "nerocolonies:range_module", "reference_price": 50, "npc_daily_demand": 16, "class": "crafted", "house": "settlers", "sector": "colonies" },
+    { "item": "nerocolonies:capacity_module", "reference_price": 36, "npc_daily_demand": 16, "class": "crafted", "house": "settlers", "sector": "colonies" }
+  ]
+}

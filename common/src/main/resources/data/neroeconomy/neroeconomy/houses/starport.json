@@ -1,0 +1,8 @@
+{
+  "name": "house.neroeconomy.starport",
+  "working_capital": 5000,
+  "restock_per_day": 0.5,
+  "sectors": [
+    "space"
+  ]
+}

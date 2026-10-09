@@ -1,0 +1,44 @@
+{
+  "bounties": [
+    {
+      "entity": "minecraft:zombie",
+      "quantity": 8,
+      "payout": 40
+    },
+    {
+      "entity": "minecraft:skeleton",
+      "quantity": 8,
+      "payout": 45
+    },
+    {
+      "entity": "minecraft:creeper",
+      "quantity": 5,
+      "payout": 50
+    },
+    {
+      "entity": "minecraft:spider",
+      "quantity": 8,
+      "payout": 35
+    },
+    {
+      "entity": "minecraft:enderman",
+      "quantity": 3,
+      "payout": 60
+    },
+    {
+      "entity": "minecraft:witch",
+      "quantity": 2,
+      "payout": 60
+    },
+    {
+      "entity": "minecraft:blaze",
+      "quantity": 4,
+      "payout": 70
+    },
+    {
+      "entity": "minecraft:wither_skeleton",
+      "quantity": 2,
+      "payout": 90
+    }
+  ]
+}

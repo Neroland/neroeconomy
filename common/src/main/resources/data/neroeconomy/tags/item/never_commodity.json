@@ -1,0 +1,99 @@
+{
+  "replace": false,
+  "values": [
+    "minecraft:potion",
+    "minecraft:splash_potion",
+    "minecraft:lingering_potion",
+    "minecraft:tipped_arrow",
+    "minecraft:ominous_bottle",
+    "minecraft:suspicious_stew",
+    "minecraft:enchanted_book",
+    "minecraft:written_book",
+    "minecraft:writable_book",
+    "minecraft:filled_map",
+    "minecraft:firework_rocket",
+    "minecraft:firework_star",
+    "minecraft:player_head",
+    "minecraft:goat_horn",
+    {
+      "id": "#minecraft:shulker_boxes",
+      "required": false
+    },
+    {
+      "id": "#minecraft:bundles",
+      "required": false
+    },
+    {
+      "id": "neroagriculture:resource_fragment",
+      "required": false
+    },
+    {
+      "id": "neroagriculture:resource_seed",
+      "required": false
+    },
+    {
+      "id": "neroagriculture:charged_seed",
+      "required": false
+    },
+    {
+      "id": "neroagriculture:food_seed",
+      "required": false
+    },
+    {
+      "id": "neroagriculture:alien_seed",
+      "required": false
+    },
+    {
+      "id": "neroagriculture:engineered_food",
+      "required": false
+    },
+    {
+      "id": "neroagriculture:alien_produce",
+      "required": false
+    },
+    {
+      "id": "neropower:fuel_rod",
+      "required": false
+    },
+    {
+      "id": "neronotes:custom_disk",
+      "required": false
+    },
+    {
+      "id": "nerocreatures:apex_trophy",
+      "required": false
+    },
+    {
+      "id": "nerologistics:item_cell_1k",
+      "required": false
+    },
+    {
+      "id": "nerologistics:item_cell_8k",
+      "required": false
+    },
+    {
+      "id": "nerologistics:item_cell_64k",
+      "required": false
+    },
+    {
+      "id": "nerologistics:item_cell_512k",
+      "required": false
+    },
+    {
+      "id": "nerologistics:fluid_cell_16b",
+      "required": false
+    },
+    {
+      "id": "nerologistics:fluid_cell_128b",
+      "required": false
+    },
+    {
+      "id": "nerologistics:fluid_cell_1024b",
+      "required": false
+    },
+    {
+      "id": "nerologistics:fluid_cell_8192b",
+      "required": false
+    }
+  ]
+}

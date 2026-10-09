@@ -119,6 +119,16 @@ class OperationFuzzTest {
             assertTrue(world.exchangeAlerts.getOrDefault(kind, 0L) > 0L, kind + " never happened");
         assertTrue(splits > 0, "no share ever split");
         assertTrue(exchange.practice().size() > 0);
+        // The Merchant Houses really traded: players bought from them and sold to them, they restocked,
+        // they destroyed what they could not keep, and they were funded within the NPC budget.
+        za.co.neroland.neroeconomy.house.HouseSection houses = world.store.houses();
+        System.out.println("[fuzz] houses: " + houses.size() + " commodities, logs made " + houses.created("minecraft:oak_log")
+                + ", diamonds destroyed " + houses.destroyed("minecraft:diamond") + ", guard checks " + world.guardChecks);
+        assertTrue(result.effects().get("house_buy") > 100);
+        assertTrue(result.effects().get("house_sell") > 100);
+        assertTrue(houses.created("minecraft:oak_log") > 0L);
+        assertTrue(houses.destroyed("minecraft:diamond") > 0L);
+        assertTrue(world.guardChecks > 1L);
     }
 
     private static long lotsHeld(FuzzWorld world) {

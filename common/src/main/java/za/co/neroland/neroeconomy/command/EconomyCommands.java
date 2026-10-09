@@ -47,6 +47,8 @@ import za.co.neroland.nerolandcore.economy.CurrencyApi;
 import za.co.neroland.neroeconomy.NeroEconomyCommon;
 import za.co.neroland.neroeconomy.api.ExchangeApi;
 import za.co.neroland.neroeconomy.block.PlayerShopBlockEntity;
+import za.co.neroland.neroeconomy.commodity.CommodityData;
+import za.co.neroland.neroeconomy.commodity.CommodityRegistry;
 import za.co.neroland.neroeconomy.config.EconomyConfig;
 import za.co.neroland.neroeconomy.data.LedgerExportFiles;
 import za.co.neroland.neroeconomy.data.PlayerDataExport;
@@ -58,7 +60,13 @@ import za.co.neroland.neroeconomy.economy.KnownAccounts;
 import za.co.neroland.neroeconomy.economy.SupplyReport;
 import za.co.neroland.neroeconomy.economy.TransactionType;
 import za.co.neroland.neroeconomy.exchange.PriceText;
+import za.co.neroland.neroeconomy.exchange.StockData;
 import za.co.neroland.neroeconomy.goods.GoodsSource;
+import za.co.neroland.neroeconomy.guard.GuardReport;
+import za.co.neroland.neroeconomy.house.HouseData;
+import za.co.neroland.neroeconomy.house.HouseDefinition;
+import za.co.neroland.neroeconomy.house.HouseRegistry;
+import za.co.neroland.neroeconomy.house.HouseSection;
 import za.co.neroland.neroeconomy.market.CancelResult;
 import za.co.neroland.neroeconomy.market.ListingSource;
 import za.co.neroland.neroeconomy.market.MarketSavedData;
@@ -79,6 +87,8 @@ import za.co.neroland.neroeconomy.obligation.ObligationSavedData;
 public final class EconomyCommands {
     /** The most simulation steps one {@code /eco admin sim step} may force. */
     private static final int MAX_FORCED_STEPS = 100;
+    /** The most lines of any one list {@code /eco admin reload-check} prints. */
+    private static final int MAX_CHECK_LINES = 20;
     private static final long MILLIS_PER_MINUTE = 60_000L;
 
     private EconomyCommands() { }
@@ -114,6 +124,8 @@ public final class EconomyCommands {
                         .then(adminMutation("set", TransactionType.ADMIN_SET))
                         .then(Commands.literal("supply").executes(EconomyCommands::supply))
                         .then(Commands.literal("stocks").executes(EconomyCommands::stocks))
+                        .then(Commands.literal("houses").executes(EconomyCommands::houses))
+                        .then(Commands.literal("reload-check").executes(EconomyCommands::reloadCheck))
                         .then(Commands.literal("health").executes(EconomyCommands::health)
                                 .then(Commands.literal("accept")
                                         .requires(source -> EconomyConfig.ADMIN_MUTATIONS_ENABLED.get())
@@ -225,6 +237,122 @@ public final class EconomyCommands {
                 "command.neroeconomy.stocks.bond", Component.translatable(bond.nameKey()),
                 PriceText.percent(bond.rateBasisPoints())), false);
         return Command.SINGLE_SUCCESS;
+    }
+
+    /**
+     * Every Merchant House: its working capital as it stands, what it paid for goods and received
+     * for goods today, and its busiest commodities today. Aggregates only; never an account.
+     */
+    private static int houses(CommandContext<CommandSourceStack> context) {
+        if (frozen(context)) return 0;
+        CommandSourceStack source = context.getSource();
+        MinecraftServer server = source.getServer();
+        HouseRegistry registry = HouseData.forServer(server);
+        if (!EconomyConfig.AUTONOMOUS_ECONOMY.get())
+            source.sendSuccess(() -> Component.translatable("command.neroeconomy.houses.off"), false);
+        source.sendSuccess(() -> Component.translatable("command.neroeconomy.houses.header"), false);
+        for (HouseSection.HouseReport report : EconomyStore.get(server).houses().report(registry)) {
+            HouseDefinition house = registry.get(report.id());
+            Component name = house != null ? Component.translatable(house.nameKey())
+                    : Component.translatable("command.neroeconomy.houses.retired", report.id());
+            long cap = house != null ? house.workingCapital() : 0L;
+            source.sendSuccess(() -> Component.translatable("command.neroeconomy.houses.row", name, report.capital(), cap,
+                    report.balance(), report.escrowed(), report.paidToday(), report.receivedToday()), false);
+            if (report.top().isEmpty())
+                source.sendSuccess(() -> Component.translatable("command.neroeconomy.houses.quiet"), false);
+            for (HouseSection.Volume volume : report.top())
+                source.sendSuccess(() -> Component.translatable("command.neroeconomy.houses.top", volume.key(),
+                        volume.units(), volume.value()), false);
+        }
+        return Command.SINGLE_SUCCESS;
+    }
+
+    /**
+     * What the data packs came to: stock files and commodity entries that were skipped, items two
+     * commodities both claimed, and the arbitrage guard run afresh against the server's live
+     * recipes. Data-pack ids, fixed reason words and prices only; nothing about any account.
+     */
+    private static int reloadCheck(CommandContext<CommandSourceStack> context) {
+        CommandSourceStack source = context.getSource();
+        MinecraftServer server = source.getServer();
+        source.sendSuccess(() -> Component.translatable("command.neroeconomy.reload_check.header"), false);
+
+        int listed = StockData.forServer(server).stocks().size();
+        java.util.List<StockData.Problem> stockProblems = StockData.problems(server);
+        source.sendSuccess(() -> Component.translatable("command.neroeconomy.reload_check.stocks", listed,
+                stockProblems.size()), false);
+        checkLines(source, stockProblems, problem -> Component.translatable(
+                "command.neroeconomy.reload_check.file_problem", problem.id(), problem.word()));
+
+        HouseRegistry houses = HouseData.forServer(server);
+        source.sendSuccess(() -> Component.translatable("command.neroeconomy.reload_check.houses",
+                houses.houses().size(), houses.problems().size()), false);
+        checkLines(source, houses.problems(), problem -> Component.translatable(
+                "command.neroeconomy.reload_check.file_problem", problem.file(), problem.word()));
+
+        // The guard runs again now, against the recipes as they are, and its verdict is applied.
+        CommodityData.Check check = CommodityData.check(server);
+        CommodityRegistry registry = CommodityData.forServer(server);
+        if (!registry.available()) {
+            source.sendFailure(Component.translatable("command.neroeconomy.reload_check.unavailable"));
+            return 0;
+        }
+        CommodityRegistry.LoadReport load = registry.report();
+        source.sendSuccess(() -> Component.translatable("command.neroeconomy.reload_check.commodities",
+                registry.commodities().size(), load.files(), load.gatedFiles(), load.absent(), load.disabled()), false);
+        source.sendSuccess(() -> Component.translatable("command.neroeconomy.reload_check.commodity_problems",
+                load.problems().size()), false);
+        checkLines(source, load.problems(), problem -> problem.entry() < 0
+                ? Component.translatable("command.neroeconomy.reload_check.file_problem", problem.file(), problem.word())
+                : Component.translatable("command.neroeconomy.reload_check.entry_problem", problem.file(),
+                        problem.entry(), problem.word()));
+        source.sendSuccess(() -> Component.translatable("command.neroeconomy.reload_check.clashes",
+                load.clashes().size()), false);
+        checkLines(source, load.clashes(), clash -> Component.translatable("command.neroeconomy.reload_check.clash",
+                clash.item(), clash.kept(), clash.keptFile(), clash.dropped(), clash.droppedFile()));
+
+        if (!check.guardProblems().isEmpty()) {
+            source.sendSuccess(() -> Component.translatable("command.neroeconomy.reload_check.guard_problems",
+                    check.guardProblems().size()), false);
+            checkLines(source, check.guardProblems(), problem -> Component.translatable(
+                    "command.neroeconomy.reload_check.file_problem", problem.file(), problem.word()));
+        }
+        GuardReport report = check.report();
+        if (!check.recipesReadable()) {
+            source.sendFailure(Component.translatable("command.neroeconomy.reload_check.no_recipes"));
+            return 0;
+        }
+        source.sendSuccess(() -> Component.translatable("command.neroeconomy.reload_check.guard", report.recipesRead(),
+                report.recipesSkipped(), report.chainsChecked(), report.depth()), false);
+        java.util.List<GuardReport.Failure> failures = report.failures().stream()
+                .filter(failure -> failure.kind() != GuardReport.Kind.CLASH).toList();
+        checkLines(source, failures, failure -> switch (failure.kind()) {
+            case SPREAD -> Component.translatable("command.neroeconomy.reload_check.failure.spread",
+                    failure.commodity(), failure.cost(), failure.revenue());
+            case REDEEM -> Component.translatable("command.neroeconomy.reload_check.failure.redeem",
+                    failure.commodity(), failure.recipe(), failure.cost(), failure.revenue(), failure.steps());
+            default -> Component.translatable("command.neroeconomy.reload_check.failure.chain",
+                    failure.commodity(), failure.recipe(), failure.cost(), failure.revenue(), failure.steps());
+        });
+        if (failures.isEmpty()) {
+            source.sendSuccess(() -> Component.translatable("command.neroeconomy.reload_check.passed"), false);
+            return Command.SINGLE_SUCCESS;
+        }
+        source.sendFailure(Component.translatable("command.neroeconomy.reload_check.failed", failures.size(),
+                report.buyOff().size(), report.sellOff().size()));
+        return 0;
+    }
+
+    /** Sends up to {@link #MAX_CHECK_LINES} of {@code rows}, one line each, then how many were left out. */
+    private static <T> void checkLines(CommandSourceStack source, java.util.List<T> rows,
+            java.util.function.Function<T, Component> line) {
+        int shown = Math.min(rows.size(), MAX_CHECK_LINES);
+        for (int index = 0; index < shown; index++) {
+            T row = rows.get(index);
+            source.sendSuccess(() -> line.apply(row), false);
+        }
+        int more = rows.size() - shown;
+        if (more > 0) source.sendSuccess(() -> Component.translatable("command.neroeconomy.reload_check.more", more), false);
     }
 
     private static Component stockLine(ExchangeApi.StockQuote quote) {

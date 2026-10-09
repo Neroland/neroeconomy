@@ -9,7 +9,9 @@ import za.co.neroland.neroeconomy.economy.EconomyStore;
 /**
  * Drives the simulation: asks {@link SimClock} which steps are due, runs each one through a
  * {@link SimPipeline}, and records how far it got in the store's {@link SimulationSection} after
- * every step. It holds no state and reads no configuration, so the game and the tests run the very
+ * every step. While a step runs, the ledger's clock reads the step's deadline time
+ * ({@link SimContext#deadlineTime()}) on the running thread, so budgets, transaction times and
+ * expiries follow economy time and a catch-up ends in exactly the state an uninterrupted run would. It holds no state and reads no configuration, so the game and the tests run the very
  * same code — the game from its server tick, a test with a store, a time and no server.
  */
 public final class SimRunner {
@@ -87,8 +89,11 @@ public final class SimRunner {
         byte[] secret = section.secret();
         for (int index = 0; index < count; index++) {
             long step = first + index;
-            pipeline.run(new SimContext(store, server, secret, "", step, settings.stepMillis(), now,
-                    settings.autonomous()), failures);
+            SimContext context = new SimContext(store, server, secret, "", step, settings.stepMillis(), now,
+                    settings.autonomous());
+            // The step books everything at its own time, not at the moment it happens to run: a step
+            // replayed after a pause then does exactly what it would have done on time.
+            store.ledger().runAt(context.deadlineTime(), () -> pipeline.run(context, failures));
             // Saved with whatever the step changed, in the same store: a step is done or not done.
             section.setLastStep(step);
         }

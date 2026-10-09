@@ -1,0 +1,44 @@
+{
+  "comment": "What Nerotech's machines do in code, for the arbitrage guard. Harmless when Nerotech is not installed.",
+  "output_bonus": [
+    {
+      "recipe_type": "nerotech:ore_processing",
+      "extra_output": 1,
+      "comment": "The Advanced Ore Processor gives one more dust per operation than the recipe says."
+    }
+  ],
+  "conversions": [
+    {
+      "id": "nerotech:scrubber_fouls_filter",
+      "comment": "A Scrubber turns a filter cartridge into a dirty filter; ore processing then turns that into iron dust.",
+      "inputs": [
+        {
+          "item": "nerotech:filter_cartridge",
+          "count": 1
+        }
+      ],
+      "result": {
+        "id": "nerotech:dirty_filter",
+        "count": 1
+      }
+    },
+    {
+      "id": "nerotech:filter_loop",
+      "comment": "The whole loop in one step: 2 iron ingots and 6 paper make 4 cartridges, which end as up to 8 iron dust.",
+      "inputs": [
+        {
+          "item": "minecraft:iron_ingot",
+          "count": 2
+        },
+        {
+          "item": "minecraft:paper",
+          "count": 6
+        }
+      ],
+      "result": {
+        "id": "nerotech:iron_dust",
+        "count": 8
+      }
+    }
+  ]
+}

@@ -1,0 +1,27 @@
+{
+  "commodities": [
+    { "item": "minecraft:wheat", "reference_price": 3, "npc_daily_supply": 512, "npc_daily_demand": 512, "class": "farmable", "house": "growers", "sector": "farming" },
+    { "item": "minecraft:carrot", "reference_price": 2, "npc_daily_supply": 256, "npc_daily_demand": 512, "class": "farmable", "house": "growers", "sector": "farming" },
+    { "item": "minecraft:potato", "reference_price": 2, "npc_daily_supply": 256, "npc_daily_demand": 512, "class": "farmable", "house": "growers", "sector": "farming" },
+    { "item": "minecraft:beetroot", "reference_price": 2, "npc_daily_supply": 256, "npc_daily_demand": 256, "class": "farmable", "house": "growers", "sector": "farming" },
+    { "item": "minecraft:bread", "reference_price": 8, "npc_daily_supply": 256, "npc_daily_demand": 128, "class": "crafted", "house": "growers", "sector": "farming" },
+    { "item": "minecraft:sugar_cane", "reference_price": 2, "npc_daily_supply": 256, "npc_daily_demand": 512, "class": "farmable", "house": "growers", "sector": "farming" },
+    { "item": "minecraft:paper", "reference_price": 2, "npc_daily_demand": 256, "class": "crafted", "house": "growers", "sector": "farming" },
+    { "item": "minecraft:pumpkin", "reference_price": 4, "npc_daily_supply": 128, "npc_daily_demand": 256, "class": "farmable", "house": "growers", "sector": "farming" },
+    { "item": "minecraft:melon_slice", "reference_price": 2, "npc_daily_demand": 512, "class": "farmable", "house": "growers", "sector": "farming" },
+    { "item": "minecraft:cocoa_beans", "reference_price": 3, "npc_daily_demand": 256, "class": "farmable", "house": "growers", "sector": "farming" },
+    { "item": "minecraft:cactus", "reference_price": 2, "npc_daily_demand": 256, "class": "farmable", "house": "growers", "sector": "farming" },
+    { "item": "minecraft:nether_wart", "reference_price": 3, "npc_daily_demand": 128, "class": "farmable", "house": "growers", "sector": "farming" },
+    { "item": "minecraft:apple", "reference_price": 4, "npc_daily_demand": 64, "class": "staple", "house": "growers", "sector": "farming" },
+    { "tag": "minecraft:eggs", "reference_price": 2, "npc_daily_demand": 256, "class": "farmable", "house": "growers", "sector": "creatures" },
+    { "tag": "minecraft:wool", "reference_price": 4, "npc_daily_supply": 256, "npc_daily_demand": 256, "class": "farmable", "house": "growers", "sector": "decor" },
+    { "item": "minecraft:leather", "reference_price": 6, "npc_daily_demand": 128, "class": "farmable", "house": "growers", "sector": "creatures" },
+    { "item": "minecraft:beef", "reference_price": 3, "npc_daily_demand": 256, "class": "farmable", "house": "growers", "sector": "farming" },
+    { "item": "minecraft:porkchop", "reference_price": 3, "npc_daily_demand": 256, "class": "farmable", "house": "growers", "sector": "farming" },
+    { "item": "minecraft:mutton", "reference_price": 3, "npc_daily_demand": 256, "class": "farmable", "house": "growers", "sector": "farming" },
+    { "item": "minecraft:chicken", "reference_price": 2, "npc_daily_demand": 256, "class": "farmable", "house": "growers", "sector": "farming" },
+    { "item": "minecraft:rabbit", "reference_price": 3, "npc_daily_demand": 128, "class": "farmable", "house": "growers", "sector": "farming" },
+    { "item": "minecraft:cod", "reference_price": 3, "npc_daily_demand": 256, "class": "farmable", "house": "growers", "sector": "farming" },
+    { "item": "minecraft:salmon", "reference_price": 3, "npc_daily_demand": 256, "class": "farmable", "house": "growers", "sector": "farming" }
+  ]
+}

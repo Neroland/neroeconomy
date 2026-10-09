@@ -1,0 +1,17 @@
+{
+  "commodities": [
+    { "item": "minecraft:cobblestone", "reference_price": 2, "npc_daily_supply": 4096, "npc_daily_demand": 1024, "class": "farmable", "house": "masons", "sector": "colonies" },
+    { "item": "minecraft:cobbled_deepslate", "reference_price": 2, "npc_daily_supply": 2048, "npc_daily_demand": 512, "class": "farmable", "house": "masons", "sector": "colonies" },
+    { "item": "minecraft:stone", "reference_price": 3, "npc_daily_supply": 2048, "npc_daily_demand": 512, "class": "staple", "house": "masons", "sector": "colonies" },
+    { "item": "minecraft:dirt", "reference_price": 1, "npc_daily_supply": 2048, "class": "staple", "house": "masons", "sector": "colonies" },
+    { "item": "minecraft:sand", "reference_price": 2, "npc_daily_supply": 2048, "npc_daily_demand": 512, "class": "staple", "house": "masons", "sector": "colonies" },
+    { "item": "minecraft:gravel", "reference_price": 2, "npc_daily_supply": 1024, "npc_daily_demand": 512, "class": "staple", "house": "masons", "sector": "colonies" },
+    { "item": "minecraft:glass", "reference_price": 3, "npc_daily_supply": 1024, "npc_daily_demand": 512, "class": "crafted", "house": "masons", "sector": "decor" },
+    { "item": "minecraft:clay_ball", "reference_price": 3, "npc_daily_supply": 512, "npc_daily_demand": 512, "class": "staple", "house": "masons", "sector": "colonies" },
+    { "item": "minecraft:brick", "reference_price": 4, "npc_daily_demand": 512, "class": "crafted", "house": "masons", "sector": "colonies" },
+    { "item": "minecraft:terracotta", "reference_price": 4, "npc_daily_demand": 256, "class": "crafted", "house": "masons", "sector": "decor" },
+    { "tag": "minecraft:logs", "reference_price": 4, "npc_daily_supply": 2048, "npc_daily_demand": 512, "class": "farmable", "house": "masons", "sector": "colonies" },
+    { "tag": "minecraft:planks", "reference_price": 2, "npc_daily_supply": 2048, "npc_daily_demand": 1024, "class": "crafted", "house": "masons", "sector": "colonies" },
+    { "item": "minecraft:obsidian", "reference_price": 12, "npc_daily_demand": 128, "class": "staple", "house": "masons", "sector": "space" }
+  ]
+}

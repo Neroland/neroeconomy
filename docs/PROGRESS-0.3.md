@@ -13,10 +13,8 @@ any point and resume from the **Next** line without redoing anything. The specif
 
 ## Next
 
-**E1 + E6 — commodity data and the arbitrage guard** (commodity files, `compat/<modid>.json`,
-the loader, the recipe-walking guard in tests and `/eco admin reload-check`). Then E2 + E3
-(Merchant Houses and reference prices), then E4 + E5 (NPC auctions, system jobs, empty-server
-proof).
+**E4 + E5 — NPC auctions, Reserve-funded system jobs, empty-server proof** (brief
+`build/briefs/E45.md`). Then Stage F (Economy Hub screens).
 
 ## Status
 
@@ -45,7 +43,11 @@ smoke test.
 | D | D5 Practice mode (separate code path, never touches the ledger) | Done | 12,000-operation isolation test |
 | D | D6 Exchange tests and fuzzer operations | Done | Invariants A, B and C after every fuzz step |
 | D | D4 Invest screen | Not started (built with the hub in Stage F) | — |
-| E | E1–E6 Autonomous economy | Not started | — |
+| E | E1 Commodity data, 15 files incl. 9 sibling compat files | Done | Nine cells, 769 tests |
+| E | E6 Arbitrage guard (tests + `/eco admin reload-check`) | Done | Passes on shipped data, catches broken fixtures |
+| E | E2 Merchant Houses (9 houses, elasticity, caps inside matching, Reserve-funded) | Done | Nine cells, 798 tests, farm-bot week stays in budget |
+| E | E3 Reference prices drift toward player trades (capped, banded, guard re-checked daily) | Done | Wash-trade bound test |
+| E | E4 NPC auctions and system jobs, E5 empty-server proof | Not started | — |
 | F | F1–F4 Economy Hub screens | Not started | — |
 | G | G1–G4 Demos, handbook, gallery | Not started | — |
 | H | H1–H7 Link schema 2, bridge docs, app | Not started | — |
@@ -73,6 +75,8 @@ smoke test.
   the player accepts the exact reduced amount quoted. Principal always returns in full.
 - **Shares split 10-for-1** at 2,000 credits so prices stay readable.
 - **Idle practice portfolios are dropped after 30 economy-days.**
+- **House spreads** apply the full `spread_percent` on each side, matching what the arbitrage guard
+  proves safe.
 - **Trade steps run even when `autonomousEconomy` is off**; only NPC and exchange steps are
   switched off by it.
 

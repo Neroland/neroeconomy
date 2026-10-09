@@ -53,7 +53,9 @@ public enum BookResult {
     /** The economy is frozen for this session. */
     FROZEN,
     /** The sale could not be settled; nothing moved. */
-    INTERNAL;
+    INTERNAL,
+    /** The account has traded as much of this commodity with the Merchant Houses today as it may. */
+    DAILY_LIMIT;
 
     public boolean ok() { return this == OK; }
 

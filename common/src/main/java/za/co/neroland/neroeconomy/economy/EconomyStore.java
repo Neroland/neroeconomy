@@ -27,6 +27,7 @@ import za.co.neroland.neroeconomy.api.PlayerAccountId;
 import za.co.neroland.neroeconomy.api.SystemAccountId;
 import za.co.neroland.neroeconomy.book.BookSection;
 import za.co.neroland.neroeconomy.book.BuyOrder;
+import za.co.neroland.neroeconomy.book.HouseOrders;
 import za.co.neroland.neroeconomy.book.RuleOrders;
 import za.co.neroland.neroeconomy.book.SellOrder;
 import za.co.neroland.neroeconomy.config.EconomyConfig;
@@ -35,6 +36,7 @@ import za.co.neroland.neroeconomy.exchange.ExchangeSection;
 import za.co.neroland.neroeconomy.goods.GoodsSection;
 import za.co.neroland.neroeconomy.goods.Lot;
 import za.co.neroland.neroeconomy.goods.LotHolder;
+import za.co.neroland.neroeconomy.house.HouseSection;
 import za.co.neroland.neroeconomy.market.ListingSource;
 import za.co.neroland.neroeconomy.market.MarketBuyOffer;
 import za.co.neroland.neroeconomy.market.MarketListing;
@@ -107,7 +109,9 @@ public final class EconomyStore extends SavedData {
             // Added with the Auto-Trader block, so optional: who owns the block at each position.
             AutoTraderSection.CODEC.optionalFieldOf("auto_traders").forGetter(store -> present(store.autoTraders)),
             // Added with the exchange, so optional: an older store loads with nothing listed yet.
-            ExchangeSection.CODEC.optionalFieldOf("exchange").forGetter(store -> present(store.exchange)))
+            ExchangeSection.CODEC.optionalFieldOf("exchange").forGetter(store -> present(store.exchange)),
+            // Added with the Merchant Houses, so optional: an older store loads with no House state yet.
+            HouseSection.CODEC.optionalFieldOf("houses").forGetter(store -> present(store.houses)))
             .apply(instance, EconomyStore::new));
     public static final SavedDataType<EconomyStore> TYPE = new SavedDataType<>(ID, EconomyStore::new, CODEC, null);
 
@@ -137,11 +141,12 @@ public final class EconomyStore extends SavedData {
     private final TradeEscrowSection tradeEscrow;
     private final AutoTraderSection autoTraders;
     private final ExchangeSection exchange;
+    private final HouseSection houses;
 
     public EconomyStore() {
         this(0, Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
                 Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
-                Optional.empty(), Optional.empty(), Optional.empty(), false);
+                Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), false);
     }
 
     private EconomyStore(int schema, Optional<EconomySavedData> ledger, Optional<MarketSavedData> market,
@@ -149,9 +154,9 @@ public final class EconomyStore extends SavedData {
             Optional<GoodsSection> goods, Optional<VaultSection> vault, Optional<SimulationSection> simulation,
             Optional<BookSection> book, Optional<OffersSection> offers, Optional<RulesSection> rules,
             Optional<TradeEscrowSection> tradeEscrow, Optional<AutoTraderSection> autoTraders,
-            Optional<ExchangeSection> exchange) {
+            Optional<ExchangeSection> exchange, Optional<HouseSection> houses) {
         this(schema, ledger, market, obligations, shopOwners, goods, vault, simulation, book, offers, rules,
-                tradeEscrow, autoTraders, exchange, true);
+                tradeEscrow, autoTraders, exchange, houses, true);
     }
 
     private EconomyStore(int schema, Optional<EconomySavedData> ledger, Optional<MarketSavedData> market,
@@ -159,7 +164,7 @@ public final class EconomyStore extends SavedData {
             Optional<GoodsSection> goods, Optional<VaultSection> vault, Optional<SimulationSection> simulation,
             Optional<BookSection> book, Optional<OffersSection> offers, Optional<RulesSection> rules,
             Optional<TradeEscrowSection> tradeEscrow, Optional<AutoTraderSection> autoTraders,
-            Optional<ExchangeSection> exchange, boolean loadedFromDisk) {
+            Optional<ExchangeSection> exchange, Optional<HouseSection> houses, boolean loadedFromDisk) {
         this.schema = Math.max(0, schema);
         this.loadedFromDisk = loadedFromDisk;
         this.ledger = adopt(ledger.orElseGet(EconomySavedData::new));
@@ -175,6 +180,7 @@ public final class EconomyStore extends SavedData {
         this.tradeEscrow = adopt(tradeEscrow.orElseGet(TradeEscrowSection::new));
         this.autoTraders = adopt(autoTraders.orElseGet(AutoTraderSection::new));
         this.exchange = adopt(exchange.orElseGet(ExchangeSection::new));
+        this.houses = adopt(houses.orElseGet(HouseSection::new));
         // A store written before the vault existed still holds item claims in its market section.
         adoptItemClaims(false);
         // And one written before the order book existed still holds its Market Board rows there.
@@ -216,6 +222,12 @@ public final class EconomyStore extends SavedData {
     /** The exchange: the price state of every listed company, and the index fund's level. */
     public ExchangeSection exchange() { return exchange; }
 
+    /** The Merchant Houses: their stock, daily counts, price pressure and drifted reference prices. */
+    public HouseSection houses() { return houses; }
+
+    /** What the order book asks about a Merchant House's orders: the House section. */
+    public HouseOrders houseOrders() { return houses; }
+
     /** What the order book asks about an order an auto-trade rule placed: the rules section. */
     public RuleOrders ruleOrders() { return rules; }
 
@@ -246,7 +258,7 @@ public final class EconomyStore extends SavedData {
      */
     private List<EconomySection> sections() {
         return List.of(ledger, market, obligations, shopOwners, goods, vault, simulation, book, offers, rules,
-                tradeEscrow, autoTraders, exchange);
+                tradeEscrow, autoTraders, exchange, houses);
     }
 
     /** The names of the sections that hold anything, for the health report. */
@@ -265,6 +277,7 @@ public final class EconomyStore extends SavedData {
         if (!tradeEscrow.isEmpty()) names.add("trade_escrow");
         if (!autoTraders.isEmpty()) names.add("auto_traders");
         if (!exchange.isEmpty()) names.add("exchange");
+        if (!houses.isEmpty()) names.add("houses");
         return names;
     }
 

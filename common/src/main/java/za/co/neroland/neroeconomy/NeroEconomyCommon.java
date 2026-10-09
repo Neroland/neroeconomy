@@ -61,6 +61,9 @@ public final class NeroEconomyCommon {
         //    The order book goes before the market sweep too: nothing it erases is owed to anyone
         //    else, and a seller's proceeds from the erased player's purchases are claims that stay.
         PlayerDataErasure.register(Trading::eraseFor);
+        //    The Merchant Houses: what the erased player traded with them today, and their count
+        //    toward reference-price drift.
+        PlayerDataErasure.register(za.co.neroland.neroeconomy.house.Houses::eraseFor);
         //    The exchange: the erased player's share cost, bond principal and reserved interest move
         //    from the exchange account to the Reserve, and their practice portfolio is dropped.
         PlayerDataErasure.register(za.co.neroland.neroeconomy.exchange.Investing::eraseFor);
@@ -86,6 +89,10 @@ public final class NeroEconomyCommon {
         // After the prices: the day's dividends, then bond maturities and delisting payouts.
         za.co.neroland.neroeconomy.exchange.ExchangeSteps.register(Simulation.PIPELINE,
                 za.co.neroland.neroeconomy.exchange.Investing::env);
+        // The Merchant Houses, after the exchange: drift, funding, restock and quotes. Not housekeeping.
+        za.co.neroland.neroeconomy.house.Houses.register(Simulation.PIPELINE);
+        // The Houses keep the stock of their own accounts; until this is plugged in the book makes no House order.
+        Trading.systemDelivery(za.co.neroland.neroeconomy.house.Houses.DELIVERY);
         // Auto-Trader blocks are the inventories a rule can work from besides its owner's vault.
         Trading.ruleBinder(za.co.neroland.neroeconomy.trader.AutoTraders.BINDER);
         // Server-funded delivery jobs (soft logistics seam); without this the overload refuses jobs.

@@ -802,14 +802,15 @@ class BookSectionTest {
         Placed listed = book().placeSell(world.env, house, Lot.of(TradeWorld.IRON, 20), 3L, OrderSource.HOUSE, houseStock, null);
         assertTrue(listed.ok());
         assertEquals(0L, listed.listingFee());
+        // A House order the Merchant Houses' section does not track has no caps it could check, so it
+        // never fills (the real Houses and their caps are covered by house.HouseSectionTest).
         Placed bought = buy(buyer, TradeWorld.IRON, 5, 3L);
-        assertEquals(5, bought.filled());
-        assertEquals(15L, bought.buyerPaid());
-        // The House is paid straight into its account, less the market fee.
-        assertEquals(14L, world.ledger().getBalance(house, za.co.neroland.neroeconomy.NeroEconomyCommon.CREDITS));
-        // What is left goes back to the House's stock when the order lapses.
+        assertTrue(bought.ok());
+        assertEquals(0, bought.filled());
+        assertEquals(0L, world.ledger().getBalance(house, za.co.neroland.neroeconomy.NeroEconomyCommon.CREDITS));
+        // The goods go back to the House's stock when the order lapses.
         world.wall += 49L * TradeWorld.HOUR;
-        assertEquals(1, book().expire(world.env, world.now()));
-        assertEquals(List.of(Lot.of(TradeWorld.IRON, 15)), stock);
+        assertEquals(2, book().expire(world.env, world.now()));
+        assertEquals(List.of(Lot.of(TradeWorld.IRON, 20)), stock);
     }
 }
