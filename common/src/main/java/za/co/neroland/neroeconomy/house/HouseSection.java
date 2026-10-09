@@ -545,7 +545,9 @@ public final class HouseSection extends EconomySection implements LotHolder, Hou
      */
     public synchronized void step(HouseEnv env, long today, long stepMillis) {
         EconomyStore store = owner();
-        if (store == null || env == null || EconomyHealth.frozen() || !env.commodities().available()) return;
+        // Nor while an operator has closed the market: the Houses neither restock nor quote until it opens.
+        if (store == null || env == null || EconomyHealth.frozen() || marketClosed() || !env.commodities().available())
+            return;
         roll(today);
         boolean newDay = quotedDay == NEVER || today > quotedDay;
         quotedDay = today;
@@ -572,7 +574,7 @@ public final class HouseSection extends EconomySection implements LotHolder, Hou
 
     /** Re-quotes up to {@code max} commodities that were traded since they were last quoted. @return how many */
     public synchronized int requoteDirty(HouseEnv env, int max) {
-        if (owner() == null || env == null || EconomyHealth.frozen()) return 0;
+        if (owner() == null || env == null || EconomyHealth.frozen() || marketClosed()) return 0;
         int done = 0;
         for (State state : states.values()) {
             if (done >= max) break;

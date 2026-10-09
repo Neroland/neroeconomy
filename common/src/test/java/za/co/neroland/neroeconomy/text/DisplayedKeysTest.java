@@ -64,10 +64,8 @@ class DisplayedKeysTest {
                 "command.neroeconomy.supply.check_escrow", "gui.neroeconomy.purchase.surcharge",
                 "gui.neroeconomy.purchase.discount", "gui.neroeconomy.purchase.discount_skipped",
                 "item.neroeconomy.credit_chip.reserve_empty", "item.neroeconomy.credit_chip.refused"));
-        // The vault screen, its button at the Bank Terminal, and the simulation report.
-        keys.addAll(List.of("container.neroeconomy.vault", "gui.neroeconomy.bank.vault",
-                "gui.neroeconomy.bank.vault.tooltip", "gui.neroeconomy.bank.send.tooltip",
-                "gui.neroeconomy.bank.collect.tooltip", "gui.neroeconomy.vault.count",
+        // The vault screen and the simulation report.
+        keys.addAll(List.of("container.neroeconomy.vault", "gui.neroeconomy.vault.count",
                 "gui.neroeconomy.vault.count.tooltip", "gui.neroeconomy.vault.empty", "gui.neroeconomy.vault.hidden",
                 "gui.neroeconomy.vault.hidden.tooltip", "gui.neroeconomy.vault.hint",
                 "gui.neroeconomy.vault.locked.tooltip", "gui.neroeconomy.vault.over_cap",

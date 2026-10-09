@@ -1,13 +1,10 @@
 package za.co.neroland.neroeconomy.command;
 
-import java.io.IOException;
 import java.nio.file.Path;
 import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
 
-import com.google.gson.GsonBuilder;
-import com.google.gson.JsonObject;
 import com.mojang.brigadier.Command;
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.BoolArgumentType;
@@ -33,6 +30,7 @@ import net.minecraft.resources.Identifier;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
@@ -42,16 +40,16 @@ import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.AABB;
 
-import za.co.neroland.nerolandcore.data.PlayerDataErasure;
 import za.co.neroland.nerolandcore.economy.CurrencyApi;
 import za.co.neroland.neroeconomy.NeroEconomyCommon;
+import za.co.neroland.neroeconomy.admin.AdminOps;
 import za.co.neroland.neroeconomy.api.ExchangeApi;
 import za.co.neroland.neroeconomy.block.PlayerShopBlockEntity;
+import za.co.neroland.neroeconomy.hub.HubOpener;
+import za.co.neroland.neroeconomy.hub.HubTab;
 import za.co.neroland.neroeconomy.commodity.CommodityData;
 import za.co.neroland.neroeconomy.commodity.CommodityRegistry;
 import za.co.neroland.neroeconomy.config.EconomyConfig;
-import za.co.neroland.neroeconomy.data.LedgerExportFiles;
-import za.co.neroland.neroeconomy.data.PlayerDataExport;
 import za.co.neroland.neroeconomy.economy.EconomyHealth;
 import za.co.neroland.neroeconomy.economy.EconomySavedData;
 import za.co.neroland.neroeconomy.economy.EconomyStore;
@@ -74,7 +72,6 @@ import za.co.neroland.neroeconomy.registry.ModBlocks;
 import za.co.neroland.neroeconomy.shop.ShopOwnershipState;
 import za.co.neroland.neroeconomy.simulation.SimClock;
 import za.co.neroland.neroeconomy.simulation.Simulation;
-import za.co.neroland.neroeconomy.telemetry.NeroEconomyTelemetry;
 import za.co.neroland.neroeconomy.text.ShortIds;
 import za.co.neroland.neroeconomy.text.TimeText;
 import za.co.neroland.neroeconomy.obligation.EconomyJob;
@@ -113,6 +110,10 @@ public final class EconomyCommands {
                         .then(Commands.argument("amount", LongArgumentType.longArg(1L))
                                 .executes(EconomyCommands::pay))))
                 .then(Commands.literal("history").executes(EconomyCommands::history))
+                // The Economy Hub, as a shortcut for using the economy block the player stands at.
+                .then(Commands.literal("hub").executes(context -> hub(context, null))
+                        .then(Commands.argument("tab", StringArgumentType.word()).suggests(HUB_TABS)
+                                .executes(context -> hub(context, StringArgumentType.getString(context, "tab")))))
                 .then(Commands.literal("privacy").then(Commands.literal("logging")
                         .then(Commands.argument("optOut", BoolArgumentType.bool())
                                 .executes(EconomyCommands::privacy))))
@@ -131,6 +132,11 @@ public final class EconomyCommands {
                                         .requires(source -> EconomyConfig.ADMIN_MUTATIONS_ENABLED.get())
                                         .executes(EconomyCommands::acceptFreshStart)))
                         // The report is always available; running steps by hand changes the economy.
+                        // The operator's market freeze: trading stops, reads, collecting and refunds go on.
+                        .then(Commands.literal("market")
+                                .requires(source -> EconomyConfig.ADMIN_MUTATIONS_ENABLED.get())
+                                .then(Commands.literal("close").executes(context -> marketSwitch(context, true)))
+                                .then(Commands.literal("open").executes(context -> marketSwitch(context, false))))
                         .then(Commands.literal("sim").executes(EconomyCommands::simStatus)
                                 .then(Commands.literal("step")
                                         .requires(source -> EconomyConfig.ADMIN_MUTATIONS_ENABLED.get())
@@ -170,6 +176,16 @@ public final class EconomyCommands {
     private static boolean frozen(CommandContext<CommandSourceStack> context) {
         if (!EconomyHealth.frozen()) return false;
         context.getSource().sendFailure(Component.translatable(EconomyHealth.FROZEN_KEY));
+        return true;
+    }
+
+    /**
+     * Tells the caller an operator has closed the market. @return true when it is, so a command that
+     * would trade, post, claim or fulfil must stop; cancelling, collecting and refunds carry on
+     */
+    private static boolean marketClosed(CommandContext<CommandSourceStack> context, ServerPlayer player) {
+        if (!EconomyStore.get(player.level().getServer()).marketClosed()) return false;
+        context.getSource().sendFailure(Component.translatable(EconomyHealth.MARKET_CLOSED_KEY));
         return true;
     }
 
@@ -397,9 +413,8 @@ public final class EconomyCommands {
 
     /** Gives up on the unreadable store and starts the economy afresh. Needs {@code adminMutationsEnabled}. */
     private static int acceptFreshStart(CommandContext<CommandSourceStack> context) {
-        if (!EconomyStore.acceptFreshStart(context.getSource().getServer()))
+        if (!AdminOps.acceptFreshStart(context.getSource().getServer()))
             return fail(context, "command.neroeconomy.health.not_frozen");
-        NeroEconomyCommon.CURRENCY_PROVIDER.refresh(context.getSource().getServer());
         // The broadcast to other operators carries no player data: it only says what was done.
         context.getSource().sendSuccess(() -> Component.translatable("command.neroeconomy.health.accepted"), true);
         return Command.SINGLE_SUCCESS;
@@ -428,10 +443,21 @@ public final class EconomyCommands {
         return Command.SINGLE_SUCCESS;
     }
 
+    /** Closes or opens the market. Needs {@code adminMutationsEnabled}. */
+    private static int marketSwitch(CommandContext<CommandSourceStack> context, boolean closed) {
+        boolean changed = AdminOps.setMarketClosed(context.getSource().getServer(), closed);
+        String key = !changed ? (closed ? "command.neroeconomy.market_switch.already_closed"
+                : "command.neroeconomy.market_switch.already_open")
+                : closed ? "command.neroeconomy.market_switch.closed" : "command.neroeconomy.market_switch.opened";
+        // The broadcast to other operators says what was done and nothing else.
+        context.getSource().sendSuccess(() -> Component.translatable(key), changed);
+        return changed ? Command.SINGLE_SUCCESS : 0;
+    }
+
     /** Runs simulation steps now, for testing. Needs {@code adminMutationsEnabled}. */
     private static int simStep(CommandContext<CommandSourceStack> context, int steps) {
         if (frozen(context)) return 0;
-        int ran = Simulation.stepNow(context.getSource().getServer(), steps);
+        int ran = AdminOps.simStep(context.getSource().getServer(), steps);
         // The broadcast to other operators says what was done and nothing else.
         context.getSource().sendSuccess(() -> Component.translatable("command.neroeconomy.sim.stepped", ran), true);
         return ran;
@@ -475,6 +501,32 @@ public final class EconomyCommands {
         return Command.SINGLE_SUCCESS;
     }
 
+    /** The tabs the caller sees, as {@code /eco hub} accepts them. */
+    private static final SuggestionProvider<CommandSourceStack> HUB_TABS = (context, builder) -> {
+        ServerPlayer player = context.getSource().getPlayer();
+        boolean admin = player != null && Commands.LEVEL_ADMINS.check(player.permissions());
+        return SharedSuggestionProvider.suggest(HubTab.visibleTabs(admin).stream().map(HubTab::id), builder);
+    };
+
+    /**
+     * Opens the Economy Hub at the economy block the player stands at, on the tab named or the
+     * block's own. There is no remote hub: without a block in reach the command says so.
+     */
+    private static int hub(CommandContext<CommandSourceStack> context, String tabName) {
+        ServerPlayer player = TradingCommands.trader(context, false);
+        if (player == null) return 0;
+        HubTab tab = null;
+        if (tabName != null) {
+            tab = HubTab.parse(tabName);
+            if (tab == null || !tab.visible(Commands.LEVEL_ADMINS.check(player.permissions())))
+                return TradingCommands.fail(context, "command.neroeconomy.hub.unknown_tab", tabName);
+        }
+        BlockEntity anchor = HubOpener.nearestAnchor(player);
+        if (anchor == null) return TradingCommands.fail(context, "command.neroeconomy.hub.no_terminal");
+        HubOpener.open(player, anchor, tab);
+        return Command.SINGLE_SUCCESS;
+    }
+
     private static int history(CommandContext<CommandSourceStack> context) {
         ServerPlayer player = context.getSource().getPlayer();
         if (player == null) return playerOnly(context);
@@ -510,26 +562,12 @@ public final class EconomyCommands {
         UUID target = resolveAccount(context);
         if (target == null) return 0;
         long amount = LongArgumentType.getLong(context, "amount");
-        EconomySavedData data = NeroEconomyCommon.CURRENCY_PROVIDER.activeData();
-        long balance = data.getBalance(target, NeroEconomyCommon.CREDITS);
-        boolean success = switch (type) {
-            case ADMIN_GRANT -> Long.MAX_VALUE - balance >= amount
-                    && NeroEconomyCommon.CURRENCY_PROVIDER.depositTyped(target, NeroEconomyCommon.CREDITS, amount, type);
-            case ADMIN_TAKE -> NeroEconomyCommon.CURRENCY_PROVIDER.withdrawTyped(
-                    target, NeroEconomyCommon.CREDITS, amount, type);
-            case ADMIN_SET -> amount >= balance
-                    ? NeroEconomyCommon.CURRENCY_PROVIDER.depositTyped(
-                            target, NeroEconomyCommon.CREDITS, amount - balance, type)
-                    : NeroEconomyCommon.CURRENCY_PROVIDER.withdrawTyped(
-                            target, NeroEconomyCommon.CREDITS, balance - amount, type);
-            default -> false;
-        };
-        if (!success) {
+        // The same call as the hub's Admin tab: one ledger row under the reason, and the action counted.
+        if (!AdminOps.credits(context.getSource().getServer(), target, amount, type)) {
             context.getSource().sendFailure(Component.translatable("command.neroeconomy.admin_failed"));
             return 0;
         }
         // Neither the log nor the broadcast carries the amount, and the result stays with the caller.
-        NeroEconomyCommon.LOGGER.debug("[NeroEconomy] Administrative mutation completed (reason={}).", type);
         context.getSource().sendSuccess(() -> Component.translatable("command.neroeconomy.admin_success"), false);
         return Command.SINGLE_SUCCESS;
     }
@@ -538,14 +576,8 @@ public final class EconomyCommands {
         UUID target = resolveSubject(context);
         if (target == null) return 0;
         // Every store, not just the ledger, and not cut at historyLimitPerPlayer.
-        Path output;
-        try {
-            JsonObject json = PlayerDataExport.build(context.getSource().getServer(), target);
-            output = LedgerExportFiles.write(context.getSource().getServer(), target,
-                    new GsonBuilder().setPrettyPrinting().create().toJson(json));
-        } catch (IOException | RuntimeException failure) {
-            // The real message holds the path, and the file name is the subject's id: class name only.
-            NeroEconomyTelemetry.captureHandledException(LedgerExportFiles.reportable(failure), "data_subject_export");
+        Path output = AdminOps.export(context.getSource().getServer(), target);
+        if (output == null) {
             context.getSource().sendFailure(Component.translatable("command.neroeconomy.export_failed"));
             return 0;
         }
@@ -557,7 +589,7 @@ public final class EconomyCommands {
     private static int erase(CommandContext<CommandSourceStack> context) {
         UUID target = resolveSubject(context);
         if (target == null) return 0;
-        PlayerDataErasure.erase(context.getSource().getServer(), target);
+        AdminOps.erase(context.getSource().getServer(), target);
         context.getSource().sendSuccess(() -> Component.translatable("command.neroeconomy.erase_success"), true);
         return Command.SINGLE_SUCCESS;
     }
@@ -719,7 +751,7 @@ public final class EconomyCommands {
             String destination) {
         ServerPlayer player = context.getSource().getPlayer();
         if (player == null) return playerOnly(context);
-        if (frozen(context)) return 0;
+        if (frozen(context) || marketClosed(context, player)) return 0;
         ObligationSavedData store = ObligationSavedData.get(player.level().getServer());
         int cap = EconomyConfig.MAX_JOBS_PER_PLAYER.get();
         if (store.jobsIssuedBy(player.getUUID()).size() >= cap)
@@ -740,7 +772,7 @@ public final class EconomyCommands {
         ServerPlayer player = context.getSource().getPlayer();
         if (player == null) return playerOnly(context);
         UUID id = parseId(context); if (id == null) return 0;
-        if (frozen(context)) return 0;
+        if (frozen(context) || marketClosed(context, player)) return 0;
         boolean ok = ObligationSavedData.get(player.level().getServer()).claim(id, player.getUUID());
         if (!ok) return fail(context, "command.neroeconomy.job.claim_failed");
         context.getSource().sendSuccess(() -> Component.translatable("command.neroeconomy.job.claimed"), false);
@@ -861,7 +893,7 @@ public final class EconomyCommands {
     private static int createAuction(CommandContext<CommandSourceStack> context, boolean interplanetary) {
         ServerPlayer player = context.getSource().getPlayer();
         if (player == null) return playerOnly(context);
-        if (frozen(context)) return 0;
+        if (frozen(context) || marketClosed(context, player)) return 0;
         // The lot comes out of the hand, which a creative-mode or spectator one may never supply.
         if (GoodsSource.refused(player)) return 0;
         long end = NeroEconomyCommon.CURRENCY_PROVIDER.now()
@@ -884,7 +916,7 @@ public final class EconomyCommands {
         ServerPlayer player = context.getSource().getPlayer();
         if (player == null) return playerOnly(context);
         UUID id = parseId(context); if (id == null) return 0;
-        if (frozen(context)) return 0;
+        if (frozen(context) || marketClosed(context, player)) return 0;
         ObligationSavedData store = ObligationSavedData.get(player.level().getServer());
         long amount = LongArgumentType.getLong(context, "amount");
         long minimum = store.minimumNextBid(id);

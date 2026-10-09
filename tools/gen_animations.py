@@ -27,6 +27,8 @@ PULSE = [
     ("market_board_front", 8, 3, 0.24, (0.00, 0.18)),
     ("player_shop_front", 8, 3, 0.20, (0.02, 0.18)),
     ("auto_trader_front", 8, 3, 0.26, (0.06, 0.48)),
+    ("exchange_terminal_front", 8, 3, 0.26, (0.06, 0.18)),
+    ("merchant_stall_front", 8, 3, 0.20, (0.06, 0.18)),
 ]
 
 
@@ -112,7 +114,8 @@ def write_png(path, rows):
 
 
 def write_mcmeta(path, frametime):
-    with open(str(path) + ".mcmeta", "w", encoding="utf-8", newline="\n") as fh:
+    # CRLF, like every other tracked text file in the working tree, so a regeneration changes nothing.
+    with open(str(path) + ".mcmeta", "w", encoding="utf-8", newline="\r\n") as fh:
         json.dump({"animation": {"frametime": frametime}}, fh, indent=2)
         fh.write("\n")
 

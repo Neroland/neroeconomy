@@ -433,12 +433,135 @@ def gen_trader_front():
     write_block("auto_trader_front", cv)
 
 
+# --------------------------------------------------------------- exchange terminal
+
+# Exchange Terminal -- deep navy hull with the bank's gold: a ticker of candles on a dark screen.
+EXCH = [(30, 36, 60, 255), (25, 31, 52, 255), (35, 42, 68, 255), (21, 26, 45, 255)]
+EXCH_L = (92, 104, 146, 255)
+EXCH_D = (10, 13, 26, 255)
+CANDLE_UP = (96, 232, 140, 255)
+CANDLE_DOWN = (232, 96, 84, 255)
+
+
+def gen_exchange_side():
+    rng = random.Random(1601)
+    cv = canvas()
+    noise(cv, EXCH, rng)
+    bevel(cv, EXCH_L, EXCH_D)
+    # A tape of gold ticks running down the side, and a vented base.
+    rect(cv, 3, 2, 3, 12, GOLD_D)
+    for y in (3, 6, 9, 12):
+        cv[y][3] = GOLD
+    for y in (5, 7, 9):
+        rect(cv, 6, y, 12, y, EXCH_D)
+    rect(cv, 5, 12, 12, 13, EXCH_D)
+    rivets(cv, GOLD_D)
+    write_block("exchange_terminal", cv)
+
+
+def gen_exchange_top():
+    rng = random.Random(1602)
+    cv = canvas()
+    noise(cv, EXCH, rng)
+    bevel(cv, EXCH_L, EXCH_D)
+    # A gold coin slot in a dark well.
+    rect(cv, 4, 4, 11, 11, EXCH_D)
+    disc(cv, 7.5, 7.5, 1.8, 3.2, GOLD_D)
+    rect(cv, 5, 7, 10, 8, INK)
+    cv[7][7] = GOLD_HI
+    cv[7][8] = GOLD
+    rivets(cv, GOLD_D)
+    write_block("exchange_terminal_top", cv)
+
+
+def gen_exchange_front():
+    rng = random.Random(1603)
+    cv = canvas()
+    noise(cv, EXCH, rng)
+    bevel(cv, EXCH_L, EXCH_D)
+    rect(cv, 1, 2, 14, 11, EXCH_D)
+    rect(cv, 2, 3, 13, 10, SCREEN)
+    # Candles: wick and body, up in green, down in red, climbing left to right.
+    candles = ((3, 7, 9, True), (5, 6, 8, False), (7, 5, 8, True), (9, 4, 6, True), (11, 3, 6, False))
+    for x, top, bottom, up in candles:
+        colour = CANDLE_UP if up else CANDLE_DOWN
+        rect(cv, x, top - 1, x, bottom + 1, mix(SCREEN, colour, 0.45))
+        rect(cv, x, top, x + 1, bottom, colour)
+    # Gold ticker line along the bezel.
+    rect(cv, 2, 12, 13, 12, GOLD_D)
+    for x in range(3, 13, 3):
+        cv[12][x] = GOLD
+    rivets(cv, GOLD_D)
+    write_block("exchange_terminal_front", cv)
+
+
+# --------------------------------------------------------------- merchant stall
+
+# Merchant Stall -- the shop's timber with a house-green awning and stacked crates of goods.
+HOUSE_GREEN = (64, 168, 104, 255)
+HOUSE_GREEN_D = (30, 92, 56, 255)
+
+
+def gen_stall_side():
+    rng = random.Random(1701)
+    cv = canvas()
+    noise(cv, WOOD, rng)
+    bevel(cv, WOOD_L, WOOD_D)
+    stripes(cv, 0, 2, HOUSE_GREEN, CREAM)
+    rect(cv, 0, 3, 15, 3, WOOD_D)
+    # Two crates stacked against the side.
+    for (x0, y0) in ((2, 8), (8, 10)):
+        rect(cv, x0, y0, x0 + 5, y0 + 4, mix(WOOD[0], WOOD_L, 0.3))
+        rect(cv, x0, y0, x0 + 5, y0, WOOD_D)
+        rect(cv, x0, y0, x0, y0 + 4, WOOD_D)
+        cv[y0 + 2][x0 + 2] = BRASS
+    rivets(cv, BRASS)
+    write_block("merchant_stall", cv)
+
+
+def gen_stall_top():
+    rng = random.Random(1702)
+    cv = canvas()
+    noise(cv, WOOD, rng)
+    bevel(cv, WOOD_L, WOOD_D)
+    stripes(cv, 0, 15, HOUSE_GREEN, CREAM, width=3)
+    rect(cv, 0, 15, 15, 15, HOUSE_GREEN_D)
+    rivets(cv, BRASS)
+    write_block("merchant_stall_top", cv)
+
+
+def gen_stall_front():
+    rng = random.Random(1703)
+    cv = canvas()
+    noise(cv, WOOD, rng)
+    bevel(cv, WOOD_L, WOOD_D)
+    # Awning valance with a scalloped edge.
+    stripes(cv, 0, 2, HOUSE_GREEN, CREAM)
+    for x in range(0, 16, 2):
+        cv[3][x] = HOUSE_GREEN_D
+    # Hanging house banner over the counter.
+    rect(cv, 6, 4, 9, 7, HOUSE_GREEN_D)
+    rect(cv, 7, 5, 8, 6, LAMP)
+    # Counter lip and the goods on display.
+    rect(cv, 1, 9, 14, 9, BRASS)
+    rect(cv, 1, 10, 14, 14, mix(WOOD[2], WOOD_D, 0.45))
+    for (gx, colour) in ((3, AWN), (5, LAMP), (10, HOUSE_GREEN), (12, CREAM)):
+        cv[8][gx] = colour
+        cv[8][gx + 1] = colour
+    for (bx, by) in ((3, 12), (7, 12), (11, 12)):
+        rect(cv, bx, by, bx + 1, by + 1, mix(WOOD[0], WOOD_L, 0.3))
+    rivets(cv, BRASS)
+    write_block("merchant_stall_front", cv)
+
+
 BLOCK_GENERATORS = (
     gen_bank_side, gen_bank_top, gen_bank_front,
     gen_terminal_side, gen_terminal_top, gen_terminal_front,
     gen_board_side, gen_board_top, gen_board_front,
     gen_shop_side, gen_shop_top, gen_shop_front,
     gen_trader_side, gen_trader_top, gen_trader_front,
+    gen_exchange_side, gen_exchange_top, gen_exchange_front,
+    gen_stall_side, gen_stall_top, gen_stall_front,
 )
 
 
@@ -454,6 +577,36 @@ def chip():
     png(ROOT / "item" / "credit_chip.png", 16, 16, pixel)
 
 
+def handbook():
+    """The Trader's Handbook: a teal-bound book with page edges on the right and a gold credit coin."""
+    cover = (24, 92, 74, 255)
+    cover_hi = (40, 140, 110, 255)
+    cover_d = (12, 46, 38, 255)
+    page = (232, 222, 196, 255)
+    page_d = (196, 182, 150, 255)
+
+    def pixel(x, y):
+        if y < 1 or y > 14 or x < 2 or x > 13:
+            return (0, 0, 0, 0)
+        if x >= 12:                                   # page block seen from the fore-edge
+            return page if (y % 2) else page_d
+        if x == 2:                                    # spine
+            return cover_d
+        if y in (1, 14):
+            return cover_hi if y == 1 else cover_d
+        if x == 3:
+            return GOLD_D
+        d = math.hypot(x - 7.5, y - 7.5)
+        if d <= 1.2:
+            return GOLD_D
+        if d <= 2.6:
+            return GOLD_HI if x + y < 15 else GOLD
+        if y in (3, 12) and 5 <= x <= 10:
+            return GOLD
+        return cover if (x + y) % 3 else cover_hi
+    png(ROOT / "item" / "traders_handbook.png", 16, 16, pixel)
+
+
 def main():
     targets = [a for a in sys.argv[1:] if not a.startswith("-")] or ["blocks", "item"]
     if "blocks" in targets:
@@ -462,6 +615,7 @@ def main():
         print(f"Generated {len(BLOCK_GENERATORS)} NeroEconomy block sprites")
     if "item" in targets:
         chip()
+        handbook()
     if "gui" in targets:
         # GUI panel sheets are owned by tools/gen_gui.py (layout-matched 256x256 sheets);
         # generating them here would clobber those. Run gen_gui.py instead.

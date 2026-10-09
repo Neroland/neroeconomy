@@ -22,11 +22,14 @@ public enum PurchaseResult {
     /** The buyer has the credits, but part of them is a starting balance that has not vested yet. */
     FUNDS_LOCKED,
     /** The economy is frozen for this session; nothing can be bought. */
-    FROZEN;
+    FROZEN,
+    /** An operator has closed the market for now; reads, collecting and refunds still work. */
+    MARKET_CLOSED;
 
     /** Lang key of the player-facing wording for this result. */
     public String translationKey() {
         if (this == FROZEN) return EconomyHealth.FROZEN_KEY;
+        if (this == MARKET_CLOSED) return EconomyHealth.MARKET_CLOSED_KEY;
         return "gui.neroeconomy.purchase_result." + name().toLowerCase(Locale.ROOT);
     }
 }

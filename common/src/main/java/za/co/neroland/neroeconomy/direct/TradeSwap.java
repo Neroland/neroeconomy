@@ -54,7 +54,9 @@ public final class TradeSwap {
         FIRST_LOCKED(Side.FIRST, "funds_locked"),
         SECOND_LOCKED(Side.SECOND, "funds_locked"),
         /** The ledger refused the credits for a reason the checks did not foresee. */
-        LEDGER(null, "ledger");
+        LEDGER(null, "ledger"),
+        /** An operator has closed the market for now. */
+        MARKET_CLOSED(null, "market_closed");
 
         private final Side side;
         private final String word;
@@ -72,6 +74,7 @@ public final class TradeSwap {
         /** Lang key of the plain reason, worded for the side reading it. */
         public String translationKey(Side viewer) {
             if (this == FROZEN) return EconomyHealth.FROZEN_KEY;
+            if (this == MARKET_CLOSED) return EconomyHealth.MARKET_CLOSED_KEY;
             String key = "message.neroeconomy.direct_trade.swap." + word;
             return side == null ? key : key + (side == viewer ? ".you" : ".them");
         }
@@ -177,6 +180,7 @@ public final class TradeSwap {
             List<Lot> firstGives, GoodsReceiver firstReceiver, AccountId second, long secondCredits,
             List<Lot> secondGives, GoodsReceiver secondReceiver) {
         if (EconomyHealth.frozen()) return Outcome.refused(Result.FROZEN);
+        if (store != null && store.marketClosed()) return Outcome.refused(Result.MARKET_CLOSED);
         if (store == null || env == null || first == null || second == null || first.equals(second)
                 || firstReceiver == null || secondReceiver == null || firstGives == null || secondGives == null
                 || firstCredits < 0L || secondCredits < 0L || firstCredits > TradeSession.MAX_CREDITS

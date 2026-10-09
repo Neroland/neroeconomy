@@ -101,6 +101,11 @@ final class LifecycleOperations {
             world.owe(player, -owed);
             // A direct trade they have open ends first, so the other side gets its goods back.
             destroyed += DirectTradeOperations.erased(world, player);
+            // The obligations go before the book and the market's claims, as in the game: a standing
+            // bid of theirs on a House's lot is swept to the Reserve and the lot stays up with no bid,
+            // a settled row keeps its numbers and loses their name, and a House or server job they
+            // claimed is open to anyone again.
+            DealOperations.erased(world, player);
             // The trading sections go in the order the game erases them: the book and offers, then
             // the market's claims. Each sweeps its own escrow; the erased player's goods on the
             // book and in offers they sent are destroyed, and offers sent to them go back.

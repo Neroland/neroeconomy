@@ -30,13 +30,12 @@ RAIL = (11, 17, 25, 255)
 
 # Economy accent family: the credits green, varied per screen.
 ACCENTS = {
-    "bank_terminal": (56, 230, 161, 255),
     "player_shop": (96, 232, 140, 255),
-    "trading_terminal": (48, 214, 190, 255),
-    "market_board": (150, 236, 120, 255),
     "vault": (72, 220, 150, 255),
     "direct_trade": (84, 226, 172, 255),
     "auto_trader": (120, 228, 150, 255),
+    "economy_hub": (56, 230, 161, 255),
+    "handbook": (64, 214, 170, 255),
 }
 
 
@@ -52,19 +51,19 @@ def write_png(path: Path, buf):
         return (struct.pack(">I", len(data)) + kind + data
                 + struct.pack(">I", zlib.crc32(kind + data) & 0xFFFFFFFF))
 
-    payload = b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", SHEET, SHEET, 8, 6, 0, 0, 0))
+    payload = b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", len(buf[0]), len(buf), 8, 6, 0, 0, 0))
     payload += chunk(b"IDAT", zlib.compress(bytes(raw), 9)) + chunk(b"IEND", b"")
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_bytes(payload)
     return len(payload)
 
 
-def new_sheet():
-    return [[CLEAR] * SHEET for _ in range(SHEET)]
+def new_sheet(width=SHEET, height=SHEET):
+    return [[CLEAR] * width for _ in range(height)]
 
 
 def put(buf, x, y, colour):
-    if 0 <= x < SHEET and 0 <= y < SHEET:
+    if 0 <= x < len(buf[0]) and 0 <= y < len(buf):
         buf[y][x] = colour
 
 
@@ -131,21 +130,6 @@ def player_inventory(buf, top, hotbar):
             socket(buf, 8 + col * 18, top + row * 18)
     for col in range(9):
         socket(buf, 8 + col * 18, hotbar)
-
-
-def gen_bank_terminal():
-    """176x134 — balance well, two form wells, one action row. Mirrors BankTerminalScreen."""
-    name = "bank_terminal"
-    width, height = 176, 134
-    accent = ACCENTS[name]
-    buf = new_sheet()
-    hull(buf, name, width, height, accent)
-    header_rule(buf, width, 14, accent)
-    recess(buf, 7, 16, 169, 32)     # balance readout
-    recess(buf, 8, 46, 168, 68)     # recipient field well
-    recess(buf, 8, 80, 168, 102)    # amount field well
-    recess(buf, 7, 103, 169, 129)   # action row well
-    return name, buf
 
 
 def gen_player_shop():
@@ -229,31 +213,55 @@ def gen_auto_trader():
     return name, buf
 
 
-def gen_terminal(name):
-    """256x226 — search row, status well, eight-row listing frame, two control rows, posting row."""
-    width, height = 256, 226
+def gen_economy_hub():
+    """256x224 body of the Economy Hub: a header strip and one deep content well. Each tab draws its
+    own rows inside it. Mirrors EconomyHubScreen (the body starts 24px into the panel)."""
+    name = "economy_hub"
+    width, height = 256, 224
     accent = ACCENTS[name]
     buf = new_sheet()
     hull(buf, name, width, height, accent)
-    header_rule(buf, width, 16, accent)
-    recess(buf, 7, 18, 249, 40)     # search field + Search button
-    recess(buf, 7, 42, 249, 58)     # balance / counts status well
-    recess(buf, 7, 62, 249, 156)    # listing frame: eight rows of 11px from y 65
-    for row in range(1, 8):
-        rect(buf, 9, 64 + row * 11, 247, 65 + row * 11, DIVIDER)
-    rect(buf, 240, 65, 244, 153, RAIL)  # scroll rail channel
-    recess(buf, 7, 158, 249, 202)   # navigation + action button rows
-    recess(buf, 7, 202, 249, 224)   # posting row (board only; a hint line otherwise)
+    header_rule(buf, width, 15, accent)
+    recess(buf, 6, 17, 250, 220)
+    return name, buf
+
+
+def gen_economy_hub_tabs():
+    """24x224 tab column of the Economy Hub: ten 22x22 tab sockets, 21px apart from y 5. Mirrors
+    EconomyHubScreen's tab buttons (20x20 from (2, 6))."""
+    name = "economy_hub_tabs"
+    width, height = 24, 224
+    accent = ACCENTS["economy_hub"]
+    buf = new_sheet()
+    hull(buf, name, width, height, accent)
+    for index in range(10):
+        top = 5 + index * 21
+        recess(buf, 1, top, 23, top + 22)
+    return name, buf
+
+
+def gen_handbook():
+    """304x220 Trader's Handbook on a 512x256 sheet: a header strip, the chapter list well on the
+    left and the page well on the right, with a rule under the page heading and one over the paging
+    row. Mirrors HandbookScreen (list 6..110, page 112..298, rules at y 32 and y 168)."""
+    name = "handbook"
+    width, height = 304, 220
+    accent = ACCENTS[name]
+    buf = new_sheet(512, 256)
+    hull(buf, name, width, height, accent)
+    header_rule(buf, width, 15, accent)
+    recess(buf, 6, 18, 110, 214)     # chapter list: twelve 100x14 buttons from (8, 20), 16px apart
+    recess(buf, 112, 18, 298, 214)   # page: heading, words, Open demo, paging row
+    rect(buf, 116, 32, 294, 33, DIVIDER)
+    rect(buf, 116, 168, 294, 169, DIVIDER)
     return name, buf
 
 
 def main():
     written = []
-    for build in (gen_bank_terminal, gen_player_shop, gen_vault, gen_direct_trade, gen_auto_trader):
+    for build in (gen_player_shop, gen_vault, gen_direct_trade, gen_auto_trader, gen_economy_hub, gen_economy_hub_tabs,
+                  gen_handbook):
         name, buf = build()
-        written.append((name, write_png(GUI_DIR / f"{name}.png", buf)))
-    for board in ("trading_terminal", "market_board"):
-        name, buf = gen_terminal(board)
         written.append((name, write_png(GUI_DIR / f"{name}.png", buf)))
     for name, size in written:
         print(f"wrote {name}.png ({size} bytes)")

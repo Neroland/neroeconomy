@@ -10,6 +10,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
+import java.util.function.Predicate;
 import java.util.function.Supplier;
 
 import com.google.gson.JsonArray;
@@ -292,6 +293,7 @@ public final class MarketSavedData extends EconomySection implements EscrowHolde
             case PAYOUT_BLOCKED -> PostResult.PAYOUT_BLOCKED;
             case CREATIVE -> PostResult.CREATIVE;
             case FROZEN -> PostResult.FROZEN;
+            case MARKET_CLOSED -> PostResult.MARKET_CLOSED;
             default -> PostResult.INVALID;
         };
     }
@@ -310,6 +312,7 @@ public final class MarketSavedData extends EconomySection implements EscrowHolde
             case PAYOUT_BLOCKED -> FillResult.PAYOUT_BLOCKED;
             case CREATIVE -> FillResult.CREATIVE;
             case FROZEN -> FillResult.FROZEN;
+            case MARKET_CLOSED -> FillResult.MARKET_CLOSED;
             default -> FillResult.INVALID;
         };
     }
@@ -328,6 +331,7 @@ public final class MarketSavedData extends EconomySection implements EscrowHolde
             case STORAGE_FULL -> live ? PurchaseResult.INVENTORY_FULL : PurchaseResult.CLAIMS_FULL;
             case INVALID -> PurchaseResult.INVALID_QUANTITY;
             case FROZEN -> PurchaseResult.FROZEN;
+            case MARKET_CLOSED -> PurchaseResult.MARKET_CLOSED;
             default -> PurchaseResult.INTERNAL_ERROR;
         };
     }
@@ -495,6 +499,46 @@ public final class MarketSavedData extends EconomySection implements EscrowHolde
                 sells.size(), buys.size());
     }
 
+    /**
+     * One row of {@link #searchOffered}: the row as a listing, whether it is a player shop, and the
+     * account that sells it. The account stays on the server: the Economy Hub turns it into a seller
+     * kind ("a player", "a shop", the Merchant House's name) and never sends it.
+     */
+    public record OfferedRow(MarketListing listing, boolean shop, AccountId seller) { }
+
+    /** A page of {@link #searchOffered}, with how many rows matched in all. */
+    public record OfferedPage(List<OfferedRow> rows, int total) { }
+
+    /**
+     * Everything on offer that matches the search — shops and the book's sell orders, Merchant
+     * House orders among them — in the same order as {@link #searchPage}, optionally only from
+     * sellers {@code sellers} accepts (a Merchant Stall shows one House).
+     *
+     * @param sellers which selling accounts to keep; null keeps every one
+     */
+    public synchronized OfferedPage searchOffered(String query, int page, int pageSize, long now, boolean includeDemo,
+            Predicate<AccountId> sellers) {
+        expire(now);
+        int size = MarketLimits.pageSize(pageSize);
+        long offset = MarketLimits.pageOffset(page, size);
+        List<Offered> rows = new ArrayList<>();
+        for (Offered row : offered(needle(query), now, includeDemo))
+            if (sellers == null || sellers.test(sellerOf(row))) rows.add(row);
+        EconomyStore store = owner();
+        List<OfferedRow> out = new ArrayList<>(size);
+        for (long index = offset; index < rows.size() && out.size() < size; index++) {
+            Offered row = rows.get((int) index);
+            MarketListing view = row.listing() != null ? copy(row.listing()) : listingView(store, row.order());
+            if (view != null) out.add(new OfferedRow(view, row.listing() != null
+                    && row.listing().source() == ListingSource.PLAYER_SHOP, sellerOf(row)));
+        }
+        return new OfferedPage(out, rows.size());
+    }
+
+    private static AccountId sellerOf(Offered row) {
+        return row.listing() != null ? new PlayerAccountId(row.listing().seller()) : row.order().owner();
+    }
+
     /** One thing on offer: a shop listing held here, or a sell order on the book. */
     private record Offered(String item, long price, long sequence, MarketListing listing, SellOrder order) { }
 
@@ -616,6 +660,7 @@ public final class MarketSavedData extends EconomySection implements EscrowHolde
     private PurchaseOutcome settlePurchase(UUID buyerId, ServerPlayer live, MinecraftServer server, UUID listingId,
             int quantity, long quotedUnitPrice, UUID requestId, Identifier expectedItem) {
         if (EconomyHealth.frozen()) return PurchaseOutcome.refused(PurchaseResult.FROZEN);
+        if (marketClosed()) return PurchaseOutcome.refused(PurchaseResult.MARKET_CLOSED);
         if (listingId == null || requestId == null || quantity < 1)
             return PurchaseOutcome.refused(PurchaseResult.INVALID_QUANTITY);
         if (!rememberRequest(buyerId, requestId)) return PurchaseOutcome.refused(PurchaseResult.STALE_REQUEST);

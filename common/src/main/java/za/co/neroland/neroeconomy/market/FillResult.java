@@ -11,11 +11,14 @@ public enum FillResult {
     /** The economy is frozen for this session; nothing can be sold. */
     FROZEN,
     /** Goods may not leave a creative-mode or spectator inventory into the economy. */
-    CREATIVE;
+    CREATIVE,
+    /** An operator has closed the market for now; reads, collecting and refunds still work. */
+    MARKET_CLOSED;
 
     /** Lang key of the message shown to the seller. */
     public String translationKey() {
         if (this == FROZEN) return EconomyHealth.FROZEN_KEY;
+        if (this == MARKET_CLOSED) return EconomyHealth.MARKET_CLOSED_KEY;
         return "gui.neroeconomy.fill_result." + name().toLowerCase(Locale.ROOT);
     }
 }

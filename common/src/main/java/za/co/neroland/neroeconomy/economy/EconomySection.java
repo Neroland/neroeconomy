@@ -27,6 +27,15 @@ public abstract class EconomySection extends SavedData {
     /** The store this section belongs to; null for a section that stands alone (a test, an old file). */
     protected final EconomyStore owner() { return owner; }
 
+    /**
+     * Whether an operator has closed the market (see {@code AdminSection}): trading refuses while
+     * reads, collecting and refunds carry on. False for a section that stands alone.
+     */
+    protected final boolean marketClosed() {
+        EconomyStore store = owner;
+        return store != null && store.marketClosed();
+    }
+
     /** The ledger of the store this section belongs to; null for a section that stands alone. */
     protected final EconomySavedData ledger() {
         EconomyStore store = owner;

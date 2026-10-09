@@ -171,7 +171,7 @@ public final class ObligationSavedData extends EconomySection implements EscrowH
 
     public synchronized EconomyJob postJob(ServerPlayer issuer, JobType type, String target, int quantity,
             String destination, long payout, long expiresAt) {
-        if (EconomyHealth.frozen()) return null;
+        if (EconomyHealth.frozen() || marketClosed()) return null;
         if (issuer == null || type == null || target == null || target.isBlank() || quantity < 1
                 || destination == null || payout < 1L || expiresAt <= now()) return null;
         if (!targetUsable(type, target)) return null;
@@ -202,7 +202,7 @@ public final class ObligationSavedData extends EconomySection implements EscrowH
     public synchronized EconomyJob postSystemJob(JobType type, String target, int quantity,
             String destination, long payout, long expiresAt) {
         long now = now();
-        if (EconomyHealth.frozen()) return null;
+        if (EconomyHealth.frozen() || marketClosed()) return null;
         if (type == null || quantity < 1 || destination == null || payout < 1L || expiresAt <= now
                 || JobTargets.isPlayer(target) || !targetUsable(type, target)) return null;
         if (!EconomyConfig.SYSTEM_JOBS_ENABLED.get()) {
@@ -226,7 +226,8 @@ public final class ObligationSavedData extends EconomySection implements EscrowH
     /** {@link #claim(UUID, UUID)} at economy time {@code now}: the rule itself, without a server. */
     public synchronized boolean claim(UUID id, UUID player, long now) {
         EconomyJob job = jobs.get(id);
-        if (EconomyHealth.frozen()) return false;
+        // Closing the market stops new claims; giving a claim back (release) still works.
+        if (EconomyHealth.frozen() || marketClosed()) return false;
         if (job == null || player == null || job.state() != JobState.OPEN || job.issuer().equals(player)
                 || job.expiresAt() <= now) return false;
         // A claim is exclusive, so the player a bounty is on must not be able to take it out of play.
@@ -254,6 +255,7 @@ public final class ObligationSavedData extends EconomySection implements EscrowH
      */
     public synchronized FulfillResult fulfill(ServerPlayer player, UUID id) {
         if (EconomyHealth.frozen()) return FulfillResult.FROZEN;
+        if (marketClosed()) return FulfillResult.MARKET_CLOSED;
         EconomyJob job = jobs.get(id);
         if (player == null || job == null || job.state() != JobState.CLAIMED
                 || !player.getUUID().equals(job.claimantId()) || job.type() == JobType.BOUNTY)
@@ -337,24 +339,39 @@ public final class ObligationSavedData extends EconomySection implements EscrowH
         if (killer == null || victim == null || EconomyHealth.frozen()) return 0;
         String entityId = BuiltInRegistries.ENTITY_TYPE.getKey(victim.getType()).toString();
         String playerTarget = victim instanceof ServerPlayer target ? JobTargets.player(target.getUUID()) : "";
-        MarketSavedData market = MarketSavedData.get(killer.level().getServer());
+        return recordKill(MarketSavedData.get(killer.level().getServer()), killer.getUUID(), entityId, playerTarget,
+                now());
+    }
+
+    /**
+     * {@link #onKill} as a rule, without a server: {@code killer} killed a mob of {@code entityId}
+     * (or the player whose bounty target is {@code playerTarget}; empty for a mob) at economy time
+     * {@code now}. Every bounty on it that the killer may work counts the kill; one that reaches its
+     * quantity pays its escrowed payout to the killer's credit claim.
+     *
+     * @return how many bounties the kill completed
+     */
+    public synchronized int recordKill(MarketSavedData market, UUID killer, String entityId, String playerTarget,
+            long now) {
+        // A kill while an operator has closed the market completes no bounty, as no job is fulfilled then.
+        if (market == null || killer == null || entityId == null || EconomyHealth.frozen() || marketClosed()) return 0;
+        String victimPlayer = playerTarget == null ? "" : playerTarget;
         int completed = 0;
         boolean changed = false;
-        long now = now();
         for (EconomyJob job : new ArrayList<>(jobs.values())) {
             if (job.type() != JobType.BOUNTY || terminal(job.state())
-                    || job.issuer().equals(killer.getUUID()) || job.expiresAt() <= now) continue;
-            if (!job.target().equals(entityId) && !job.target().equals(playerTarget)) continue;
+                    || job.issuer().equals(killer) || job.expiresAt() <= now) continue;
+            if (!job.target().equals(entityId) && !job.target().equals(victimPlayer)) continue;
             UUID claimant = job.claimantId();
-            if (claimant != null && !claimant.equals(killer.getUUID())) continue;
+            if (claimant != null && !claimant.equals(killer)) continue;
             // A bounty settles at its full quantity, not on the first kill.
             int progress = bountyProgress.computeIfAbsent(job.id(), ignored -> new LinkedHashMap<>())
-                    .merge(killer.getUUID(), 1, Integer::sum);
+                    .merge(killer, 1, Integer::sum);
             changed = true;
             if (progress < job.quantity()) continue;
-            if (!market.addCreditClaim(killer.getUUID(), job.payout(), TransactionType.BOUNTY_PAYOUT)) continue;
+            if (!market.addCreditClaim(killer, job.payout(), TransactionType.BOUNTY_PAYOUT)) continue;
             bountyProgress.remove(job.id());
-            jobs.put(job.id(), job.claimedBy(killer.getUUID(), job.claimedAt()).withState(JobState.FULFILLED));
+            jobs.put(job.id(), job.claimedBy(killer, job.claimedAt()).withState(JobState.FULFILLED));
             completed++;
         }
         if (changed) { invalidateSchedule(); setDirty(); }
@@ -363,7 +380,7 @@ public final class ObligationSavedData extends EconomySection implements EscrowH
 
     public synchronized AuctionRecord createAuction(ServerPlayer seller, int quantity, long minimumBid,
             long endsAt, boolean requestedInterplanetary) {
-        if (EconomyHealth.frozen()) return null;
+        if (EconomyHealth.frozen() || marketClosed()) return null;
         if (seller == null || quantity < 1 || minimumBid < 1L || endsAt <= now()) return null;
         // The lot comes out of the seller's hand, which a creative-mode one may never supply.
         if (!GoodsSource.allowed(seller)) return null;
@@ -383,7 +400,7 @@ public final class ObligationSavedData extends EconomySection implements EscrowH
         if (bidder != null && id != null && houseAuctions.containsKey(id)) return bidHouse(bidder, id, amount);
         AuctionRecord auction = auctions.get(id);
         long now = now();
-        if (EconomyHealth.frozen()) return false;
+        if (EconomyHealth.frozen() || marketClosed()) return false;
         if (bidder == null || auction == null || auction.state() != JobState.OPEN || auction.endsAt() <= now
                 || auction.seller().equals(bidder.getUUID()) || amount <= auction.highestBid()
                 || amount < ObligationRules.minimumNextBid(auction.minimumBid(), auction.highestBid(),
@@ -613,7 +630,7 @@ public final class ObligationSavedData extends EconomySection implements EscrowH
      */
     public synchronized HouseAuction startHouseAuction(String house, Lot lot, long minimumBid, long endsAt,
             boolean interplanetary, long now, int perDay) {
-        if (EconomyHealth.frozen() || house == null || house.isBlank() || lot == null || !lot.pristine()
+        if (EconomyHealth.frozen() || marketClosed() || house == null || house.isBlank() || lot == null || !lot.pristine()
                 || minimumBid < 1L || endsAt <= now || houseAuctions.size() >= MAX_HOUSE_AUCTIONS) return null;
         rollDealDay(now);
         if (npcAuctionsToday >= perDay) return null;
@@ -636,6 +653,7 @@ public final class ObligationSavedData extends EconomySection implements EscrowH
     public synchronized HouseBid bidHouseAuction(TradeEnv env, AuctionTerms terms, UUID bidder, UUID id, long amount,
             long now, boolean orbitOpen) {
         if (EconomyHealth.frozen()) return HouseBid.refused(HouseBid.Result.FROZEN);
+        if (marketClosed()) return HouseBid.refused(HouseBid.Result.MARKET_CLOSED);
         HouseAuction auction = id == null ? null : houseAuctions.get(id);
         EconomyStore store = owner();
         if (auction == null || bidder == null || store == null || env == null || terms == null)
@@ -710,7 +728,7 @@ public final class ObligationSavedData extends EconomySection implements EscrowH
      */
     public synchronized EconomyJob postHouseJob(String house, JobType type, String target, int quantity,
             String destination, long payout, long expiresAt, long now, boolean enabled, int perHouse) {
-        if (EconomyHealth.frozen() || !enabled || house == null || house.isBlank() || type == null
+        if (EconomyHealth.frozen() || marketClosed() || !enabled || house == null || house.isBlank() || type == null
                 || type == JobType.BOUNTY || !JobTargets.wellFormed(target) || JobTargets.isPlayer(target)
                 || quantity < 1 || destination == null || payout < 1L || expiresAt <= now) return null;
         int open = 0;
@@ -737,7 +755,8 @@ public final class ObligationSavedData extends EconomySection implements EscrowH
      */
     public synchronized EconomyJob postSystemBounty(String entity, int quantity, long payout, long expiresAt, long now,
             boolean enabled, int perDay) {
-        if (EconomyHealth.frozen() || !enabled || !JobTargets.wellFormed(entity) || JobTargets.isPlayer(entity)
+        if (EconomyHealth.frozen() || marketClosed() || !enabled || !JobTargets.wellFormed(entity)
+                || JobTargets.isPlayer(entity)
                 || JobTargets.isTag(entity) || JobTargets.PLAYER_ENTITY.equals(entity) || quantity < 1 || payout < 1L
                 || expiresAt <= now) return null;
         rollDealDay(now);
@@ -769,6 +788,7 @@ public final class ObligationSavedData extends EconomySection implements EscrowH
      */
     public synchronized FulfillResult fulfilHouseJob(UUID id, UUID worker, List<Lot> goods) {
         if (EconomyHealth.frozen()) return FulfillResult.FROZEN;
+        if (marketClosed()) return FulfillResult.MARKET_CLOSED;
         EconomyJob job = id == null ? null : jobs.get(id);
         String house = id == null ? null : houseJobs.get(id);
         EconomyStore store = owner();

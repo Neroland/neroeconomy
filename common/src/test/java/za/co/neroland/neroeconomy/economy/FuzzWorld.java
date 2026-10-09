@@ -34,11 +34,17 @@ import za.co.neroland.neroeconomy.commodity.CommodityCatalog;
 import za.co.neroland.neroeconomy.commodity.CommodityDefinition;
 import za.co.neroland.neroeconomy.commodity.CommodityRegistry;
 import za.co.neroland.neroeconomy.goods.Lot;
+import za.co.neroland.neroeconomy.house.BountyTable;
+import za.co.neroland.neroeconomy.house.HouseDealSettings;
+import za.co.neroland.neroeconomy.house.HouseDealsEnv;
+import za.co.neroland.neroeconomy.house.HouseDealsStep;
 import za.co.neroland.neroeconomy.house.HouseDefinition;
 import za.co.neroland.neroeconomy.house.HouseEnv;
 import za.co.neroland.neroeconomy.house.HouseRegistry;
 import za.co.neroland.neroeconomy.house.HouseSettings;
 import za.co.neroland.neroeconomy.house.HouseStep;
+import za.co.neroland.neroeconomy.obligation.AuctionTerms;
+import za.co.neroland.neroeconomy.obligation.ObligationSavedData;
 import za.co.neroland.neroeconomy.trade.SystemDelivery;
 import za.co.neroland.neroeconomy.goods.StackLimit;
 import za.co.neroland.neroeconomy.simulation.Housekeeping;
@@ -110,7 +116,18 @@ final class FuzzWorld {
             new StockDefinition("fuzz:wild", "stock.fuzz.wild", "stock.fuzz.wild.description", "space",
                     StockType.RISKY, 60L, 20.0D, 20.0D, 0.0D, List.of(), true),
             new StockDefinition("fuzz:pricey", "stock.fuzz.pricey", "stock.fuzz.pricey.description", "mining",
-                    StockType.RISKY, 1_900L, 10.0D, 40.0D, 0.7D, List.of(), true));
+                    StockType.RISKY, 1_900L, 10.0D, 40.0D, 0.7D, List.of(), true),
+            new StockDefinition(FuzzWorld.SPLITTER, "stock.fuzz.dear", "stock.fuzz.dear.description", "building",
+                    StockType.STEADY, 2_400L, 3.0D, 6.0D, 0.0D, List.of(), true));
+    /**
+     * A steady company that starts above the split line (2000 credits) and is never delisted by a
+     * data-pack reload. A steady price moves at most 10 % in an economy-day, so it is still at or
+     * above 2160 at the first day roll, whatever the random path: the first day roll splits it.
+     * This makes a split certain in every run instead of a matter of luck with the risky one.
+     */
+    static final String SPLITTER = "fuzz:dear";
+    /** The companies a data-pack reload may remove: all but {@link #SPLITTER}. */
+    static final List<StockDefinition> DELISTABLE = STOCKS.stream().filter(stock -> !SPLITTER.equals(stock.id())).toList();
     /**
      * The exchange's terms: a two-minute holding period so sales happen, small limits and a tight
      * rate limit so they are hit all the time, three bonds an account, 2000 play credits.
@@ -132,7 +149,13 @@ final class FuzzWorld {
     final Random random;
     final List<UUID> players = new ArrayList<>();
     final SimPipeline pipeline = new SimPipeline();
-    final SimRunner.Settings settings = new SimRunner.Settings(STEP_MILLIS, 432L, 2, true);
+    /**
+     * Six steps a tick. Steps run at their own (pinned) economy time, so a replayed step's House
+     * orders expire on the step's clock: with the game's two a tick the world, whose ticks are only
+     * one operation in twenty, stayed behind for most of a run and the Houses' orders were mostly
+     * dead on arrival. Six keeps it caught up most of the time while catch-up still happens.
+     */
+    final SimRunner.Settings settings = new SimRunner.Settings(STEP_MILLIS, 432L, 6, true);
     /** The real store. Replaced by a reloaded copy at a crash point. */
     EconomyStore store = new EconomyStore();
     /** The wall clock the ledger reads; only operations move it. */
@@ -207,8 +230,9 @@ final class FuzzWorld {
             @Override public double shock(List<String> keys, long now) { return 1.0D; }
         }));
         ExchangeSteps.register(pipeline, context -> exchangeEnv());
-        // The Merchant Houses, as the game registers them: after the exchange.
+        // The Merchant Houses, as the game registers them: after the exchange, then their auctions and jobs.
         pipeline.register(new HouseStep(context -> houseEnv()));
+        HouseDealsStep.register(pipeline, context -> dealsEnv());
         store.exchange().reconcile(registry());
     }
 
@@ -243,6 +267,31 @@ final class FuzzWorld {
         return new HouseEnv(COMMODITIES, HOUSES, env, new HouseSettings(100, 5_000, 20_000, 4L, 300L),
                 quotes -> guardChecks++ % 3 == 1 ? Set.of("minecraft:oak_log") : Set.of());
     }
+
+    /** The terms every House auction runs under: an ordinary auction's. */
+    static final AuctionTerms AUCTION_TERMS = new AuctionTerms(5.0D, 5, 60_000L);
+    /**
+     * The Houses' auctions and jobs, busier and shorter than the game's so that every branch is
+     * taken often: a dozen auctions a day of three hours, jobs and bounties of four hours.
+     */
+    static final HouseDealSettings DEAL_SETTINGS = new HouseDealSettings(12, 3L * 3_600_000L, true, 1_500, 2,
+            4L * 3_600_000L, 3, 4L * 3_600_000L);
+    /** The mobs the server may post a bounty on: small quantities, so the fuzzer's kills complete them. */
+    static final BountyTable BOUNTIES = BountyTable.of(List.of(new BountyTable.Entry("minecraft:creeper", 3, 90L),
+            new BountyTable.Entry("minecraft:skeleton", 1, 25L), new BountyTable.Entry("minecraft:zombie", 2, 40L)));
+    /** Where a House's delivery jobs deliver to. */
+    static final String DESTINATION = "minecraft:overworld|0|64|0";
+
+    /** What the Houses' auctions and jobs work with in a step. */
+    HouseDealsEnv dealsEnv() { return new HouseDealsEnv(houseEnv(), AUCTION_TERMS, DEAL_SETTINGS, BOUNTIES, DESTINATION); }
+
+    ObligationSavedData obligations() { return store.obligations(); }
+
+    /** House auctions the server tick settled to a winner, and settled with no bid (the lot back in stock). */
+    long houseLotsSold;
+    long houseLotsReturned;
+    /** Server-funded jobs the server tick expired, their escrow back to the Reserve. */
+    long systemJobsExpired;
 
     /** The book delivers the Houses' goods into the House section of whichever store is current. */
     private SystemDelivery houseDelivery() {
@@ -501,7 +550,11 @@ final class FuzzWorld {
                 .append(store.autoTraders().locations()).append(';').append(trades.size()).append(';')
                 .append(slotWrites()).append(';').append(guardChecks).append(';')
                 .append(za.co.neroland.neroeconomy.house.HouseSection.CODEC.encodeStart(
-                        com.mojang.serialization.JsonOps.INSTANCE, store.houses()).getOrThrow());
+                        com.mojang.serialization.JsonOps.INSTANCE, store.houses()).getOrThrow()).append(';')
+                // The obligations: House auctions, House and server jobs, bounty progress, the deal day.
+                .append(ObligationSavedData.CODEC.encodeStart(com.mojang.serialization.JsonOps.INSTANCE,
+                        store.obligations()).getOrThrow()).append(';').append(houseLotsSold).append('/')
+                .append(houseLotsReturned).append('/').append(systemJobsExpired);
         traders.forEach((location, slots) -> out.append(';').append(location).append(slots.loaded ? '+' : '-')
                 .append(java.util.Arrays.toString(slots.held)));
         return out.toString();

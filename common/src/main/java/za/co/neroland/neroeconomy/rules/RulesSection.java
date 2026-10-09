@@ -410,7 +410,8 @@ public final class RulesSection extends EconomySection implements EscrowHolder, 
      */
     public synchronized int evaluatePending(TradeEnv env, long tickId) {
         EconomyStore store = owner();
-        if (store == null || env == null || EconomyHealth.frozen()) return 0;
+        // While the market is closed no rule trades; each keeps its place for when it opens.
+        if (store == null || env == null || EconomyHealth.frozen() || marketClosed()) return 0;
         foldChanges(env);
         if (tickId != budgetTick) {
             budgetTick = tickId;

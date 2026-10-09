@@ -1,0 +1,19 @@
+{
+  "variants": {
+    "facing=east": {
+      "model": "neroeconomy:block/merchant_stall",
+      "y": 90
+    },
+    "facing=north": {
+      "model": "neroeconomy:block/merchant_stall"
+    },
+    "facing=south": {
+      "model": "neroeconomy:block/merchant_stall",
+      "y": 180
+    },
+    "facing=west": {
+      "model": "neroeconomy:block/merchant_stall",
+      "y": 270
+    }
+  }
+}

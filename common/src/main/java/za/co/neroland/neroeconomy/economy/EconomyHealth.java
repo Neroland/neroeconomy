@@ -16,6 +16,11 @@ package za.co.neroland.neroeconomy.economy;
 public final class EconomyHealth {
     /** Lang key of the one message a player or operator is shown for a refused operation. */
     public static final String FROZEN_KEY = "message.neroeconomy.frozen";
+    /**
+     * Lang key of the message for an operation refused because an operator closed the market (see
+     * {@code AdminSection}): not the freeze, which stops everything; trading only.
+     */
+    public static final String MARKET_CLOSED_KEY = "message.neroeconomy.market_closed";
 
     private static volatile boolean frozen;
 

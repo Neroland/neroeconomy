@@ -10,6 +10,7 @@ import java.util.UUID;
 import java.util.function.Consumer;
 
 import com.mojang.serialization.Codec;
+import com.mojang.serialization.MapCodec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 
 import net.minecraft.resources.Identifier;
@@ -22,6 +23,7 @@ import net.minecraft.world.level.storage.SavedDataStorage;
 
 import za.co.neroland.nerolandcore.data.SavedDataRecovery;
 import za.co.neroland.neroeconomy.NeroEconomyCommon;
+import za.co.neroland.neroeconomy.admin.AdminSection;
 import za.co.neroland.neroeconomy.api.AccountId;
 import za.co.neroland.neroeconomy.api.PlayerAccountId;
 import za.co.neroland.neroeconomy.api.SystemAccountId;
@@ -58,8 +60,8 @@ import za.co.neroland.neroeconomy.vault.VaultStacks;
  *
  * <p><b>Sections.</b> Each section is one optional field of {@link #CODEC} and one accessor here.
  * A new section is added by writing an {@link EconomySection}, giving it a codec, and adding one
- * {@code optionalFieldOf} line, one field, one accessor and one entry in {@link #sections()} to this
- * class; a store saved before the section existed simply loads it empty. A section that escrows
+ * {@code optionalFieldOf} line to a field group of {@link #CODEC} with room (see there), one field,
+ * one accessor and one entry in {@link #sections()} to this class; a store saved before the section existed simply loads it empty. A section that escrows
  * credits implements {@link EscrowHolder} and one that holds goods implements {@link LotHolder};
  * nothing else has to be told about either.
  *
@@ -82,37 +84,85 @@ public final class EconomyStore extends SavedData {
     /** The schema this build writes. 0 is a store that has never been set up. */
     public static final int SCHEMA = 1;
 
+    /**
+     * The store's codec. On disk the store is one flat map of optional fields, one per section; in
+     * code those fields are split over field groups ({@link Core}, {@link Markets}), each a
+     * {@link MapCodec} that reads and writes its own fields of that same map. A group adds no level
+     * of nesting, so the split is invisible in the file: every store any earlier build wrote loads
+     * exactly as it did, and is written back field for field. One {@code RecordCodecBuilder} group
+     * holds at most sixteen fields, so a new section goes into a group with room, or into a new
+     * group composed here the same way.
+     */
     static final Codec<EconomyStore> CODEC = RecordCodecBuilder.create(instance -> instance.group(
-            Codec.INT.optionalFieldOf("schema", 0).forGetter(store -> store.schema),
-            EconomySavedData.CODEC.optionalFieldOf("ledger").forGetter(store -> Optional.of(store.ledger)),
-            // The sections below hold item stacks, whose codec needs the game's registries; resolving
-            // them lazily keeps the store itself loadable without them.
-            Codec.lazyInitialized(() -> MarketSavedData.CODEC).optionalFieldOf("market")
-                    .forGetter(store -> present(store.market)),
-            Codec.lazyInitialized(() -> ObligationSavedData.CODEC).optionalFieldOf("obligations")
-                    .forGetter(store -> present(store.obligations)),
-            Codec.lazyInitialized(() -> ShopOwnershipState.CODEC).optionalFieldOf("shop_owners")
-                    .forGetter(store -> present(store.shopOwners)),
-            // Added with the vault and the simulation, so optional: an older store loads them empty.
-            Codec.lazyInitialized(() -> GoodsSection.CODEC).optionalFieldOf("goods")
-                    .forGetter(store -> present(store.goods)),
-            VaultSection.CODEC.optionalFieldOf("vault").forGetter(store -> present(store.vault)),
-            SimulationSection.CODEC.optionalFieldOf("simulation").forGetter(store -> present(store.simulation)),
-            // Added with the order book, so optional: an older store loads it empty and its Market
-            // Board rows, still in the market section, are adopted as orders.
-            BookSection.CODEC.optionalFieldOf("book").forGetter(store -> present(store.book)),
-            OffersSection.CODEC.optionalFieldOf("offers").forGetter(store -> present(store.offers)),
-            RulesSection.CODEC.optionalFieldOf("rules").forGetter(store -> present(store.rules)),
-            // Added with direct trade, so optional. It only ever holds anything between a save and
-            // the next load: a load returns what it finds here to its owners' vaults.
-            TradeEscrowSection.CODEC.optionalFieldOf("trade_escrow").forGetter(store -> present(store.tradeEscrow)),
-            // Added with the Auto-Trader block, so optional: who owns the block at each position.
-            AutoTraderSection.CODEC.optionalFieldOf("auto_traders").forGetter(store -> present(store.autoTraders)),
-            // Added with the exchange, so optional: an older store loads with nothing listed yet.
-            ExchangeSection.CODEC.optionalFieldOf("exchange").forGetter(store -> present(store.exchange)),
-            // Added with the Merchant Houses, so optional: an older store loads with no House state yet.
-            HouseSection.CODEC.optionalFieldOf("houses").forGetter(store -> present(store.houses)))
+            Core.CODEC.forGetter(Core::of),
+            Markets.CODEC.forGetter(Markets::of))
             .apply(instance, EconomyStore::new));
+
+    /** The first eight fields: the schema, the four sections adopted from the older stores, goods, vault and simulation. */
+    private record Core(int schema, Optional<EconomySavedData> ledger, Optional<MarketSavedData> market,
+            Optional<ObligationSavedData> obligations, Optional<ShopOwnershipState> shopOwners,
+            Optional<GoodsSection> goods, Optional<VaultSection> vault, Optional<SimulationSection> simulation) {
+        static final Core EMPTY = new Core(0, Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
+                Optional.empty(), Optional.empty(), Optional.empty());
+
+        static final MapCodec<Core> CODEC = RecordCodecBuilder.mapCodec(instance -> instance.group(
+                Codec.INT.optionalFieldOf("schema", 0).forGetter(Core::schema),
+                EconomySavedData.CODEC.optionalFieldOf("ledger").forGetter(Core::ledger),
+                // The sections below hold item stacks, whose codec needs the game's registries; resolving
+                // them lazily keeps the store itself loadable without them.
+                Codec.lazyInitialized(() -> MarketSavedData.CODEC).optionalFieldOf("market").forGetter(Core::market),
+                Codec.lazyInitialized(() -> ObligationSavedData.CODEC).optionalFieldOf("obligations")
+                        .forGetter(Core::obligations),
+                Codec.lazyInitialized(() -> ShopOwnershipState.CODEC).optionalFieldOf("shop_owners")
+                        .forGetter(Core::shopOwners),
+                // Added with the vault and the simulation, so optional: an older store loads them empty.
+                Codec.lazyInitialized(() -> GoodsSection.CODEC).optionalFieldOf("goods").forGetter(Core::goods),
+                VaultSection.CODEC.optionalFieldOf("vault").forGetter(Core::vault),
+                SimulationSection.CODEC.optionalFieldOf("simulation").forGetter(Core::simulation))
+                .apply(instance, Core::new));
+
+        static Core of(EconomyStore store) {
+            return new Core(store.schema, Optional.of(store.ledger), present(store.market), present(store.obligations),
+                    present(store.shopOwners), present(store.goods), present(store.vault), present(store.simulation));
+        }
+    }
+
+    /**
+     * The trading sections, added from the order book on; every one optional, so an older store loads
+     * them empty. Eight fields: room for eight more sections before a third group is needed.
+     */
+    private record Markets(Optional<BookSection> book, Optional<OffersSection> offers, Optional<RulesSection> rules,
+            Optional<TradeEscrowSection> tradeEscrow, Optional<AutoTraderSection> autoTraders,
+            Optional<ExchangeSection> exchange, Optional<HouseSection> houses, Optional<AdminSection> admin) {
+        static final Markets EMPTY = new Markets(Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
+                Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty());
+
+        static final MapCodec<Markets> CODEC = RecordCodecBuilder.mapCodec(instance -> instance.group(
+                // An older store loads the book empty and its Market Board rows, still in the market
+                // section, are adopted as orders.
+                BookSection.CODEC.optionalFieldOf("book").forGetter(Markets::book),
+                OffersSection.CODEC.optionalFieldOf("offers").forGetter(Markets::offers),
+                RulesSection.CODEC.optionalFieldOf("rules").forGetter(Markets::rules),
+                // Direct trade: only ever holds anything between a save and the next load, which
+                // returns what it finds here to its owners' vaults.
+                TradeEscrowSection.CODEC.optionalFieldOf("trade_escrow").forGetter(Markets::tradeEscrow),
+                // Who owns the Auto-Trader block at each position.
+                AutoTraderSection.CODEC.optionalFieldOf("auto_traders").forGetter(Markets::autoTraders),
+                // The exchange: an older store loads with nothing listed yet.
+                ExchangeSection.CODEC.optionalFieldOf("exchange").forGetter(Markets::exchange),
+                // The Merchant Houses: an older store loads with no House state yet.
+                HouseSection.CODEC.optionalFieldOf("houses").forGetter(Markets::houses),
+                // The Admin tab: an older store loads with the market open.
+                AdminSection.CODEC.optionalFieldOf("admin").forGetter(Markets::admin))
+                .apply(instance, Markets::new));
+
+        static Markets of(EconomyStore store) {
+            return new Markets(present(store.book), present(store.offers), present(store.rules),
+                    present(store.tradeEscrow), present(store.autoTraders), present(store.exchange),
+                    present(store.houses), present(store.admin));
+        }
+    }
+
     public static final SavedDataType<EconomyStore> TYPE = new SavedDataType<>(ID, EconomyStore::new, CODEC, null);
 
     /** What one running server has resolved; never outlives it. */
@@ -142,45 +192,34 @@ public final class EconomyStore extends SavedData {
     private final AutoTraderSection autoTraders;
     private final ExchangeSection exchange;
     private final HouseSection houses;
+    private final AdminSection admin;
 
     public EconomyStore() {
-        this(0, Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
-                Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
-                Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), false);
+        this(Core.EMPTY, Markets.EMPTY, false);
     }
 
-    private EconomyStore(int schema, Optional<EconomySavedData> ledger, Optional<MarketSavedData> market,
-            Optional<ObligationSavedData> obligations, Optional<ShopOwnershipState> shopOwners,
-            Optional<GoodsSection> goods, Optional<VaultSection> vault, Optional<SimulationSection> simulation,
-            Optional<BookSection> book, Optional<OffersSection> offers, Optional<RulesSection> rules,
-            Optional<TradeEscrowSection> tradeEscrow, Optional<AutoTraderSection> autoTraders,
-            Optional<ExchangeSection> exchange, Optional<HouseSection> houses) {
-        this(schema, ledger, market, obligations, shopOwners, goods, vault, simulation, book, offers, rules,
-                tradeEscrow, autoTraders, exchange, houses, true);
+    private EconomyStore(Core core, Markets trading) {
+        this(core, trading, true);
     }
 
-    private EconomyStore(int schema, Optional<EconomySavedData> ledger, Optional<MarketSavedData> market,
-            Optional<ObligationSavedData> obligations, Optional<ShopOwnershipState> shopOwners,
-            Optional<GoodsSection> goods, Optional<VaultSection> vault, Optional<SimulationSection> simulation,
-            Optional<BookSection> book, Optional<OffersSection> offers, Optional<RulesSection> rules,
-            Optional<TradeEscrowSection> tradeEscrow, Optional<AutoTraderSection> autoTraders,
-            Optional<ExchangeSection> exchange, Optional<HouseSection> houses, boolean loadedFromDisk) {
-        this.schema = Math.max(0, schema);
+    private EconomyStore(Core core, Markets trading, boolean loadedFromDisk) {
+        this.schema = Math.max(0, core.schema());
         this.loadedFromDisk = loadedFromDisk;
-        this.ledger = adopt(ledger.orElseGet(EconomySavedData::new));
-        this.market = adopt(market.orElseGet(MarketSavedData::new));
-        this.obligations = adopt(obligations.orElseGet(ObligationSavedData::new));
-        this.shopOwners = adopt(shopOwners.orElseGet(ShopOwnershipState::new));
-        this.goods = adopt(goods.orElseGet(GoodsSection::new));
-        this.vault = adopt(vault.orElseGet(VaultSection::new));
-        this.simulation = adopt(simulation.orElseGet(SimulationSection::new));
-        this.book = adopt(book.orElseGet(BookSection::new));
-        this.offers = adopt(offers.orElseGet(OffersSection::new));
-        this.rules = adopt(rules.orElseGet(RulesSection::new));
-        this.tradeEscrow = adopt(tradeEscrow.orElseGet(TradeEscrowSection::new));
-        this.autoTraders = adopt(autoTraders.orElseGet(AutoTraderSection::new));
-        this.exchange = adopt(exchange.orElseGet(ExchangeSection::new));
-        this.houses = adopt(houses.orElseGet(HouseSection::new));
+        this.ledger = adopt(core.ledger().orElseGet(EconomySavedData::new));
+        this.market = adopt(core.market().orElseGet(MarketSavedData::new));
+        this.obligations = adopt(core.obligations().orElseGet(ObligationSavedData::new));
+        this.shopOwners = adopt(core.shopOwners().orElseGet(ShopOwnershipState::new));
+        this.goods = adopt(core.goods().orElseGet(GoodsSection::new));
+        this.vault = adopt(core.vault().orElseGet(VaultSection::new));
+        this.simulation = adopt(core.simulation().orElseGet(SimulationSection::new));
+        this.book = adopt(trading.book().orElseGet(BookSection::new));
+        this.offers = adopt(trading.offers().orElseGet(OffersSection::new));
+        this.rules = adopt(trading.rules().orElseGet(RulesSection::new));
+        this.tradeEscrow = adopt(trading.tradeEscrow().orElseGet(TradeEscrowSection::new));
+        this.autoTraders = adopt(trading.autoTraders().orElseGet(AutoTraderSection::new));
+        this.exchange = adopt(trading.exchange().orElseGet(ExchangeSection::new));
+        this.houses = adopt(trading.houses().orElseGet(HouseSection::new));
+        this.admin = adopt(trading.admin().orElseGet(AdminSection::new));
         // A store written before the vault existed still holds item claims in its market section.
         adoptItemClaims(false);
         // And one written before the order book existed still holds its Market Board rows there.
@@ -231,6 +270,15 @@ public final class EconomyStore extends SavedData {
     /** What the order book asks about an order an auto-trade rule placed: the rules section. */
     public RuleOrders ruleOrders() { return rules; }
 
+    /** The operators' section: the market freeze switch and the counts of operator actions. */
+    public AdminSection admin() { return admin; }
+
+    /**
+     * Whether an operator has closed the market: player trading, the Merchant Houses' orders and the
+     * exchange refuse, while reads, collecting and refunds carry on. Not the corruption freeze.
+     */
+    public boolean marketClosed() { return admin.marketFrozen(); }
+
     public int schema() { return schema; }
 
     /**
@@ -258,7 +306,7 @@ public final class EconomyStore extends SavedData {
      */
     private List<EconomySection> sections() {
         return List.of(ledger, market, obligations, shopOwners, goods, vault, simulation, book, offers, rules,
-                tradeEscrow, autoTraders, exchange, houses);
+                tradeEscrow, autoTraders, exchange, houses, admin);
     }
 
     /** The names of the sections that hold anything, for the health report. */
@@ -278,6 +326,7 @@ public final class EconomyStore extends SavedData {
         if (!autoTraders.isEmpty()) names.add("auto_traders");
         if (!exchange.isEmpty()) names.add("exchange");
         if (!houses.isEmpty()) names.add("houses");
+        if (!admin.isEmpty()) names.add("admin");
         return names;
     }
 

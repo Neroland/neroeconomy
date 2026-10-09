@@ -1,6 +1,7 @@
 package za.co.neroland.neroeconomy.client;
 
 import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
@@ -46,6 +47,18 @@ public final class VaultScreen extends TexturedContainerScreen<VaultMenu> {
         this.titleLabelY = 6;
         this.inventoryLabelX = 8;
         this.inventoryLabelY = 143;
+    }
+
+    @Override
+    protected void init() {
+        super.init();
+        // Back to the Economy Hub, on its Vault tab: the server opens it, at the same terminal.
+        addRenderableWidget(Button.builder(Component.translatable("gui.neroeconomy.hub.back"), ignored -> {
+            if (this.minecraft != null && this.minecraft.gameMode != null) {
+                this.minecraft.gameMode.handleInventoryButtonClick(this.menu.containerId, VaultMenu.BACK_BUTTON);
+            }
+        }).bounds(this.leftPos + 44, this.topPos + 2, 36, 12)
+                .tooltip(Tooltip.create(Component.translatable("gui.neroeconomy.hub.back.tooltip"))).build());
     }
 
     private Component count() {

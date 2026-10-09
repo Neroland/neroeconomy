@@ -7,11 +7,10 @@ import net.neoforged.neoforge.client.event.RegisterMenuScreensEvent;
 import net.neoforged.neoforge.common.NeoForge;
 
 import za.co.neroland.neroeconomy.client.AutoTraderScreen;
-import za.co.neroland.neroeconomy.client.BankTerminalScreen;
 import za.co.neroland.neroeconomy.client.DirectTradeScreen;
+import za.co.neroland.neroeconomy.client.EconomyHubScreen;
 import za.co.neroland.neroeconomy.client.GalleryCaptureHarness;
 import za.co.neroland.neroeconomy.client.PlayerShopScreen;
-import za.co.neroland.neroeconomy.client.TradingTerminalScreen;
 import za.co.neroland.neroeconomy.client.VaultScreen;
 import za.co.neroland.neroeconomy.registry.ModMenuTypes;
 
@@ -32,11 +31,10 @@ final class NeoForgeClientSetup {
                 GalleryCaptureHarness.registerClientCommands(event.getDispatcher()));
     }
     private static void screens(RegisterMenuScreensEvent event) {
-        event.register(ModMenuTypes.BANK_TERMINAL.get(), BankTerminalScreen::new);
         event.register(ModMenuTypes.PLAYER_SHOP.get(), PlayerShopScreen::new);
-        event.register(ModMenuTypes.TRADING_TERMINAL.get(), TradingTerminalScreen::new);
         event.register(ModMenuTypes.VAULT.get(), VaultScreen::new);
         event.register(ModMenuTypes.DIRECT_TRADE.get(), DirectTradeScreen::new);
         event.register(ModMenuTypes.AUTO_TRADER.get(), AutoTraderScreen::new);
+        event.register(ModMenuTypes.ECONOMY_HUB.get(), EconomyHubScreen::new);
     }
 }

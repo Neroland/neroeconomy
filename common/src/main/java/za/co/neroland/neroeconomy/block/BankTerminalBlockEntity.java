@@ -9,16 +9,21 @@ import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 
-import za.co.neroland.neroeconomy.menu.BankTerminalMenu;
+import za.co.neroland.neroeconomy.hub.HubAnchor;
+import za.co.neroland.neroeconomy.hub.HubOpener;
+import za.co.neroland.neroeconomy.hub.HubTab;
+import za.co.neroland.neroeconomy.menu.EconomyHubMenu;
 import za.co.neroland.neroeconomy.registry.ModBlockEntities;
 
-public final class BankTerminalBlockEntity extends BlockEntity implements MenuProvider {
+/** The Bank Terminal: opens the Economy Hub at the Wallet, and is where the vault is opened. */
+public final class BankTerminalBlockEntity extends BlockEntity implements MenuProvider, HubAnchor {
     public BankTerminalBlockEntity(BlockPos pos, BlockState state) {
         super(ModBlockEntities.BANK_TERMINAL.get(), pos, state);
     }
 
-    @Override public Component getDisplayName() { return Component.translatable("container.neroeconomy.bank_terminal"); }
+    @Override public HubTab hubTab() { return HubTab.WALLET; }
+    @Override public Component getDisplayName() { return Component.translatable(HubOpener.TITLE); }
     @Override public AbstractContainerMenu createMenu(int id, Inventory inventory, Player player) {
-        return new BankTerminalMenu(id, inventory, player, this);
+        return new EconomyHubMenu(id, inventory, this, hubTab());
     }
 }

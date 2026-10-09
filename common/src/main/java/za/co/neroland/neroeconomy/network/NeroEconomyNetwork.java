@@ -13,12 +13,10 @@ import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.inventory.AbstractContainerMenu;
 
-import za.co.neroland.neroeconomy.market.MarketSavedData;
 import za.co.neroland.neroeconomy.menu.AutoTraderMenu;
-import za.co.neroland.neroeconomy.menu.BankTerminalMenu;
 import za.co.neroland.neroeconomy.menu.DirectTradeMenu;
+import za.co.neroland.neroeconomy.menu.EconomyHubMenu;
 import za.co.neroland.neroeconomy.menu.PlayerShopMenu;
-import za.co.neroland.neroeconomy.menu.TradingTerminalMenu;
 import za.co.neroland.neroeconomy.network.RateLimiter.Budget;
 import za.co.neroland.neroeconomy.platform.Services;
 
@@ -52,34 +50,6 @@ public final class NeroEconomyNetwork {
     public static synchronized void init() {
         if (initialized) return;
         initialized = true;
-        clientbound(MarketPagePayload.TYPE, MarketPagePayload.STREAM_CODEC, ClientMarketPage::accept);
-        intent(MarketQueryPayload.TYPE, MarketQueryPayload.STREAM_CODEC, value -> Budget.QUERY,
-                TradingTerminalMenu.class, MarketQueryPayload::containerId,
-                (menu, player, value) -> menu.sendPage(value.query(), value.page()));
-        intent(MarketBuyPayload.TYPE, MarketBuyPayload.STREAM_CODEC, value -> Budget.VALUE,
-                TradingTerminalMenu.class, MarketBuyPayload::containerId, TradingTerminalMenu::buy);
-        intent(MarketPostPayload.TYPE, MarketPostPayload.STREAM_CODEC, value -> Budget.VALUE,
-                TradingTerminalMenu.class, MarketPostPayload::containerId, TradingTerminalMenu::post);
-        intent(MarketClaimPayload.TYPE, MarketClaimPayload.STREAM_CODEC, value -> Budget.VALUE,
-                TradingTerminalMenu.class, MarketClaimPayload::containerId, (menu, player, value) -> {
-                    MarketSavedData store = MarketSavedData.get(player.level().getServer());
-                    long credits = store.collectCreditsTotal(player.getUUID());
-                    int items = store.collectItems(player);
-                    player.sendSystemMessage(net.minecraft.network.chat.Component.translatable(
-                            "gui.neroeconomy.market.collect_complete", credits, items));
-                });
-        clientbound(OpportunityPagePayload.TYPE, OpportunityPagePayload.STREAM_CODEC, ClientOpportunityPage::accept);
-        intent(OpportunityIntentPayload.TYPE, OpportunityIntentPayload.STREAM_CODEC,
-                value -> value.action().moves() ? Budget.VALUE : Budget.QUERY,
-                TradingTerminalMenu.class, OpportunityIntentPayload::containerId,
-                TradingTerminalMenu::handleOpportunity);
-        intent(BankTransferPayload.TYPE, BankTransferPayload.STREAM_CODEC, value -> Budget.VALUE,
-                BankTerminalMenu.class, BankTransferPayload::containerId, (menu, player, value) ->
-                        menu.transfer(player, value.requestId(), value.target(), value.amount()));
-        intent(MarketBuyOfferPayload.TYPE, MarketBuyOfferPayload.STREAM_CODEC, value -> Budget.VALUE,
-                TradingTerminalMenu.class, MarketBuyOfferPayload::containerId, TradingTerminalMenu::postBuyOffer);
-        intent(MarketFillBuyOfferPayload.TYPE, MarketFillBuyOfferPayload.STREAM_CODEC, value -> Budget.VALUE,
-                TradingTerminalMenu.class, MarketFillBuyOfferPayload::containerId, TradingTerminalMenu::fillBuyOffer);
         intent(ShopBuyPayload.TYPE, ShopBuyPayload.STREAM_CODEC, value -> Budget.VALUE,
                 PlayerShopMenu.class, ShopBuyPayload::containerId, PlayerShopMenu::buy);
         intent(DirectTradePayload.TYPE, DirectTradePayload.STREAM_CODEC, value -> Budget.VALUE,
@@ -87,6 +57,11 @@ public final class NeroEconomyNetwork {
         clientbound(AutoTraderStatePayload.TYPE, AutoTraderStatePayload.STREAM_CODEC, ClientAutoTrader::accept);
         intent(AutoTraderPayload.TYPE, AutoTraderPayload.STREAM_CODEC, value -> Budget.VALUE,
                 AutoTraderMenu.class, AutoTraderPayload::containerId, AutoTraderMenu::handle);
+        // The Economy Hub: one page payload out, one intent payload in, for every tab.
+        clientbound(HubPagePayload.TYPE, HubPagePayload.STREAM_CODEC, ClientHubPage::accept);
+        intent(HubIntentPayload.TYPE, HubIntentPayload.STREAM_CODEC,
+                value -> value.action() != null && value.action().movesValue() ? Budget.VALUE : Budget.QUERY,
+                EconomyHubMenu.class, HubIntentPayload::containerId, EconomyHubMenu::handle);
     }
 
     public static <T extends CustomPacketPayload> void clientbound(CustomPacketPayload.Type<T> type,

@@ -10,7 +10,9 @@ import java.util.UUID;
  */
 public record HouseBid(Result result, UUID displaced) {
     public enum Result {
-        PLACED, FROZEN, NOT_FOUND, ENDED, TOO_LOW, ORBIT, VAULT_FULL, REFUND_BLOCKED, FUNDS
+        PLACED, FROZEN, NOT_FOUND, ENDED, TOO_LOW, ORBIT, VAULT_FULL, REFUND_BLOCKED, FUNDS,
+        /** An operator has closed the market. */
+        MARKET_CLOSED
     }
 
     public static HouseBid refused(Result result) { return new HouseBid(result, null); }

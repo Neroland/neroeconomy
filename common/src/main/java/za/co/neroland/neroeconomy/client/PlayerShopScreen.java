@@ -6,6 +6,7 @@ import java.util.UUID;
 
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Button;
+import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
@@ -73,7 +74,8 @@ public final class PlayerShopScreen extends TexturedContainerScreen<PlayerShopMe
                                 UUID.randomUUID(), Math.max(1L, this.menu.price()),
                                 // The item on show right now; the server refuses the sale if it has changed.
                                 BuiltInRegistries.ITEM.getKey(this.menu.getSlot(0).getItem().getItem()))))
-                .bounds(this.leftPos + BUY_X, this.topPos + BUY_Y, BUY_W, BUY_H).build());
+                .bounds(this.leftPos + BUY_X, this.topPos + BUY_Y, BUY_W, BUY_H)
+                .tooltip(Tooltip.create(Component.translatable("gui.neroeconomy.shop.buy.tooltip"))).build());
     }
 
     private Button stepButton(int id, String key, int dx) {
@@ -81,7 +83,8 @@ public final class PlayerShopScreen extends TexturedContainerScreen<PlayerShopMe
             if (this.minecraft != null && this.minecraft.gameMode != null) {
                 this.minecraft.gameMode.handleInventoryButtonClick(this.menu.containerId, id);
             }
-        }).bounds(this.leftPos + dx, this.topPos + STEP_Y, STEP_W, STEP_H).build());
+        }).bounds(this.leftPos + dx, this.topPos + STEP_Y, STEP_W, STEP_H)
+                .tooltip(Tooltip.create(Component.translatable(key + ".tooltip"))).build());
     }
 
     @Override

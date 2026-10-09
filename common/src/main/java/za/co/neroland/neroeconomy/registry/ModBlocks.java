@@ -11,6 +11,8 @@ import za.co.neroland.nerolandcore.registry.RegistrationProvider.RegistryEntry;
 import za.co.neroland.neroeconomy.NeroEconomyCommon;
 import za.co.neroland.neroeconomy.block.AutoTraderBlock;
 import za.co.neroland.neroeconomy.block.BankTerminalBlock;
+import za.co.neroland.neroeconomy.block.ExchangeTerminalBlock;
+import za.co.neroland.neroeconomy.block.MerchantStallBlock;
 import za.co.neroland.neroeconomy.block.PlayerShopBlock;
 import za.co.neroland.neroeconomy.block.TradingTerminalBlock;
 import za.co.neroland.neroeconomy.block.MarketBoardBlock;
@@ -28,6 +30,11 @@ public final class ModBlocks {
             key -> new MarketBoardBlock(properties().setId(key)));
     public static final RegistryEntry<AutoTraderBlock> AUTO_TRADER = BLOCKS.register("auto_trader",
             key -> new AutoTraderBlock(properties().setId(key)));
+
+    public static final RegistryEntry<ExchangeTerminalBlock> EXCHANGE_TERMINAL = BLOCKS.register("exchange_terminal",
+            key -> new ExchangeTerminalBlock(properties().setId(key)));
+    public static final RegistryEntry<MerchantStallBlock> MERCHANT_STALL = BLOCKS.register("merchant_stall",
+            key -> new MerchantStallBlock(properties().setId(key)));
 
     private ModBlocks() {
     }

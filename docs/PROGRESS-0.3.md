@@ -13,8 +13,8 @@ any point and resume from the **Next** line without redoing anything. The specif
 
 ## Next
 
-**E4 + E5 — NPC auctions, Reserve-funded system jobs, empty-server proof** (brief
-`build/briefs/E45.md`). Then Stage F (Economy Hub screens).
+**G2 — Trader's Handbook** (brief `build/briefs/G2.md`). Then G3 + G4 (gallery and capture
+harness, brief `G34.md`), then Stage H.
 
 ## Status
 
@@ -42,14 +42,19 @@ smoke test.
 | D | D3 Shares, index, bonds, dividends, splits, Reserve-funded gains, Invariant C | Done | Nine cells, 695 tests |
 | D | D5 Practice mode (separate code path, never touches the ledger) | Done | 12,000-operation isolation test |
 | D | D6 Exchange tests and fuzzer operations | Done | Invariants A, B and C after every fuzz step |
-| D | D4 Invest screen | Not started (built with the hub in Stage F) | — |
+| D | D4 Invest screen | Done in F1b | Nine cells |
 | E | E1 Commodity data, 15 files incl. 9 sibling compat files | Done | Nine cells, 769 tests |
 | E | E6 Arbitrage guard (tests + `/eco admin reload-check`) | Done | Passes on shipped data, catches broken fixtures |
 | E | E2 Merchant Houses (9 houses, elasticity, caps inside matching, Reserve-funded) | Done | Nine cells, 798 tests, farm-bot week stays in budget |
 | E | E3 Reference prices drift toward player trades (capped, banded, guard re-checked daily) | Done | Wash-trade bound test |
-| E | E4 NPC auctions and system jobs, E5 empty-server proof | Not started | — |
-| F | F1–F4 Economy Hub screens | Not started | — |
-| G | G1–G4 Demos, handbook, gallery | Not started | — |
+| E | E4 House auctions, House jobs, Reserve-funded bounties | Done | Nine cells, 809 tests, fuzzer covers all three |
+| E | E5 Economy runs with zero players; catch-up equals an uninterrupted run | Done | Empty-server harness: 7 days, 72 h catch-up at most 2 steps and 1.74 ms per tick |
+| F | F1a Hub framework, Wallet / Vault / Market / My orders tabs, Exchange Terminal and Merchant Stall blocks; old terminal screens removed | Done | Nine cells, 842 tests incl. a no-player-data-in-pages test |
+| F | F1b Invest (D4: Pick → How much → Confirm, chart, portfolio, practice), Trade, Jobs, Auctions, Shop tabs, My data page | Done | Nine cells, 861 tests |
+| F | F3 Admin tab (level 3, supply, simulation, market freeze, tables, health, player data tools) | Done | Nine cells, 879 tests |
+| F | F4 Polish: codec room, market freeze on auctions and jobs, cleanup, lang / tooltip / fit / asset audits | Done | Nine cells, 895 tests incl. fit and asset audits |
+| G | G1 "Show me" walkthrough on every hub tab (sample data, cannot send anything) | Done | Nine cells, 903 tests incl. a bytecode scan proving no serverbound calls |
+| G | G2 Handbook, G3 gallery, G4 capture harness | Not started | — |
 | H | H1–H7 Link schema 2, bridge docs, app | Not started | — |
 | I | I1–I2 Public API, handover documents | Not started | — |
 | J | J1–J2 Abuse proof and independent red-team | Not started | — |
@@ -77,6 +82,8 @@ smoke test.
 - **Idle practice portfolios are dropped after 30 economy-days.**
 - **House spreads** apply the full `spread_percent` on each side, matching what the arbitrage guard
   proves safe.
+- **Every simulation step books at its own economy time**, so a catch-up after a pause replays the
+  missed days exactly (auto-trade rules included, within each day's caps).
 - **Trade steps run even when `autonomousEconomy` is off**; only NPC and exchange steps are
   switched off by it.
 

@@ -15,7 +15,10 @@ import net.minecraft.world.level.block.entity.BlockEntity;
 
 import za.co.neroland.neroeconomy.economy.EconomyHealth;
 import za.co.neroland.neroeconomy.economy.EconomyStore;
+import za.co.neroland.neroeconomy.hub.HubOpener;
+import za.co.neroland.neroeconomy.hub.HubTab;
 import za.co.neroland.neroeconomy.network.IntentGuard;
+import za.co.neroland.neroeconomy.network.RateLimiter;
 import za.co.neroland.neroeconomy.registry.ModMenuTypes;
 
 /**
@@ -80,6 +83,16 @@ public final class VaultMenu extends AbstractContainerMenu implements TerminalAn
         for (int row = 0; row < 3; row++) for (int col = 0; col < COLUMNS; col++)
             addSlot(new Slot(inventory, col + row * COLUMNS + 9, GRID_X + col * 18, INVENTORY_Y + row * 18));
         for (int col = 0; col < COLUMNS; col++) addSlot(new Slot(inventory, col, GRID_X + col * 18, HOTBAR_Y));
+    }
+
+    /** Menu button: back to the Economy Hub, on its Vault tab, at the same terminal. */
+    public static final int BACK_BUTTON = 0;
+
+    @Override public boolean clickMenuButton(Player player, int id) {
+        if (id != BACK_BUTTON || !(player instanceof ServerPlayer opener) || terminal == null
+                || !IntentGuard.button(player, this, RateLimiter.Budget.QUERY)) return false;
+        HubOpener.open(opener, terminal, HubTab.VAULT);
+        return true;
     }
 
     /** The Bank Terminal the vault was opened at: a player looking at their vault is still at it. */

@@ -280,7 +280,7 @@ final class ExchangeOperations {
         @Override public String name() { return "exchange_listing"; }
         @Override public int weight() { return 2; }
         @Override public long run(FuzzWorld world) {
-            StockDefinition company = FuzzWorld.STOCKS.get(world.random.nextInt(FuzzWorld.STOCKS.size()));
+            StockDefinition company = FuzzWorld.DELISTABLE.get(world.random.nextInt(FuzzWorld.DELISTABLE.size()));
             boolean wasListed = world.listed.remove(company);
             if (!wasListed) world.listed.add(company);
             world.exchange().reconcile(world.registry());

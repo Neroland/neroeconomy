@@ -63,7 +63,7 @@ public final class HouseDeals {
     /** One step of the Houses' auctions and jobs. Does nothing while the economy is frozen. */
     public static Report step(SimContext context, HouseDealsEnv env) {
         EconomyStore store = context.store();
-        if (env == null || EconomyHealth.frozen()) return Report.NONE;
+        if (env == null || EconomyHealth.frozen() || store == null || store.marketClosed()) return Report.NONE;
         long now = context.deadlineTime();
         long stepsPerDay = Math.max(1L, DAY / Math.max(1L, context.stepMillis()));
         HouseAuction auction = auction(store, env, now, stepsPerDay, context.random("auction"));

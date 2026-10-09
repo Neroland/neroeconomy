@@ -116,6 +116,10 @@ public final class DirectTrades {
             if (!quiet) tell(from, EconomyHealth.FROZEN_KEY);
             return;
         }
+        if (za.co.neroland.neroeconomy.economy.EconomyStore.get(from.level().getServer()).marketClosed()) {
+            if (!quiet) tell(from, EconomyHealth.MARKET_CLOSED_KEY);
+            return;
+        }
         if (from.getUUID().equals(to.getUUID())) {
             if (!quiet) tell(from, "command.neroeconomy.trade.request.self");
             return;
@@ -179,6 +183,10 @@ public final class DirectTrades {
         if (target == null) return;
         if (EconomyHealth.frozen()) {
             tell(target, EconomyHealth.FROZEN_KEY);
+            return;
+        }
+        if (za.co.neroland.neroeconomy.economy.EconomyStore.get(target.level().getServer()).marketClosed()) {
+            tell(target, EconomyHealth.MARKET_CLOSED_KEY);
             return;
         }
         if (busy(target.getUUID())) {

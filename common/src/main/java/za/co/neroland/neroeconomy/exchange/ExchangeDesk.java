@@ -579,6 +579,9 @@ public final class ExchangeDesk {
     private TradeResult act(ExchangeEnv env, AccountId account, boolean needsExchangeOn) {
         TradeResult gate = gate(env, account, needsExchangeOn);
         if (!gate.ok()) return gate;
+        // Buying and selling stop while an operator has closed the market; cashing in a bond does not.
+        EconomyStore store = store();
+        if (needsExchangeOn && store != null && store.marketClosed()) return TradeResult.MARKET_CLOSED;
         return env.limiter().allow(account, now(), env.terms().actionsPerMinute()) ? TradeResult.OK : TradeResult.TOO_FAST;
     }
 

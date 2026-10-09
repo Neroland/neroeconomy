@@ -71,6 +71,14 @@ public final class ShopOwnershipState extends EconomySection {
     }
     /** Every stored location key, for the stranded-shop sweep. */
     public List<String> locations() { return List.copyOf(owners.keySet()); }
+    /** The location keys of every shop this player owns, for their own Shop tab; never anyone else's. */
+    public List<String> locationsOf(UUID player) {
+        List<String> out = new ArrayList<>();
+        if (player != null) owners.forEach((location, owner) -> {
+            if (player.equals(owner)) out.add(location);
+        });
+        return out;
+    }
     public void forgetPlayer(UUID player) {
         if (player != null && owners.entrySet().removeIf(entry -> player.equals(entry.getValue()))) setDirty();
     }

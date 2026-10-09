@@ -54,6 +54,9 @@ public final class LinkPayloads {
             + "market row marked sell, or list your items at a Trading Terminal in game.";
     public static final String SELL_NEEDS_PLAYER =
             "Selling takes the items from your main hand, so you need to be in the game.";
+    /** An operator closed the market for now. */
+    public static final String MARKET_CLOSED = "The market on this server is closed by an operator for now. "
+            + "You can still look around and collect what is waiting for you.";
     public static final String ECONOMY_FROZEN = "The economy on this server is paused, so nothing can be "
             + "traded right now. Ask a server operator.";
     public static final String CREATIVE_SOURCE =
@@ -471,6 +474,7 @@ public final class LinkPayloads {
             case CLAIMS_FULL -> "Your vault is full. Take some items out at a Bank Terminal first.";
             case FUNDS_LOCKED -> "Your starting credits cannot be spent with other players until you have played a little longer.";
             case FROZEN -> ECONOMY_FROZEN;
+            case MARKET_CLOSED -> MARKET_CLOSED;
         };
     }
 
@@ -489,6 +493,7 @@ public final class LinkPayloads {
             case PAYOUT_BLOCKED -> "Collect your waiting credits at a Trading Terminal first.";
             case FROZEN -> ECONOMY_FROZEN;
             case CREATIVE -> CREATIVE_SOURCE;
+            case MARKET_CLOSED -> MARKET_CLOSED;
         };
     }
 
@@ -509,6 +514,7 @@ public final class LinkPayloads {
             case STORAGE_FULL -> "Neither your inventory nor your vault has room for what the order would buy at once.";
             case PAYOUT_BLOCKED -> "Collect your waiting credits at a Trading Terminal first.";
             case CREATIVE -> CREATIVE_SOURCE;
+            case MARKET_CLOSED -> MARKET_CLOSED;
         };
     }
 }

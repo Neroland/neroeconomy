@@ -45,6 +45,7 @@ final class OperationFuzzer {
         all.addAll(TraderOperations.all());
         all.addAll(ExchangeOperations.all());
         all.addAll(HouseOperations.all());
+        all.addAll(DealOperations.all());
         return List.copyOf(all);
     }
 

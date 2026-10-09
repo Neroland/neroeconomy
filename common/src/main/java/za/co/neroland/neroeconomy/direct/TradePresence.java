@@ -7,8 +7,8 @@ package za.co.neroland.neroeconomy.direct;
  *
  * <p>Both must be in the game, alive and not spectating. Beyond that they must either stand
  * within {@code tradeRangeBlocks} of each other in the same level, or each be at an economy
- * terminal (a Bank Terminal, a Trading Terminal or a Market Board) — which is what lets two
- * players trade from their own bases.
+ * terminal (with the Economy Hub or the vault open at one of the economy blocks) — which is what
+ * lets two players trade from their own bases.
  */
 public final class TradePresence {
     public enum Verdict {

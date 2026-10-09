@@ -140,6 +140,8 @@ public final class OffersSection extends EconomySection implements LotHolder, Es
             long credits, String askItem, int askCount, long askCredits, UUID presetId) {
         EconomyStore store = owner();
         if (EconomyHealth.frozen()) return OfferOutcome.refused(OfferResult.FROZEN);
+        // Sending and accepting trade; declining, cancelling and expiry are refunds and still work.
+        if (marketClosed()) return OfferOutcome.refused(OfferResult.MARKET_CLOSED);
         if (store == null || env == null || given == null || credits < 0L || askCount < 0 || askCredits < 0L
                 || askCount > BookSection.MAX_ORDER_QUANTITY || given.size() > MAX_LOTS
                 || !(sender instanceof PlayerAccountId) || !(recipient instanceof PlayerAccountId)
@@ -229,6 +231,8 @@ public final class OffersSection extends EconomySection implements LotHolder, Es
     public synchronized OfferOutcome accept(TradeEnv env, UUID id, AccountId actor) {
         EconomyStore store = owner();
         if (EconomyHealth.frozen()) return OfferOutcome.refused(OfferResult.FROZEN);
+        // Sending and accepting trade; declining, cancelling and expiry are refunds and still work.
+        if (marketClosed()) return OfferOutcome.refused(OfferResult.MARKET_CLOSED);
         if (store == null || env == null) return OfferOutcome.refused(OfferResult.INVALID);
         Offer offer = id == null ? null : offers.get(id);
         if (offer == null || actor == null || !offer.recipient().equals(actor) || offer.expiresAt() <= store.ledger().now())

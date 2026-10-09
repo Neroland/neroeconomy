@@ -26,7 +26,7 @@ class ResultKeysTest {
         PurchaseResult[] values = PurchaseResult.values();
         assertEquals(List.of("SUCCESS", "STALE_REQUEST", "NOT_FOUND", "OWN_LISTING", "INVALID_QUANTITY",
                 "OUT_OF_STOCK", "PRICE_MOVED", "INSUFFICIENT_FUNDS", "INVENTORY_FULL", "INTERNAL_ERROR",
-                "ITEM_CHANGED", "CLAIMS_FULL", "FUNDS_LOCKED", "FROZEN"),
+                "ITEM_CHANGED", "CLAIMS_FULL", "FUNDS_LOCKED", "FROZEN", "MARKET_CLOSED"),
                 java.util.Arrays.stream(values).map(Enum::name).toList());
     }
 

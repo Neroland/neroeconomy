@@ -54,13 +54,16 @@ public enum OfferResult {
     /** The economy is frozen for this session. */
     FROZEN,
     /** The swap could not be settled; nothing moved. */
-    INTERNAL;
+    INTERNAL,
+    /** An operator has closed the market for now; reads, collecting and refunds still work. */
+    MARKET_CLOSED;
 
     public boolean ok() { return this == OK; }
 
     /** Lang key of the message shown to the player. */
     public String translationKey() {
         if (this == FROZEN) return EconomyHealth.FROZEN_KEY;
+        if (this == MARKET_CLOSED) return EconomyHealth.MARKET_CLOSED_KEY;
         return "message.neroeconomy.offer." + name().toLowerCase(Locale.ROOT);
     }
 }

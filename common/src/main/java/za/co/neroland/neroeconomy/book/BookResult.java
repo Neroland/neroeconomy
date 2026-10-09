@@ -55,13 +55,16 @@ public enum BookResult {
     /** The sale could not be settled; nothing moved. */
     INTERNAL,
     /** The account has traded as much of this commodity with the Merchant Houses today as it may. */
-    DAILY_LIMIT;
+    DAILY_LIMIT,
+    /** An operator has closed the market for now; reads, collecting and refunds still work. */
+    MARKET_CLOSED;
 
     public boolean ok() { return this == OK; }
 
     /** Lang key of the message shown to the player. */
     public String translationKey() {
         if (this == FROZEN) return EconomyHealth.FROZEN_KEY;
+        if (this == MARKET_CLOSED) return EconomyHealth.MARKET_CLOSED_KEY;
         return "message.neroeconomy.order." + name().toLowerCase(Locale.ROOT);
     }
 }

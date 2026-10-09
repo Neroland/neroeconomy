@@ -7,11 +7,10 @@ import net.minecraftforge.eventbus.api.bus.BusGroup;
 import net.minecraftforge.fml.event.lifecycle.FMLClientSetupEvent;
 
 import za.co.neroland.neroeconomy.client.AutoTraderScreen;
-import za.co.neroland.neroeconomy.client.BankTerminalScreen;
 import za.co.neroland.neroeconomy.client.DirectTradeScreen;
+import za.co.neroland.neroeconomy.client.EconomyHubScreen;
 import za.co.neroland.neroeconomy.client.GalleryCaptureHarness;
 import za.co.neroland.neroeconomy.client.PlayerShopScreen;
-import za.co.neroland.neroeconomy.client.TradingTerminalScreen;
 import za.co.neroland.neroeconomy.client.VaultScreen;
 import za.co.neroland.neroeconomy.registry.ModMenuTypes;
 
@@ -19,12 +18,11 @@ final class ForgeClientSetup {
     private ForgeClientSetup() { }
     static void init(BusGroup bus) {
         FMLClientSetupEvent.getBus(bus).addListener(event -> event.enqueueWork(() -> {
-            MenuScreens.register(ModMenuTypes.BANK_TERMINAL.get(), BankTerminalScreen::new);
             MenuScreens.register(ModMenuTypes.PLAYER_SHOP.get(), PlayerShopScreen::new);
-            MenuScreens.register(ModMenuTypes.TRADING_TERMINAL.get(), TradingTerminalScreen::new);
             MenuScreens.register(ModMenuTypes.VAULT.get(), VaultScreen::new);
             MenuScreens.register(ModMenuTypes.DIRECT_TRADE.get(), DirectTradeScreen::new);
             MenuScreens.register(ModMenuTypes.AUTO_TRADER.get(), AutoTraderScreen::new);
+            MenuScreens.register(ModMenuTypes.ECONOMY_HUB.get(), EconomyHubScreen::new);
         }));
         // The capture tooling exists in a development environment only; a release jar wires up
         // neither the tick hook nor the command.

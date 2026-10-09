@@ -272,6 +272,7 @@ public final class BookSection extends EconomySection implements LotHolder, Escr
             GoodsOrigin origin, UUID presetId) {
         EconomyStore store = owner();
         if (EconomyHealth.frozen()) return Placed.refused(BookResult.FROZEN);
+        if (marketClosed()) return Placed.refused(BookResult.MARKET_CLOSED);
         if (store == null || env == null || owner == null || lot == null || source == null || origin == null
                 || unitPrice < 1L || lot.count() > MAX_ORDER_QUANTITY || !mayOwn(env, owner, source)
                 || overflows(unitPrice, lot.count()) || taken(presetId) || !ruleOwned(store, source, presetId, owner))
@@ -359,6 +360,7 @@ public final class BookSection extends EconomySection implements LotHolder, Escr
             OrderSource source, boolean preEscrowed, GoodsReceiver receiver, UUID presetId) {
         EconomyStore store = owner();
         if (EconomyHealth.frozen()) return Placed.refused(BookResult.FROZEN);
+        if (marketClosed()) return Placed.refused(BookResult.MARKET_CLOSED);
         if (store == null || env == null || owner == null || item == null || item.isBlank() || source == null
                 || receiver == null || quantity < 1 || quantity > MAX_ORDER_QUANTITY || unitPrice < 1L
                 || item.length() > Lot.MAX_ITEM_LENGTH || !mayOwn(env, owner, source) || overflows(unitPrice, quantity)
@@ -447,6 +449,7 @@ public final class BookSection extends EconomySection implements LotHolder, Escr
             GoodsReceiver receiver) {
         EconomyStore store = owner();
         if (EconomyHealth.frozen()) return Traded.refused(BookResult.FROZEN);
+        if (marketClosed()) return Traded.refused(BookResult.MARKET_CLOSED);
         if (store == null || env == null || buyer == null || sellId == null || receiver == null || quantity < 1
                 || ceiling < 1L) return Traded.refused(BookResult.INVALID);
         long now = store.ledger().now();
@@ -478,6 +481,7 @@ public final class BookSection extends EconomySection implements LotHolder, Escr
     public synchronized Traded sellTo(TradeEnv env, AccountId seller, UUID buyId, Lot lot, GoodsOrigin origin) {
         EconomyStore store = owner();
         if (EconomyHealth.frozen()) return Traded.refused(BookResult.FROZEN);
+        if (marketClosed()) return Traded.refused(BookResult.MARKET_CLOSED);
         if (store == null || env == null || seller == null || buyId == null || lot == null || origin == null)
             return Traded.refused(BookResult.INVALID);
         long now = store.ledger().now();
@@ -521,6 +525,7 @@ public final class BookSection extends EconomySection implements LotHolder, Escr
             long budget, GoodsReceiver receiver) {
         EconomyStore store = owner();
         if (EconomyHealth.frozen()) return Traded.refused(BookResult.FROZEN);
+        if (marketClosed()) return Traded.refused(BookResult.MARKET_CLOSED);
         if (store == null || env == null || buyer == null || ruleOrderId == null || sellId == null || receiver == null
                 || quantity < 1 || budget < 1L || !ruleOwned(store, OrderSource.RULE, ruleOrderId, buyer))
             return Traded.refused(BookResult.INVALID);

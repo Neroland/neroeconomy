@@ -368,17 +368,20 @@ final class TradingCommands {
         return Command.SINGLE_SUCCESS;
     }
 
+    /** Between two parts of what an offer gives or asks. */
+    private static final Component SEPARATOR = Component.translatable("command.neroeconomy.trade.separator");
+
     /** What an offer gives: its items by their own names and its credits. */
     private static Component given(Offer offer) {
         MutableComponent out = Component.empty();
         boolean first = true;
         for (Lot lot : offer.lots()) {
-            if (!first) out.append(Component.literal(", "));
+            if (!first) out.append(SEPARATOR.copy());
             out.append(Component.translatable("command.neroeconomy.trade.items", lot.count(), goodsName(lot)));
             first = false;
         }
         if (offer.credits() > 0L) {
-            if (!first) out.append(Component.literal(", "));
+            if (!first) out.append(SEPARATOR.copy());
             out.append(Component.translatable("command.neroeconomy.trade.credits", offer.credits()));
             first = false;
         }
@@ -395,7 +398,7 @@ final class TradingCommands {
             first = false;
         }
         if (offer.askCredits() > 0L) {
-            if (!first) out.append(Component.literal(", "));
+            if (!first) out.append(SEPARATOR.copy());
             out.append(Component.translatable("command.neroeconomy.trade.credits", offer.askCredits()));
             first = false;
         }

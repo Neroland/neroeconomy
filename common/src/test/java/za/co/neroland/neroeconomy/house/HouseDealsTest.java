@@ -318,6 +318,9 @@ class HouseDealsTest {
                 TradeWorld.DAY);
         HouseDealsEnv env = new HouseDealsEnv(houses.env(), TERMS, settings, BountyTable.of(List.of(
                 new BountyTable.Entry("minecraft:zombie", 8, 40L))), "minecraft:overworld|0|64|0");
+        // A known secret: the step's rolls are then the same on every run, so a run that happens to
+        // roll no bounty in three days (about one in four hundred with a random secret) cannot occur.
+        SimTesting.fixSecret(world.store, SimTesting.secret(7));
         int auctions = 0;
         int bounties = 0;
         long firstDay = houses.day();

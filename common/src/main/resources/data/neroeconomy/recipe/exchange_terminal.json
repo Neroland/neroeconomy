@@ -1,0 +1,1 @@
+{"type":"minecraft:crafting_shaped","category":"misc","pattern":["GCG","RBR","III"],"key":{"G":"minecraft:glass_pane","C":"minecraft:gold_ingot","R":"minecraft:redstone","B":"neroeconomy:bank_terminal","I":"minecraft:iron_ingot"},"result":{"id":"neroeconomy:exchange_terminal"}}

@@ -20,7 +20,8 @@ import za.co.neroland.neroeconomy.api.SystemAccountId;
  * refunds, fees, Reserve payouts, another mod's deposits, vault deposits, withdrawals and
  * deliveries, erasures, days rolling over, the clock jumping and the simulation stepping, the
  * order book, offers, auto-trade rules, direct trades, rules bound to Auto-Trader blocks, and the
- * exchange: shares, the index fund, Savings Bonds, practice mode, dividends, splits and delistings.
+ * exchange: shares, the index fund, Savings Bonds, practice mode, dividends, splits and delistings,
+ * the Merchant Houses, and their auctions and jobs and the server's bounties.
  * Invariants A, B and C and item conservation are checked after every single operation by
  * {@link OperationFuzzer}; this class runs it, makes sure the run was not a run of refusals, and
  * crashes it.
@@ -34,6 +35,8 @@ class OperationFuzzTest {
     @Test void aHundredThousandMixedOperationsKeepEveryInvariantAtEveryStep() {
         OperationFuzzer.Result result = OperationFuzzer.run(20_261_003L, OPERATIONS, Set.of(), false);
         FuzzWorld world = result.world();
+        System.out.println("[fuzz] effects " + result.effects() + "; Houses " + world.store.houses().positions()
+                + "; Reserve " + world.ledger().balance(SystemAccountId.RESERVE));
         // Every kind of operation was picked, and every kind did something at least once.
         for (FuzzOperation operation : OperationFuzzer.OPERATIONS) {
             assertTrue(result.calls().get(operation.name()) > 0, operation.name() + " was never picked");
@@ -118,17 +121,38 @@ class OperationFuzzTest {
                 za.co.neroland.neroeconomy.link.EconomyAlerts.Kind.STOCK_DELISTED))
             assertTrue(world.exchangeAlerts.getOrDefault(kind, 0L) > 0L, kind + " never happened");
         assertTrue(splits > 0, "no share ever split");
+        // Not left to luck: the company that starts over the split line and stays listed splits at
+        // the first day roll on every random path (see FuzzWorld.SPLITTER).
+        assertTrue(exchange.state(FuzzWorld.SPLITTER).splits() > 0, "the company over the split line never split");
         assertTrue(exchange.practice().size() > 0);
         // The Merchant Houses really traded: players bought from them and sold to them, they restocked,
         // they destroyed what they could not keep, and they were funded within the NPC budget.
         za.co.neroland.neroeconomy.house.HouseSection houses = world.store.houses();
         System.out.println("[fuzz] houses: " + houses.size() + " commodities, logs made " + houses.created("minecraft:oak_log")
-                + ", diamonds destroyed " + houses.destroyed("minecraft:diamond") + ", guard checks " + world.guardChecks);
+                + ", diamonds destroyed " + houses.destroyed("minecraft:diamond") + ", guard checks " + world.guardChecks
+);
         assertTrue(result.effects().get("house_buy") > 100);
         assertTrue(result.effects().get("house_sell") > 100);
         assertTrue(houses.created("minecraft:oak_log") > 0L);
         assertTrue(houses.destroyed("minecraft:diamond") > 0L);
         assertTrue(world.guardChecks > 1L);
+        // The Houses' auctions and jobs and the server's bounties: lots were started from stock, bid
+        // on, outbid, sold and returned unsold; House jobs were posted within the system-job budget,
+        // claimed, fulfilled into stock and expired back to the Reserve; bounties were posted and paid.
+        za.co.neroland.neroeconomy.obligation.ObligationSavedData obligations = world.obligations();
+        System.out.println("[fuzz] house deals: lots sold " + world.houseLotsSold + ", returned " + world.houseLotsReturned
+                + ", system jobs expired " + world.systemJobsExpired + ", auction rows " + obligations.houseAuctionHistory().size()
+                + ", system job rows " + obligations.systemJobHistory().size());
+        assertTrue(result.effects().get("deal_auction_start") > 20);
+        assertTrue(result.effects().get("deal_auction_bid") > 100);
+        assertTrue(result.effects().get("deal_job_post") > 20);
+        assertTrue(result.effects().get("deal_job_claim") > 20);
+        assertTrue(result.effects().get("deal_job_fulfil") > 10);
+        assertTrue(result.effects().get("deal_bounty_post") > 5);
+        assertTrue(result.effects().get("deal_bounty_kill") > 0);
+        assertTrue(world.houseLotsSold > 0L, "no House lot was ever sold");
+        assertTrue(world.houseLotsReturned > 0L, "no unsold House lot ever went back to stock");
+        assertTrue(world.systemJobsExpired > 0L, "no server-funded job ever expired");
     }
 
     private static long lotsHeld(FuzzWorld world) {

@@ -1,0 +1,1 @@
+{"type":"minecraft:crafting_shaped","category":"misc","pattern":["WWW","CBC","IRI"],"key":{"W":"#minecraft:wool","C":"minecraft:copper_ingot","B":"minecraft:barrel","R":"minecraft:redstone","I":"minecraft:iron_ingot"},"result":{"id":"neroeconomy:merchant_stall"}}

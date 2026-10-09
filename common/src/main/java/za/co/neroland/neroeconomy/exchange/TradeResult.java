@@ -60,13 +60,16 @@ public enum TradeResult {
     /** A practice portfolio can be reset once per economy-day. */
     PRACTICE_RESET_USED,
     /** The ledger refused the movement; nothing moved. */
-    NOT_COMPLETED;
+    NOT_COMPLETED,
+    /** An operator has closed the market for now; reads, collecting and refunds still work. */
+    MARKET_CLOSED;
 
     public boolean ok() { return this == OK; }
 
     /** Lang key of the message shown to the player. */
     public String translationKey() {
         if (this == FROZEN) return EconomyHealth.FROZEN_KEY;
+        if (this == MARKET_CLOSED) return EconomyHealth.MARKET_CLOSED_KEY;
         return "message.neroeconomy.invest." + name().toLowerCase(Locale.ROOT);
     }
 }

@@ -15,7 +15,8 @@ import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.inventory.AbstractContainerMenu;
 
 /**
- * Base class for NeroEconomy terminal screens. Draws a sci-fi hull panel (a 256x256 PNG under
+ * Base class for NeroEconomy's container screens (the Economy Hub, the vault, the player shop,
+ * direct trade and the Auto-Trader). Draws a sci-fi hull panel (a 256x256 PNG under
  * {@code assets/neroeconomy/textures/gui/}, whose top-left {@code imageWidth x imageHeight} is the
  * panel) and themes the title/inventory labels for a dark background. Subclasses paint their
  * readouts in {@link #extractForeground} using the panel-relative helpers below.
