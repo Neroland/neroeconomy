@@ -30,6 +30,7 @@ import za.co.neroland.neroeconomy.market.MarketSavedData;
 import za.co.neroland.neroeconomy.network.IntentGuard;
 import za.co.neroland.neroeconomy.network.RateLimiter;
 import za.co.neroland.neroeconomy.platform.Services;
+import za.co.neroland.neroeconomy.trade.Trading;
 import za.co.neroland.neroeconomy.vault.VaultStacks;
 
 /**
@@ -293,20 +294,30 @@ public final class NeroEconomyLinkModule implements LinkSnapshotProvider, LinkAc
     }
 
     private static LinkActionResult act(MinecraftServer server, UUID playerId, String actionId, JsonObject params) {
-        PULSE.interested(playerId, System.nanoTime());
-        boolean budget = IntentGuard.withinBudget(playerId, RateLimiter.Budget.VALUE);
-        boolean actionLimit = budget && LIMITS.tryAcquire(playerId, actionId);
         // Never generated here: an id the client did not send cannot make its retry idempotent.
         UUID request = LinkPayloads.requestId(params);
         // The bridge checks presence too; a handler never relies on it.
         ServerPlayer online = server.getPlayerList().getPlayer(playerId);
         EconomyStore store = EconomyStore.get(server);
+        return act(actionId, new LinkActions.Call(server, store, Trading.env(store), LinkActions.Players.of(server),
+                playerId, online, params, request, NeroEconomyLinkModule::balance));
+    }
+
+    /**
+     * The budgets, the gate and the action for a call whose store and presence are already known:
+     * what {@link #execute} runs on the server thread, and what the offline proof drives directly.
+     */
+    static LinkActionResult act(String actionId, LinkActions.Call call) {
+        UUID playerId = call.player();
+        PULSE.interested(playerId, System.nanoTime());
+        boolean budget = IntentGuard.withinBudget(playerId, RateLimiter.Budget.VALUE);
+        boolean actionLimit = budget && LIMITS.tryAcquire(playerId, actionId);
         LinkGate.Refusal refusal = LinkGate.check(new LinkGate.Request(actionId, EconomyConfig.REMOTE_TRADE_ENABLED.get(),
-                EconomyHealth.frozen(), budget, actionLimit, request != null, online != null, store.marketClosed()));
+                EconomyHealth.frozen(), budget, actionLimit, call.request() != null, call.online() != null,
+                call.store().marketClosed()));
         if (refusal != LinkGate.Refusal.NONE) return LinkGate.result(refusal);
         try {
-            return LinkActions.run(actionId, new LinkActions.Call(server, store, playerId, online,
-                    params, request, NeroEconomyLinkModule::balance));
+            return LinkActions.run(actionId, call);
         } catch (RuntimeException failure) {
             // The type only: a message could echo client input.
             NeroEconomyCommon.LOGGER.warn("[NeroEconomy] A Link action failed unexpectedly ({}).",
@@ -380,7 +391,7 @@ public final class NeroEconomyLinkModule implements LinkSnapshotProvider, LinkAc
     }
 
     /** Erasure: nothing this module holds in memory for the player survives it. */
-    private static void forget(UUID player) {
+    static void forget(UUID player) {
         CACHE.forget(player);
         PULSE.forget(player);
         LIVE.forget(player);

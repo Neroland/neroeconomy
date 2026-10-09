@@ -27,4 +27,13 @@ public final class StoreTesting {
 
     /** Replaces the wall clock every ledger reads; null restores the real one. Reset it in a finally. */
     public static void wallClock(LongSupplier clock) { EconomySavedData.wallClockForTest(clock); }
+
+    /**
+     * Binds the game's currency provider to {@code data}, as a running server binds it to its
+     * world's ledger, so Core's {@code CurrencyApi} and the provider's own calls reach it; null
+     * unbinds. Reset it in a finally.
+     */
+    public static void bindProvider(EconomySavedData data) {
+        za.co.neroland.neroeconomy.NeroEconomyCommon.CURRENCY_PROVIDER.bindForTest(data);
+    }
 }

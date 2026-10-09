@@ -56,8 +56,8 @@ Core writes `config/neroeconomy.properties`. Gameplay settings cover the startin
 retention and bounds, admin mutations, price-multiplier caps, listing duration, auction anti-snipe
 and minimum increment, the job claim timeout, idle shop expiry, per-account caps, the stack data
 cap, Credit Chip value and daily limit, server-funded jobs, player bounties, and remote trade.
-`telemetryEnabled` is local to each installation; telemetry remains inert until a build is made
-with a real DSN. The wiki's
+`telemetryEnabled` is local to each installation, defaults to `true` (crash reporting on by default)
+and is set to `false` to opt out; telemetry remains inert until a build is made with a real DSN. The wiki's
 [configuration page](wiki/Configuration-and-Administration.md) lists every key.
 
 The stable `za.co.neroland.neroeconomy.api` package exposes abstract accounts, deterministic pricing,
@@ -73,7 +73,8 @@ keyed to player UUIDs, never names, and a finite transaction history whose rows 
 amount, currency, time and salted one-way pseudonyms rather than UUIDs. Retention is purged at load
 and daily. `/eco export` writes a subject-access JSON file covering every store under the world
 folder; `/eco erase` invokes Core-wide erasure. No log line carries a player, an amount or a
-transaction. Sentry telemetry is inert in published builds, and is capped, scrubbed and opt-out.
+transaction. Sentry telemetry is inert in published builds; once live it is on by default, capped, scrubbed and
+opt-out (`telemetryEnabled=false` in `config/neroeconomy.properties`).
 
 See [the wiki](wiki/Home.md), [the privacy notice](PRIVACY.md), [building against Core](USING-CORE.md),
 [the changelog](CHANGELOG.md), [the completion audit](AUDIT.md), and

@@ -218,9 +218,10 @@ public final class ExchangeDesk {
     private TradeQuote completeBuy(ExchangeEnv env, AccountId account, TradeQuote quote, long maxSpend, long now) {
         if (!quote.ok()) return quote;
         if (quote.net() > maxSpend) return quote.with(TradeResult.PRICE_MOVED);
-        // Both legs pay a system account, so a starting balance that has not vested may be used.
+        // Shares need earned credits: a starting balance that has not vested could otherwise come back
+        // unlocked from a sale. Only the fee, which nothing ever returns, may use it.
         LedgerResult moved = store().execute(LedgerPlan.builder()
-                .move(account, SystemAccountId.EXCHANGE, quote.total(), TransactionType.SHARE_BUY)
+                .movePlayerFacing(account, SystemAccountId.EXCHANGE, quote.total(), TransactionType.SHARE_BUY)
                 .move(account, SystemAccountId.RESERVE, quote.fee(), TransactionType.FEE_EXCHANGE).build());
         if (!moved.ok()) return quote.with(refusal(moved));
         Holding holding = portfolios.computeIfAbsent(account, ignored -> new Portfolio()).holdingFor(quote.stockId());
@@ -328,8 +329,9 @@ public final class ExchangeDesk {
                 return BondOutcome.refused(TradeResult.INSUFFICIENT_FUNDS);
             long interest = BondTerm.interest(principal, terms.bondRateBps(term));
             if (interest > gainCap()) return BondOutcome.refused(TradeResult.BONDS_SOLD_OUT);
+            // Earned credits only: cashed in early, the principal comes back in full and unlocked.
             LedgerResult moved = store().execute(LedgerPlan.builder()
-                    .move(account, SystemAccountId.EXCHANGE, principal, TransactionType.BOND_BUY)
+                    .movePlayerFacing(account, SystemAccountId.EXCHANGE, principal, TransactionType.BOND_BUY)
                     .pay(BudgetKind.EXCHANGE, SystemAccountId.EXCHANGE, interest, TransactionType.BOND_INTEREST_RESERVED)
                     .build());
             if (!moved.ok()) return BondOutcome.refused(moved == LedgerResult.RESERVE_SHORT
@@ -588,7 +590,8 @@ public final class ExchangeDesk {
     private static TradeResult refusal(LedgerResult result) {
         return switch (result) {
             case FROZEN -> TradeResult.FROZEN;
-            case INSUFFICIENT_FUNDS, FUNDS_LOCKED -> TradeResult.INSUFFICIENT_FUNDS;
+            case INSUFFICIENT_FUNDS -> TradeResult.INSUFFICIENT_FUNDS;
+            case FUNDS_LOCKED -> TradeResult.FUNDS_LOCKED;
             default -> TradeResult.NOT_COMPLETED;
         };
     }

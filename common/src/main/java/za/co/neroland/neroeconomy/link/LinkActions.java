@@ -10,6 +10,7 @@ import java.util.function.Function;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
@@ -23,6 +24,7 @@ import za.co.neroland.neroeconomy.api.PlayerAccountId;
 import za.co.neroland.neroeconomy.book.BookSection;
 import za.co.neroland.neroeconomy.book.BookStacks;
 import za.co.neroland.neroeconomy.book.Placed;
+import za.co.neroland.neroeconomy.commodity.CommodityData;
 import za.co.neroland.neroeconomy.config.EconomyConfig;
 import za.co.neroland.neroeconomy.economy.EconomySavedData;
 import za.co.neroland.neroeconomy.economy.EconomyStore;
@@ -57,6 +59,7 @@ import za.co.neroland.neroeconomy.rules.RuleSide;
 import za.co.neroland.neroeconomy.rules.RuleStacks;
 import za.co.neroland.neroeconomy.rules.RulesSection;
 import za.co.neroland.neroeconomy.rules.TradeRule;
+import za.co.neroland.neroeconomy.trade.TradeEnv;
 import za.co.neroland.neroeconomy.vault.VaultStacks;
 
 /**
@@ -70,7 +73,9 @@ import za.co.neroland.neroeconomy.vault.VaultStacks;
  * each action's own rule, the operator market switch for the actions that trade, and the daily
  * remote spending limit: an action that can spend credits states the most it could spend before
  * it runs and is refused when that would pass the limit; afterwards what it really spent is
- * counted.
+ * counted. Goods that leave the account (an offer's goods, a sell order or sell rule from the vault,
+ * resuming a sell rule, an accepted offer that asks for goods) are valued
+ * ({@link RemoteGoodsValue}) and counted the same way against the daily remote goods limit.
  *
  * <p>A reply never names another player. A recipient the player typed is used to find the
  * account and is not echoed back.
@@ -111,10 +116,34 @@ final class LinkActions {
     static final Set<String> RECORDS_OWN_REQUEST = Set.of(ORDER_CANCEL, RULE_DELETE, RULES_PAUSE, OFFER_DECLINE,
             CLAIM_COLLECT, VAULT_DEPOSIT, VAULT_WITHDRAW, OFFER_CANCEL);
 
-    /** What one action works with. {@code online} is null for a player who is away. */
-    record Call(MinecraftServer server, EconomyStore store, UUID player, ServerPlayer online, JsonObject params,
-            UUID request, Function<UUID, JsonObject> balance) {
+    /**
+     * What one action works with. {@code online} is null for a player who is away. {@code env} is
+     * what the store's trading rules are given ({@code Trading.env(store)} in game); {@code players}
+     * answers who else is in game and whose account a typed recipient names.
+     */
+    record Call(MinecraftServer server, EconomyStore store, TradeEnv env, Players players, UUID player,
+            ServerPlayer online, JsonObject params, UUID request, Function<UUID, JsonObject> balance) {
         AccountId account() { return new PlayerAccountId(player); }
+    }
+
+    /** What an action needs to know about players besides the one acting. */
+    interface Players {
+        /** The player when in game; null when away. */
+        ServerPlayer online(UUID player);
+
+        /** The account a typed name or UUID names, found as {@code /eco pay} finds it; null when none. */
+        UUID resolve(String recipient);
+
+        /** The running server's player list and saved player data. */
+        static Players of(MinecraftServer server) {
+            return new Players() {
+                @Override public ServerPlayer online(UUID player) {
+                    return player == null ? null : server.getPlayerList().getPlayer(player);
+                }
+
+                @Override public UUID resolve(String recipient) { return KnownAccounts.resolve(server, recipient); }
+            };
+        }
     }
 
     private LinkActions() { }
@@ -195,6 +224,46 @@ final class LinkActions {
     static void spent(Call call, long amount) {
         if (amount > 0L)
             call.store().remoteSpend().record(call.player(), EconomySavedData.economyDay(LinkReads.now()), amount);
+    }
+
+    /** How goods leaving the player's account through the app are valued. */
+    static RemoteGoodsValue.Pricing goodsPricing(Call call) {
+        return new RemoteGoodsValue.Pricing(CommodityData.forServer(call.server()), call.store().houses()::referenceMillis,
+                EconomyConfig.REMOTE_GOODS_FLOOR_VALUE.get(), EconomyConfig.REMOTE_MODIFIED_GOODS_VALUE.get());
+    }
+
+    /**
+     * Null when goods worth {@code value} more may leave the account through the app today within
+     * {@code remoteDailyGoodsLimit}; otherwise the refusal, with the value, the limit and what is left of it.
+     */
+    static LinkActionResult overGoodsLimit(Call call, long value) {
+        long limit = EconomyConfig.REMOTE_DAILY_GOODS_LIMIT.get();
+        long day = EconomySavedData.economyDay(LinkReads.now());
+        RemoteSpendSection spend = call.store().remoteSpend();
+        if (spend.allowsGoods(call.player(), day, Math.max(0L, value), limit)) return null;
+        if (spend.spentToday(call.player(), day) == 0L && spend.goodsToday(call.player(), day) == 0L
+                && spend.size() >= RemoteSpendSection.MAX_ACCOUNTS)
+            return invalid(LinkText.get("link.neroeconomy.remote_table_full"));
+        return invalid(LinkText.get("link.neroeconomy.remote_goods_limit", value, limit,
+                Math.max(0L, limit - spend.goodsToday(call.player(), day))));
+    }
+
+    /** Counts goods worth {@code value} that left the account through an action that ran. */
+    static void goodsSent(Call call, long value) {
+        if (value > 0L)
+            call.store().remoteSpend().recordGoods(call.player(), EconomySavedData.economyDay(LinkReads.now()), value);
+    }
+
+    /**
+     * What one unit a sell rule may sell counts as: its item's value, or for a tag, the dearest
+     * goods in the player's vault (the only goods a vault-backed rule can sell), never below the floor.
+     */
+    private static long ruleUnitValue(Call call, RemoteGoodsValue.Pricing pricing, boolean tag, String target) {
+        if (!tag) return RemoteGoodsValue.unitValue(pricing, target, Lot.PRISTINE);
+        long unit = pricing.floor();
+        for (Lot lot : call.store().vault().stacks(call.player()))
+            unit = Math.max(unit, RemoteGoodsValue.unitValue(pricing, lot.item(), lot.payload()));
+        return unit;
     }
 
     private static LinkViews.Remote remote(Call call) { return LinkReads.remote(call.store(), call.player()); }
@@ -284,11 +353,15 @@ final class LinkActions {
             if (call.online() == null) return offline(LinkPayloads.SELL_NEEDS_PLAYER);
             LinkActionResult limited = overLimit(call, EconomyConfig.LISTING_FEE.get());
             if (limited != null) return limited;
+            long goodsValue = handValue(call, quantity);
+            LinkActionResult goodsLimited = overGoodsLimit(call, goodsValue);
+            if (goodsLimited != null) return goodsLimited;
             long expires = LinkReads.now() + EconomyConfig.DEFAULT_LISTING_DURATION_HOURS.get() * 3_600_000L;
             Posted<MarketListing> posted = market.postFromHandChecked(call.online(), quantity, asking, expires,
                     ListingSource.MARKET_BOARD, "link", call.request());
             if (posted.result() != PostResult.SUCCESS) return invalid(LinkPayloads.postMessage(posted.result()));
             spent(call, posted.feeCharged());
+            goodsSent(call, goodsValue);
             return LinkActionResult.ok(LinkPayloads.tradeResult(call.balance().apply(call.player()),
                     new LinkPayloads.Trade("sell", posted.row().listingId().toString(), quantity, asking,
                             times(asking, quantity), false, "listed", posted.feeCharged(), 0L)));
@@ -299,12 +372,26 @@ final class LinkActions {
         MarketBuyOffer offer = market.buyOffer(offerId);
         if (offer == null) return invalid(LinkPayloads.SELL_NEEDS_BUY_OFFER);
         if (call.online() == null) return offline(LinkPayloads.SELL_NEEDS_PLAYER);
+        long goodsValue = handValue(call, quantity);
+        LinkActionResult goodsLimited = overGoodsLimit(call, goodsValue);
+        if (goodsLimited != null) return goodsLimited;
         FillOutcome filled = market.fillBuyOfferOutcome(call.online(), offerId, quantity, call.request());
         if (!filled.success()) return invalid(LinkPayloads.fillMessage(filled.result()));
+        goodsSent(call, goodsValue);
         // The proceeds, less the market fee, are booked to the seller's credit claim.
         return LinkActionResult.ok(LinkPayloads.tradeResult(call.balance().apply(call.player()),
                 new LinkPayloads.Trade("sell", offerId.toString(), quantity, offer.unitPrice(), filled.gross(), true,
                         "credit_claim", filled.fee(), filled.net())));
+    }
+
+    /** What up to {@code quantity} of the in-game player's main-hand stack counts as when it leaves. */
+    private static long handValue(Call call, int quantity) {
+        ItemStack held = call.online().getMainHandItem();
+        if (held.isEmpty()) return 0L;
+        String item = BuiltInRegistries.ITEM.getKey(held.getItem()).toString();
+        // Any modified stack counts as modified goods; which payload it would get does not matter here.
+        int payload = MarketSavedData.pristine(held) ? Lot.PRISTINE : 1;
+        return RemoteGoodsValue.of(goodsPricing(call), item, payload, Math.min(quantity, held.getCount()));
     }
 
     static LinkActionResult offline(String message) {
@@ -330,22 +417,28 @@ final class LinkActions {
         if (unit == null) return badNumber("unitPrice", 1L, MAX_CREDITS);
         long fee = EconomyConfig.LISTING_FEE.get();
         Placed placed;
+        long goodsValue = 0L;
         if (side.equals("sell")) {
             Long payload = number(params, "payload", 0L, Integer.MAX_VALUE, 0L);
             if (payload == null) return badNumber("payload", 0L, Integer.MAX_VALUE);
             LinkActionResult limited = overLimit(call, fee);
             if (limited != null) return limited;
-            placed = BookStacks.sellFromVault(call.server(), call.player(), item, payload.intValue(),
+            // The goods leave the vault for the book, whatever the price: counted at what they are worth.
+            goodsValue = RemoteGoodsValue.of(goodsPricing(call), item, payload.intValue(), quantity);
+            LinkActionResult goodsLimited = overGoodsLimit(call, goodsValue);
+            if (goodsLimited != null) return goodsLimited;
+            placed = BookStacks.sellFromVault(call.store(), call.env(), call.player(), item, payload.intValue(),
                     quantity.intValue(), unit, call.request());
         } else {
             LinkActionResult limited = overLimit(call, plus(times(unit, quantity), fee));
             if (limited != null) return limited;
             // Goods bought from the app always go to the vault, whether or not the player is in game.
-            placed = BookStacks.buyOrder(call.server(), call.player(), null, item, quantity.intValue(), unit,
+            placed = BookStacks.buyOrder(call.store(), call.env(), call.player(), null, item, quantity.intValue(), unit,
                     call.request());
         }
         if (!placed.ok()) return refused(placed.result().translationKey());
         spent(call, plus(placed.escrowed(), placed.listingFee()));
+        goodsSent(call, goodsValue);
         JsonObject detail = LinkViews.orderPlaced(placed.orderId().toString(), side, item, quantity, unit,
                 placed.filled(), placed.rested(), placed.listingFee(), placed.escrowed());
         return ok(call, ORDER_PLACE, LinkText.get(side.equals("sell") ? "link.neroeconomy.order_placed_sell"
@@ -358,7 +451,7 @@ final class LinkActions {
     private static LinkActionResult orderCancel(Call call) {
         UUID orderId = LinkPayloads.uuid(call.params(), "orderId");
         if (orderId == null) return badText("orderId");
-        CancelResult result = BookStacks.cancel(call.server(), call.player(), orderId);
+        CancelResult result = BookStacks.cancel(call.store(), call.env(), call.player(), orderId);
         if (result != CancelResult.CANCELLED) return refused(result.translationKey());
         JsonObject detail = LinkViews.idOnly("orderId", orderId.toString());
         return ok(call, ORDER_CANCEL, LinkText.get("link.neroeconomy.order_cancelled"), detail, false);
@@ -387,14 +480,21 @@ final class LinkActions {
         Long total = number(params, "total", 1L, MAX_CREDITS, null);
         if (total == null) return badNumber("total", 1L, MAX_CREDITS);
         RuleSide ruleSide = side.equals("buy") ? RuleSide.BUY : RuleSide.SELL;
+        long goodsValue = 0L;
         if (ruleSide == RuleSide.BUY) {
             LinkActionResult limited = overLimit(call, total);
             if (limited != null) return limited;
+        } else {
+            // A sell rule may sell its whole quantity from the vault: counted now, at what it is worth.
+            goodsValue = times(ruleUnitValue(call, goodsPricing(call), tag, target), total);
+            LinkActionResult goodsLimited = overGoodsLimit(call, goodsValue);
+            if (goodsLimited != null) return goodsLimited;
         }
         RuleOutcome added = RuleStacks.add(call.server(), call.player(), ruleSide, tag, target, limitPrice,
                 perDay.intValue(), total, RulesSection.VAULT, call.request());
         if (!added.ok()) return refused(added.result().translationKey());
         spent(call, added.escrowed());
+        goodsSent(call, goodsValue);
         JsonObject detail = LinkViews.ruleSet(LinkReads.rule(added.rule()), added.escrowed());
         return ok(call, RULE_SET, LinkText.get("link.neroeconomy.rule_added"), detail, true);
     }
@@ -442,10 +542,27 @@ final class LinkActions {
                 if (RulesSection.VAULT.equals(rule.binding())) targets.add(rule.id());
         }
         int changed = 0;
+        RemoteGoodsValue.Pricing pricing = paused ? null : goodsPricing(call);
         for (UUID ruleId : targets) {
+            // Resuming a paused sell rule lets it sell what it has left from the vault: counted as setting one.
+            TradeRule rule = vaultRule(call, ruleId);
+            long goodsValue = 0L;
+            if (pricing != null && rule != null && rule.paused() && !rule.buys()) {
+                goodsValue = times(ruleUnitValue(call, pricing, rule.tag(), rule.target()),
+                        Math.max(0L, rule.total() - rule.done()));
+                LinkActionResult goodsLimited = overGoodsLimit(call, goodsValue);
+                if (goodsLimited != null) {
+                    if (targets.size() == 1) return goodsLimited;
+                    continue;
+                }
+            }
             RuleOutcome outcome = RuleStacks.setPaused(call.server(), call.player(), ruleId, paused);
-            if (outcome.ok()) changed++;
-            else if (targets.size() == 1) return refused(outcome.result().translationKey());
+            if (outcome.ok()) {
+                changed++;
+                goodsSent(call, goodsValue);
+            } else if (targets.size() == 1) {
+                return refused(outcome.result().translationKey());
+            }
         }
         JsonObject detail = LinkViews.rulesPaused(paused, changed);
         return ok(call, RULES_PAUSE, LinkText.get(paused ? "link.neroeconomy.rules_paused"
@@ -601,7 +718,7 @@ final class LinkActions {
         if (recipient == null) return badText("recipient");
         Long amount = number(call.params(), "amount", 1L, MAX_CREDITS, null);
         if (amount == null) return badNumber("amount", 1L, MAX_CREDITS);
-        UUID target = KnownAccounts.resolve(call.server(), recipient);
+        UUID target = call.players().resolve(recipient);
         long spendable = NeroEconomyCommon.CURRENCY_PROVIDER.spendable(call.player());
         BankTransferRules.Check check = BankTransferRules.check(amount, target != null, call.player().equals(target),
                 CurrencyApi.getBalance(call.player(), NeroEconomyCommon.CREDITS), spendable);
@@ -616,7 +733,7 @@ final class LinkActions {
             return invalid(LinkText.get("gui.neroeconomy.bank.payment_failed", amount));
         spent(call, amount);
         // The recipient is told an amount arrived, as in game; never by whom.
-        ServerPlayer online = call.server().getPlayerList().getPlayer(target);
+        ServerPlayer online = call.players().online(target);
         if (online != null)
             online.sendSystemMessage(Component.translatable("command.neroeconomy.payment_received", amount));
         JsonObject detail = LinkViews.paid(amount);
@@ -658,13 +775,17 @@ final class LinkActions {
         if ((askItem == null) != (askQty == 0L)) return badText("askItem");
         LinkActionResult limited = overLimit(call, credits);
         if (limited != null) return limited;
-        UUID target = KnownAccounts.resolve(call.server(), recipient);
+        long goodsValue = RemoteGoodsValue.of(goodsPricing(call), lots);
+        LinkActionResult goodsLimited = overGoodsLimit(call, goodsValue);
+        if (goodsLimited != null) return goodsLimited;
+        UUID target = call.players().resolve(recipient);
         OfferStacks.Terms terms = new OfferStacks.Terms(0, lots, credits, askItem, askQty.intValue(), askCredits);
-        OfferOutcome sent = OfferStacks.send(call.server(), call.player(), null, target, terms, call.request());
+        OfferOutcome sent = OfferStacks.send(call.store(), call.env(), call.player(), null, target, terms, call.request());
         if (!sent.ok()) return refused(sent.result().translationKey());
         spent(call, sent.offer().credits());
+        goodsSent(call, goodsValue);
         // The recipient learns an offer is waiting, not who sent it.
-        ServerPlayer online = target == null ? null : call.server().getPlayerList().getPlayer(target);
+        ServerPlayer online = call.players().online(target);
         if (online != null) online.sendSystemMessage(Component.translatable("gui.neroeconomy.hub.trade.received"));
         JsonObject detail = LinkViews.offerSent(sent.offer().id().toString(), sent.offer().credits(),
                 sent.offer().itemCount(), Math.max(0L, sent.offer().expiresAt() - LinkReads.now()));
@@ -680,13 +801,17 @@ final class LinkActions {
             return refused(OfferResult.NOT_FOUND.translationKey());
         LinkActionResult limited = overLimit(call, offer.askCredits());
         if (limited != null) return limited;
-        OfferOutcome accepted = OfferStacks.accept(call.server(), call.player(), offerId, call.request());
+        // Goods the offer asks for leave the player's vault.
+        long goodsValue = RemoteGoodsValue.of(goodsPricing(call), offer.askItem(), Lot.PRISTINE, offer.askCount());
+        LinkActionResult goodsLimited = overGoodsLimit(call, goodsValue);
+        if (goodsLimited != null) return goodsLimited;
+        OfferOutcome accepted = OfferStacks.accept(call.store(), call.env(), call.player(), offerId, call.request());
         if (!accepted.ok()) return refused(accepted.result().translationKey());
         spent(call, accepted.recipientPaid());
+        goodsSent(call, goodsValue);
         // The sender is told their offer was answered, as in game; never by whom.
         AccountId sender = accepted.offer().sender();
-        ServerPlayer online = sender instanceof PlayerAccountId id ? call.server().getPlayerList().getPlayer(id.playerId())
-                : null;
+        ServerPlayer online = sender instanceof PlayerAccountId id ? call.players().online(id.playerId()) : null;
         if (online != null) online.sendSystemMessage(Component.translatable("command.neroeconomy.offer.accepted_sender",
                 accepted.senderGets()));
         JsonObject detail = LinkViews.offerAccepted(offerId.toString(), accepted.recipientGot(),
@@ -697,11 +822,10 @@ final class LinkActions {
     private static LinkActionResult offerDecline(Call call) {
         UUID offerId = LinkPayloads.uuid(call.params(), "offerId");
         if (offerId == null) return badText("offerId");
-        OfferOutcome declined = OfferStacks.decline(call.server(), call.player(), offerId);
+        OfferOutcome declined = OfferStacks.decline(call.store(), call.env(), call.player(), offerId);
         if (!declined.ok()) return refused(declined.result().translationKey());
         AccountId sender = declined.offer().sender();
-        ServerPlayer online = sender instanceof PlayerAccountId id ? call.server().getPlayerList().getPlayer(id.playerId())
-                : null;
+        ServerPlayer online = sender instanceof PlayerAccountId id ? call.players().online(id.playerId()) : null;
         if (online != null) online.sendSystemMessage(Component.translatable("command.neroeconomy.offer.declined_sender"));
         JsonObject detail = LinkViews.idOnly("offerId", offerId.toString());
         return ok(call, OFFER_DECLINE, LinkText.get("link.neroeconomy.offer_declined"), detail, false);
@@ -716,7 +840,7 @@ final class LinkActions {
     private static LinkActionResult offerCancel(Call call) {
         UUID offerId = LinkPayloads.uuid(call.params(), "offerId");
         if (offerId == null) return badText("offerId");
-        OfferOutcome cancelled = OfferStacks.cancel(call.server(), call.player(), offerId);
+        OfferOutcome cancelled = OfferStacks.cancel(call.store(), call.env(), call.player(), offerId);
         if (!cancelled.ok()) return refused(cancelled.result().translationKey());
         Offer offer = cancelled.offer();
         JsonObject detail = LinkViews.offerCancelled(offerId.toString(), offer.credits(), offer.itemCount(),

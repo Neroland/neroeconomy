@@ -88,13 +88,48 @@ class RemoteSpendSectionTest {
         JsonObject export = section.exportFor(ALICE);
         assertEquals(DAY, export.get("economy_day").getAsLong());
         assertEquals(1_234L, export.get("spent").getAsLong());
-        assertEquals(2, export.size());
+        assertEquals(0L, export.get("goods_value").getAsLong());
+        assertEquals(3, export.size());
         assertFalse(export.toString().contains(BOB.toString()));
         section.forgetPlayer(ALICE);
         assertEquals(0L, section.spentToday(ALICE, DAY));
         assertEquals(0, section.exportFor(ALICE).size());
         assertEquals(10L, section.spentToday(BOB, DAY));
         section.forgetPlayer(UUID.randomUUID());
+    }
+
+    @Test void goodsAreCountedApartFromCreditsAndBoundedTheSameWay() {
+        RemoteSpendSection section = new RemoteSpendSection();
+        section.record(ALICE, DAY, 4_000L);
+        assertTrue(section.allowsGoods(ALICE, DAY, LIMIT, LIMIT), "credits spent do not use up the goods limit");
+        section.recordGoods(ALICE, DAY, 4_999L);
+        assertEquals(4_000L, section.spentToday(ALICE, DAY));
+        assertEquals(4_999L, section.goodsToday(ALICE, DAY));
+        assertTrue(section.allowsGoods(ALICE, DAY, 1L, LIMIT));
+        assertFalse(section.allowsGoods(ALICE, DAY, 2L, LIMIT));
+        assertFalse(section.allowsGoods(ALICE, DAY, -1L, LIMIT));
+        assertFalse(section.allowsGoods(ALICE, DAY, 1L, 0L), "a zero limit lets no goods leave");
+        assertTrue(section.allowsGoods(ALICE, DAY, 0L, 0L));
+        section.recordGoods(ALICE, DAY, Long.MAX_VALUE);
+        assertEquals(Long.MAX_VALUE, section.goodsToday(ALICE, DAY), "saturates");
+        assertEquals(1_000L + 3_000L, section.spentToday(ALICE, DAY), "the credit sum is left alone");
+        assertTrue(section.allowsGoods(ALICE, DAY + 1, LIMIT, LIMIT), "the next day starts afresh");
+        assertEquals(Long.MAX_VALUE, section.exportFor(ALICE).get("goods_value").getAsLong());
+        section.forgetPlayer(ALICE);
+        assertEquals(0L, section.goodsToday(ALICE, DAY));
+    }
+
+    @Test void aGoodsOnlyRowSurvivesASaveAndAnOlderRowLoadsWithNoGoods() {
+        RemoteSpendSection section = new RemoteSpendSection();
+        section.recordGoods(ALICE, DAY, 640L);
+        JsonElement encoded = RemoteSpendSection.CODEC.encodeStart(JsonOps.INSTANCE, section).getOrThrow();
+        RemoteSpendSection restored = RemoteSpendSection.CODEC.parse(JsonOps.INSTANCE, encoded).getOrThrow();
+        assertEquals(640L, restored.goodsToday(ALICE, DAY));
+        assertEquals(0L, restored.spentToday(ALICE, DAY));
+        RemoteSpendSection older = RemoteSpendSection.CODEC.parse(JsonOps.INSTANCE, JsonParser.parseString(
+                "{\"spends\":[{\"player\":\"" + ALICE + "\",\"day\":" + DAY + ",\"spent\":5}]}")).getOrThrow();
+        assertEquals(5L, older.spentToday(ALICE, DAY));
+        assertEquals(0L, older.goodsToday(ALICE, DAY));
     }
 
     @Test void itSurvivesASaveAndAnOlderStoreLoadsItEmpty() {

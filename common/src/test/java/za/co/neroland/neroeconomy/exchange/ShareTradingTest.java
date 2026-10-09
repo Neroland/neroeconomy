@@ -111,15 +111,22 @@ class ShareTradingTest {
         exchange.check();
     }
 
-    @Test void theStartingBalanceLockDoesNotStopAPurchase() {
+    @Test void theStartingBalanceLockStopsAPurchaseButMayPayTheFee() {
         UUID newcomer = exchange.world.newcomer(5);
         assertEquals(100L, exchange.ledger().locked(newcomer));
-        // One unit at 50.25 costs 51, and a fee of 1.
+        // One unit at 50.25 costs 51, and a fee of 1. Locked starting credits do not buy shares (JF1 A1):
+        // sold again, they would come back unlocked.
+        TradeQuote refused = exchange.buy(newcomer, PLAIN, 1L);
+        assertEquals(TradeResult.FUNDS_LOCKED, refused.result());
+        assertEquals(100L, balance(newcomer));
+        assertEquals(100L, exchange.ledger().locked(newcomer));
+        // With 51 earned credits the shares are paid from those, and the fee from the locked part.
+        exchange.ledger().deposit(newcomer, NeroEconomyCommon.CREDITS, 51L, TransactionType.ADMIN_GRANT);
         TradeQuote done = exchange.buy(newcomer, PLAIN, 1L);
         assertTrue(done.ok());
         assertEquals(52L, done.net());
-        assertEquals(48L, balance(newcomer));
-        assertEquals(48L, exchange.ledger().locked(newcomer));
+        assertEquals(99L, balance(newcomer));
+        assertEquals(99L, exchange.ledger().locked(newcomer));
         exchange.check();
     }
 

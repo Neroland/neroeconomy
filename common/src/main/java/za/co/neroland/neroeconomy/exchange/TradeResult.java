@@ -62,7 +62,9 @@ public enum TradeResult {
     /** The ledger refused the movement; nothing moved. */
     NOT_COMPLETED,
     /** An operator has closed the market for now; reads, collecting and refunds still work. */
-    MARKET_CLOSED;
+    MARKET_CLOSED,
+    /** Only starting credits that have not unlocked yet would pay for it; shares and bonds need earned credits. */
+    FUNDS_LOCKED;
 
     public boolean ok() { return this == OK; }
 

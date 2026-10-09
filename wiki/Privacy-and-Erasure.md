@@ -123,5 +123,5 @@ The mod writes no log line that contains a player, an amount or a transaction.
 The mod contains a crash reporter that is inert in published builds, because it has no address to
 report to. If a build were made with one, a report would hold the mod version, an operation label,
 the exception class, its message and its stack trace, with home-directory paths and anything shaped
-like a UUID removed, at most 10 reports per session. `telemetryEnabled=false` opts an installation
-out.
+like a UUID removed, at most 10 reports per session. Reporting would be on by default and opt-out:
+`telemetryEnabled=false` in `config/neroeconomy.properties` opts an installation out.

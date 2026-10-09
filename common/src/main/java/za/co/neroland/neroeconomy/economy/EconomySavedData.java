@@ -27,6 +27,7 @@ import net.minecraft.world.level.saveddata.SavedDataType;
 import za.co.neroland.nerolandcore.economy.Currency;
 import za.co.neroland.nerolandcore.economy.CurrencyProvider;
 import za.co.neroland.neroeconomy.NeroEconomyCommon;
+import za.co.neroland.neroeconomy.admin.AdminSection;
 import za.co.neroland.neroeconomy.api.AccountId;
 import za.co.neroland.neroeconomy.api.PlayerAccountId;
 import za.co.neroland.neroeconomy.api.SystemAccountId;
@@ -315,6 +316,7 @@ public final class EconomySavedData extends EconomySection implements CurrencyPr
         balances.put(account, current + amount);
         append(type, amount, null, account, now);
         setDirty();
+        countAdmin(type);
         return true;
     }
 
@@ -329,7 +331,25 @@ public final class EconomySavedData extends EconomySection implements CurrencyPr
         clampLock(account);
         append(type, amount, account, null, now);
         setDirty();
+        countAdmin(type);
         return true;
+    }
+
+    /**
+     * An operator's mint or burn has changed a balance: it is counted in the store's admin section
+     * under its own action, whichever way it came in ({@code AdminOps}, the provider's public typed
+     * calls, or this ledger directly). Counts only, never whose account or how much. A ledger with
+     * no store (a unit test's) has nowhere to count.
+     */
+    private void countAdmin(TransactionType type) {
+        AdminSection.Action action = switch (type) {
+            case ADMIN_GRANT -> AdminSection.Action.GRANT;
+            case ADMIN_TAKE -> AdminSection.Action.TAKE;
+            case ADMIN_SET -> AdminSection.Action.SET;
+            default -> null;
+        };
+        EconomyStore store = owner();
+        if (action != null && store != null) store.admin().record(action);
     }
 
     /** Each minting reason has the accounts it may create credits in, and no others. */
@@ -500,6 +520,7 @@ public final class EconomySavedData extends EconomySection implements CurrencyPr
             case SIBLING -> EconomyConfig.SIBLING_DAILY_BUDGET.get();
             case SYSTEM_JOB -> EconomyConfig.SYSTEM_JOB_DAILY_PAYOUT_CAP.get();
             case UNBUDGETED -> Long.MAX_VALUE;
+            case CREDIT_CHIP -> EconomyConfig.CREDIT_CHIP_DAILY_BUDGET.get();
         };
     }
 

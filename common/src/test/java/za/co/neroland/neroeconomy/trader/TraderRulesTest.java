@@ -8,8 +8,10 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 import org.junit.jupiter.api.AfterEach;
@@ -47,9 +49,13 @@ class TraderRulesTest {
     private final TradeWorld world = new TradeWorld();
     /** The Auto-Trader blocks the world has, by location: what the game's chunks are to the binder. */
     private final Map<String, FakeSlots> blocks = new HashMap<>();
+    /** Owners who are in creative or spectator mode right now: what the game's players are to the binder. */
+    private final Set<UUID> noSource = new HashSet<>();
     private long tick;
 
-    TraderRulesTest() { world.env = world.env.withBinder(TraderRules.binder(blocks::get)); }
+    TraderRulesTest() {
+        world.env = world.env.withBinder(TraderRules.binder(blocks::get, owner -> !noSource.contains(owner)));
+    }
 
     @AfterEach void done() {
         assertTrue(world.invariants(), "the ledger invariants must hold at the end of every test");
@@ -108,6 +114,32 @@ class TraderRulesTest {
     }
 
     // --- selling from the input slots --------------------------------------------------------
+
+    @Test void aSellRuleTakesNothingFromTheSlotsWhileItsOwnerIsInCreativeAndListsAgainOnceTheyAreNot() {
+        UUID alice = world.player(1, 100L);
+        FakeSlots slots = place(HERE, alice);
+        slots.input(0, DIAMOND, 40);
+        noSource.add(alice);
+        TradeRule rule = apply(alice, HERE, RuleSide.SELL, DIAMOND, 10L, 64, 100L);
+        assertNull(rule.orderId(), "nothing reaches the market from a creative owner's Auto-Trader");
+        assertEquals(40L, slots.inputs(DIAMOND));
+        assertEquals(0L, world.inStore(DIAMOND, Lot.PRISTINE));
+        noSource.remove(alice);
+        wake(HERE);
+        assertNotNull(rule(HERE).orderId(), "listed once the owner is a goods source again");
+        assertEquals(0L, slots.inputs(DIAMOND));
+    }
+
+    @Test void aBuyRuleStillDeliversIntoTheSlotsWhileItsOwnerIsInCreative() {
+        UUID alice = world.player(1, 1_000L);
+        UUID bob = world.player(2, 100L);
+        FakeSlots slots = place(HERE, alice);
+        noSource.add(alice);
+        apply(alice, HERE, RuleSide.BUY, DIAMOND, 10L, 64, 100L);
+        assertTrue(sell(bob, DIAMOND, 5, 10L).ok());
+        settle();
+        assertEquals(5L, slots.outputs(DIAMOND));
+    }
 
     @Test void aSellRuleListsTheUnmodifiedGoodsInTheInputSlotsAndNothingElse() {
         UUID alice = world.player(1, 100L);

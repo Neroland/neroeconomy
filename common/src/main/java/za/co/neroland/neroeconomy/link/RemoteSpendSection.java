@@ -23,12 +23,17 @@ import za.co.neroland.neroeconomy.economy.EconomySection;
  * spends counts: purchases, buy-order escrow, rule budgets, shares, bonds, payments and the
  * credits of an offer. The day rolls over on its own: a row from an earlier day counts as nothing.
  *
+ * <p><b>Goods.</b> Goods that leave the account through the app (an offer's goods, a sell order or
+ * a sell rule from the vault, an accepted offer that asks for goods) are counted apart, at what
+ * they are worth ({@link RemoteGoodsValue}), against {@code remoteDailyGoodsLimit}, by the same
+ * rule: {@link #allowsGoods} before, {@link #recordGoods} after.
+ *
  * <p><b>Bounds.</b> One row per account, only for the current day: rows of earlier days are
  * dropped whenever a row is written, and at most {@link #MAX_ACCOUNTS} accounts are held. When it
  * is full, an account with no row yet is refused remote spending for the rest of the day; nothing
  * already held is ever pushed out, so the limit cannot be reset by flooding the table.
  *
- * <p><b>Privacy.</b> A row is the player's id, an economy-day and a sum: nothing about what was
+ * <p><b>Privacy.</b> A row is the player's id, an economy-day and two sums: nothing about what was
  * bought or from whom. It is erased with the player ({@link #forgetPlayer}) and exported
  * ({@link #exportFor}). Every field is optional, so a store saved before this section existed
  * loads it empty.
@@ -38,7 +43,7 @@ public final class RemoteSpendSection extends EconomySection {
     /** The most accounts held for one day. */
     public static final int MAX_ACCOUNTS = 10_000;
 
-    private record Spend(long day, long spent) { }
+    private record Spend(long day, long spent, long goods) { }
 
     private final Map<UUID, Spend> spends = new LinkedHashMap<>();
 
@@ -48,6 +53,12 @@ public final class RemoteSpendSection extends EconomySection {
     public synchronized long spentToday(UUID player, long day) {
         Spend spend = player == null ? null : spends.get(player);
         return spend == null || spend.day() != day ? 0L : spend.spent();
+    }
+
+    /** What the goods {@code player} sent away through the app in economy-day {@code day} were worth. */
+    public synchronized long goodsToday(UUID player, long day) {
+        Spend spend = player == null ? null : spends.get(player);
+        return spend == null || spend.day() != day ? 0L : spend.goods();
     }
 
     /**
@@ -62,6 +73,18 @@ public final class RemoteSpendSection extends EconomySection {
         return spent <= limit && amount <= limit - spent;
     }
 
+    /**
+     * Whether goods worth up to {@code value} more may leave {@code player}'s account through the
+     * app today within {@code limit}. A negative value is never allowed; a limit of 0 allows nothing but 0.
+     */
+    public synchronized boolean allowsGoods(UUID player, long day, long value, long limit) {
+        if (player == null || value < 0L || limit < 0L) return false;
+        if (value == 0L) return true;
+        if (!spends.containsKey(player) && spends.size() >= MAX_ACCOUNTS && !purge(day)) return false;
+        long sent = goodsToday(player, day);
+        return sent <= limit && value <= limit - sent;
+    }
+
     /** Counts {@code amount} spent by {@code player} today. Saturates rather than overflows. */
     public synchronized void record(UUID player, long day, long amount) {
         if (player == null || amount <= 0L) return;
@@ -69,7 +92,18 @@ public final class RemoteSpendSection extends EconomySection {
         long before = spentToday(player, day);
         if (!spends.containsKey(player) && spends.size() >= MAX_ACCOUNTS) return;
         long after = Long.MAX_VALUE - before < amount ? Long.MAX_VALUE : before + amount;
-        spends.put(player, new Spend(day, after));
+        spends.put(player, new Spend(day, after, goodsToday(player, day)));
+        setDirty();
+    }
+
+    /** Counts goods worth {@code value} that left {@code player}'s account through the app today. Saturates. */
+    public synchronized void recordGoods(UUID player, long day, long value) {
+        if (player == null || value <= 0L) return;
+        purge(day);
+        long before = goodsToday(player, day);
+        if (!spends.containsKey(player) && spends.size() >= MAX_ACCOUNTS) return;
+        long after = Long.MAX_VALUE - before < value ? Long.MAX_VALUE : before + value;
+        spends.put(player, new Spend(day, spentToday(player, day), after));
         setDirty();
     }
 
@@ -101,13 +135,14 @@ public final class RemoteSpendSection extends EconomySection {
         if (player != null && spends.remove(player) != null) setDirty();
     }
 
-    /** The subject's own row for the data export: the day and the sum, nothing else. */
+    /** The subject's own row for the data export: the day and the two sums, nothing else. */
     public synchronized JsonObject exportFor(UUID player) {
         JsonObject out = new JsonObject();
         Spend spend = player == null ? null : spends.get(player);
         if (spend != null) {
             out.addProperty("economy_day", spend.day());
             out.addProperty("spent", spend.spent());
+            out.addProperty("goods_value", spend.goods());
         }
         return out;
     }
@@ -119,11 +154,12 @@ public final class RemoteSpendSection extends EconomySection {
 
     // --- persistence -------------------------------------------------------------------------
 
-    private record Row(String player, long day, long spent) {
+    private record Row(String player, long day, long spent, long goods) {
         static final Codec<Row> CODEC = RecordCodecBuilder.create(instance -> instance.group(
                 Codec.STRING.fieldOf("player").forGetter(Row::player),
                 Codec.LONG.optionalFieldOf("day", 0L).forGetter(Row::day),
-                Codec.LONG.optionalFieldOf("spent", 0L).forGetter(Row::spent)).apply(instance, Row::new));
+                Codec.LONG.optionalFieldOf("spent", 0L).forGetter(Row::spent),
+                Codec.LONG.optionalFieldOf("goods", 0L).forGetter(Row::goods)).apply(instance, Row::new));
     }
 
     private static Codec<RemoteSpendSection> codec() {
@@ -134,17 +170,19 @@ public final class RemoteSpendSection extends EconomySection {
 
     private synchronized List<Row> rows() {
         List<Row> rows = new ArrayList<>(spends.size());
-        spends.forEach((player, spend) -> rows.add(new Row(player.toString(), spend.day(), spend.spent())));
+        spends.forEach((player, spend) -> rows.add(new Row(player.toString(), spend.day(), spend.spent(),
+                spend.goods())));
         return rows;
     }
 
     private static RemoteSpendSection fromRows(List<Row> rows) {
         RemoteSpendSection section = new RemoteSpendSection();
-        // A malformed id or a negative sum (a hand-edited file) is dropped; the bound applies on load too.
+        // A malformed id or a row with nothing positive (a hand-edited file) is dropped; the bound applies on load too.
         for (Row row : rows) {
             if (section.spends.size() >= MAX_ACCOUNTS) break;
             try {
-                if (row.spent() > 0L) section.spends.put(UUID.fromString(row.player()), new Spend(row.day(), row.spent()));
+                if (row.spent() > 0L || row.goods() > 0L) section.spends.put(UUID.fromString(row.player()),
+                        new Spend(row.day(), Math.max(0L, row.spent()), Math.max(0L, row.goods())));
             } catch (IllegalArgumentException malformed) {
                 // skipped
             }

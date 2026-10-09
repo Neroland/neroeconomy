@@ -21,6 +21,7 @@ import za.co.neroland.neroeconomy.goods.Lot;
 import za.co.neroland.neroeconomy.goods.GoodsSource;
 import za.co.neroland.neroeconomy.market.MarketSavedData;
 import za.co.neroland.neroeconomy.vault.VaultSection;
+import za.co.neroland.neroeconomy.vault.VaultSlotRule;
 import za.co.neroland.neroeconomy.vault.VaultStacks;
 import za.co.neroland.neroeconomy.vault.VaultWindow;
 
@@ -151,8 +152,15 @@ final class VaultView implements Container {
         }
         Lot before = agreed[slot];
         Lot seen = goods.peekLot(stack);
-        // The goods that were already here may stay, in whatever quantity is left of them.
-        if (slot < active && before != null && seen != null && seen.sameGoods(before)) return seen;
+        // The goods that were already here may stay, in whatever quantity is left of them. A slot whose
+        // count grew holds new goods too, and those are asked the same question as a new stack.
+        if (slot < active && before != null && seen != null && seen.sameGoods(before)) {
+            int stay = VaultSlotRule.mayStay(before.count(), seen.count(),
+                    seen.count() <= before.count() || accepts(stack));
+            if (stay == seen.count()) return seen;
+            VaultStacks.handBack(player, stack.split(seen.count() - stay));
+            return seen.withCount(stay);
+        }
         if (slot < active && accepts(stack)) {
             Lot lot = goods.lotOf(stack);
             if (lot != null) return lot;

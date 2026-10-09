@@ -143,9 +143,13 @@ class LinkV2ContractTest {
                         2_000L, 5_400_000L, false, false, true, true)), AS_OF));
     }
 
-    /** Two bids at 5 (one level), one at 4; asks at 6 and 7. */
+    /**
+     * Two bids at 5 (one level), one at 4; asks at 6 and 7. Oak logs, so the app's demo, which opens
+     * the book of an item on the market page sample, has one to show: that page's oak-log buy offer
+     * (128 at 4) is the bid level at 4 here.
+     */
     static JsonObject book() {
-        return LinkViews.book(new LinkViews.ItemBook("minecraft:wheat", "Wheat",
+        return LinkViews.book(new LinkViews.ItemBook("minecraft:oak_log", "Oak Log",
                 LinkViews.levels(List.of(new LinkViews.BookOrder(5L, 64L), new LinkViews.BookOrder(5L, 32L),
                         new LinkViews.BookOrder(4L, 128L))),
                 LinkViews.levels(List.of(new LinkViews.BookOrder(6L, 40L), new LinkViews.BookOrder(7L, 200L))), AS_OF));
@@ -382,6 +386,17 @@ class LinkV2ContractTest {
         JsonObject empty = LinkViews.book(new LinkViews.ItemBook("", "", List.of(), List.of(), AS_OF));
         assertEquals(0L, empty.get("bestBid").getAsLong());
         assertEquals(0, empty.getAsJsonArray("asks").size());
+    }
+
+    @Test void theBookSampleIsForAnItemTheMarketPageSampleLists() throws IOException {
+        // The app's demo opens the book of an item it found on the market page: the samples must agree.
+        JsonObject page = JsonParser.parseString(Files.readString(goldenDir().getParent().resolve(
+                "neroeconomy_market.json"), StandardCharsets.UTF_8)).getAsJsonObject().getAsJsonObject("data");
+        String item = book().get("item").getAsString();
+        boolean listed = false;
+        for (JsonElement row : page.getAsJsonArray("listings"))
+            listed |= item.equals(row.getAsJsonObject().get("item").getAsString());
+        assertTrue(listed, "the market page sample lists no " + item);
     }
 
     @Test void anActionResultIsTheBalanceObjectPlusWhatTheActionDid() {

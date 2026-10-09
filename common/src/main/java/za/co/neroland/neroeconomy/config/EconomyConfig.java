@@ -166,6 +166,11 @@ public final class EconomyConfig {
     public static final ConfigValue<Integer> CREDIT_CHIP_DAILY_LIMIT = SCHEMA.intRange(
             "creditChipDailyLimit", 5, 0, 1000, true,
             "Credit chips one account may redeem per economy day; 0 disables redemption.");
+    public static final ConfigValue<Long> CREDIT_CHIP_DAILY_BUDGET = SCHEMA.longRange(
+            "creditChipDailyBudget", 3_000L, 0L, 1_000_000_000L, true,
+            "Credits the Reserve pays for Credit Chips per economy day, all accounts together, on top of "
+                    + "creditChipDailyLimit per account. A chip refused because it is spent is kept. 0 stops "
+                    + "chip payouts.");
     public static final ConfigValue<Boolean> SYSTEM_JOBS_ENABLED = SCHEMA.bool(
             "systemJobsEnabled", true, true,
             "Allow server-funded jobs, whose payouts come out of the Reserve; false refuses every new one.");
@@ -338,13 +343,28 @@ public final class EconomyConfig {
             "Credits one account may spend per economy day through companion-app actions, all of them "
                     + "together: purchases, buy-order escrow, rule budgets, shares, bonds, payments and offers. "
                     + "It is the most a stolen app token can cost a player in a day. 0 allows no spending from the app.");
+    public static final ConfigValue<Long> REMOTE_DAILY_GOODS_LIMIT = SCHEMA.longRange(
+            "remoteDailyGoodsLimit", 5_000L, 0L, 1_000_000_000_000L, true,
+            "Credits' worth of goods that may leave one account per economy day through companion-app "
+                    + "actions, all of them together: goods in offers, sell orders and sell rules from the vault, "
+                    + "goods an accepted offer asks for. Counted apart from remoteDailySpendLimit, so the two "
+                    + "together are the most a stolen app token can cost a player in a day. 0 lets no goods leave "
+                    + "through the app.");
+    public static final ConfigValue<Long> REMOTE_GOODS_FLOOR_VALUE = SCHEMA.longRange(
+            "remoteGoodsFloorValue", 10L, 1L, 1_000_000_000L, true,
+            "Credits one unit of unmodified goods that are no commodity counts as against "
+                    + "remoteDailyGoodsLimit. A commodity counts at its reference price.");
+    public static final ConfigValue<Long> REMOTE_MODIFIED_GOODS_VALUE = SCHEMA.longRange(
+            "remoteModifiedGoodsValue", 500L, 1L, 1_000_000_000L, true,
+            "Credits one unit of modified goods (renamed, enchanted, or holding contents such as a filled "
+                    + "shulker box) counts as against remoteDailyGoodsLimit, or its item's reference price if higher.");
     public static final ConfigValue<Boolean> GIVE_HANDBOOK_ON_FIRST_JOIN = SCHEMA.bool(
             "giveHandbookOnFirstJoin", true, true,
             "Give each player one Trader's Handbook the first time they join (never in spectator mode, "
                     + "never twice); with a full inventory it goes to their vault. The book is craftable either way.");
     public static final ConfigValue<Boolean> TELEMETRY_ENABLED = SCHEMA.bool(
             "telemetryEnabled", true, false,
-            "Send anonymous NeroEconomy-only crash reports; false opts out. No player data is sent.");
+            "Send anonymous NeroEconomy-only crash reports (Sentry, EU servers). On by default; set false to opt out (client-local, takes effect on restart). No player data is sent. See PRIVACY.md.");
 
     private EconomyConfig() {
     }

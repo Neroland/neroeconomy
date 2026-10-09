@@ -272,8 +272,10 @@ NeroEconomy embeds the Sentry client for crash reporting. Stated precisely:
   placeholder compiled into the mod, and there is no config key for it. While the placeholder is in
   place the client is never started and nothing is sent. The rest of this section describes what a
   build with a real DSN would do.
-- **Opt-out.** Set `telemetryEnabled=false` in `config/neroeconomy.properties`. The key is read at
-  start-up and is the one setting that belongs to each installation rather than to the server.
+- **On by default, opt-out.** In a build with a real DSN, reporting runs unless you set
+  `telemetryEnabled=false` in `config/neroeconomy.properties`. The key defaults to `true`, is read at
+  start-up (a change takes effect on restart) and is the one setting that belongs to each
+  installation rather than to the server.
 - **Scope.** Only failures whose stack trace includes `za.co.neroland.neroeconomy` are considered.
 - **Cap.** At most 10 events per session, and one per distinct failure.
 - **What an event would contain.** The mod release (`neroeconomy@<version>`), the environment name
@@ -287,6 +289,14 @@ NeroEconomy embeds the Sentry client for crash reporting. Stated precisely:
 - **Not attached.** `sendDefaultPii` is off, and the mod attaches no player identifier, name,
   balance, item or transaction value. As with any network request, the receiving service would see
   the network address of the machine that sent the report.
+
+Once a published build carries a real DSN, the store pages will carry this notice:
+
+> **Telemetry notice:** NeroEconomy sends anonymous error reports (stack trace + mod/game versions
+> only — never IPs, usernames, UUIDs, or world data) to the developers via Sentry (EU servers) so
+> crashes can be fixed. On by default — opt out any time by setting `telemetryEnabled = false` in
+> `config/neroeconomy.properties`. Full details:
+> [PRIVACY.md](https://github.com/Neroland/neroeconomy/blob/main/PRIVACY.md).
 
 ## Companion app (NeroLink)
 

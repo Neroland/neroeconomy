@@ -14,6 +14,8 @@ public enum BudgetKind {
     SIBLING,
     /** Payouts of server-funded jobs, counted when the job is posted. */
     SYSTEM_JOB,
-    /** Starting balances, Credit Chips and price discounts: limited only by the Reserve's balance. */
-    UNBUDGETED
+    /** Starting balances and price discounts: limited only by the Reserve's balance. */
+    UNBUDGETED,
+    /** Credit Chip redemptions of every account together ({@code creditChipDailyBudget}). */
+    CREDIT_CHIP
 }

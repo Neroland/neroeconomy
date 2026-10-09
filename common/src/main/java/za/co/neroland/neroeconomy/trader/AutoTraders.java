@@ -18,6 +18,7 @@ import za.co.neroland.neroeconomy.block.AutoTraderBlock;
 import za.co.neroland.neroeconomy.block.AutoTraderBlockEntity;
 import za.co.neroland.neroeconomy.economy.EconomyHealth;
 import za.co.neroland.neroeconomy.economy.EconomyStore;
+import za.co.neroland.neroeconomy.goods.GoodsSource;
 import za.co.neroland.neroeconomy.rules.RuleBinder;
 import za.co.neroland.neroeconomy.rules.RuleOutcome;
 import za.co.neroland.neroeconomy.rules.RuleResult;
@@ -48,13 +49,24 @@ public final class AutoTraders {
     /** What the binding of a rule that works from an Auto-Trader starts with. */
     public static final String BINDING_PREFIX = TraderRules.BINDING_PREFIX;
 
-    /** Knows the inventories of Auto-Trader blocks; plugged into the trading rules at start-up. */
+    /**
+     * Knows the inventories of Auto-Trader blocks; plugged into the trading rules at start-up. A sell
+     * rule takes nothing from the slots while its owner is in game as a creative-mode, spectator or
+     * endless-supply player.
+     */
     public static final RuleBinder BINDER = TraderRules.binder(location -> {
         AutoTraderBlockEntity trader = loaded(location);
         return trader == null ? null : trader.slots();
-    });
+    }, AutoTraders::maySupply);
 
     private AutoTraders() { }
+
+    /** Whether the owner may be a source of goods: nobody in game as a creative or spectator player. */
+    private static boolean maySupply(UUID owner) {
+        MinecraftServer server = NeroEconomyCommon.CURRENCY_PROVIDER.serverOrNull();
+        ServerPlayer online = server == null || owner == null ? null : server.getPlayerList().getPlayer(owner);
+        return online == null || GoodsSource.allowed(online);
+    }
 
     // --- locations and bindings --------------------------------------------------------------
 

@@ -81,8 +81,16 @@ public final class BookStacks {
         if (server == null || seller == null || requestId == null || unitPrice < 1L
                 || !Lot.valid(item, quantity, payload)) return Placed.refused(BookResult.INVALID);
         EconomyStore store = EconomyStore.get(server);
+        return sellFromVault(store, Trading.env(store), seller, item, payload, quantity, unitPrice, requestId);
+    }
+
+    /** {@link #sellFromVault(MinecraftServer, UUID, String, int, int, long, UUID)} against a store already resolved. */
+    public static Placed sellFromVault(EconomyStore store, TradeEnv env, UUID seller, String item, int payload,
+            int quantity, long unitPrice, UUID requestId) {
+        if (EconomyHealth.frozen()) return Placed.refused(BookResult.FROZEN);
+        if (store == null || env == null || seller == null || requestId == null || unitPrice < 1L
+                || !Lot.valid(item, quantity, payload)) return Placed.refused(BookResult.INVALID);
         if (!store.market().rememberRequest(seller, requestId)) return Placed.refused(BookResult.STALE_REQUEST);
-        TradeEnv env = Trading.env(store);
         AccountId account = account(seller);
         return store.book().placeSell(env, account, new Lot(item, quantity, payload), unitPrice, OrderSource.VAULT,
                 VaultGoods.origin(store, env, account), null);
@@ -161,7 +169,15 @@ public final class BookStacks {
         if (server == null || buyer == null || item == null || quantity < 1 || unitPrice < 1L || requestId == null)
             return Placed.refused(BookResult.INVALID);
         EconomyStore store = EconomyStore.get(server);
-        TradeEnv env = Trading.env(store);
+        return buyOrder(store, Trading.env(store), buyer, live, item, quantity, unitPrice, requestId);
+    }
+
+    /** {@link #buyOrder(MinecraftServer, UUID, ServerPlayer, String, int, long, UUID)} against a store already resolved. */
+    public static Placed buyOrder(EconomyStore store, TradeEnv env, UUID buyer, ServerPlayer live, String item,
+            int quantity, long unitPrice, UUID requestId) {
+        if (EconomyHealth.frozen()) return Placed.refused(BookResult.FROZEN);
+        if (store == null || env == null || buyer == null || item == null || quantity < 1 || unitPrice < 1L
+                || requestId == null) return Placed.refused(BookResult.INVALID);
         // Checked before the request id is spent, so a mistyped id can simply be corrected.
         if (!env.items().known(item)) return Placed.refused(BookResult.UNKNOWN_ITEM);
         if (!store.market().rememberRequest(buyer, requestId)) return Placed.refused(BookResult.STALE_REQUEST);
@@ -222,6 +238,13 @@ public final class BookStacks {
         if (EconomyHealth.frozen()) return CancelResult.FROZEN;
         if (server == null || actor == null || orderId == null) return CancelResult.NOT_FOUND;
         EconomyStore store = EconomyStore.get(server);
-        return store.book().cancel(Trading.env(store), orderId, account(actor));
+        return cancel(store, Trading.env(store), actor, orderId);
+    }
+
+    /** {@link #cancel(MinecraftServer, UUID, UUID)} against a store already resolved. */
+    public static CancelResult cancel(EconomyStore store, TradeEnv env, UUID actor, UUID orderId) {
+        if (EconomyHealth.frozen()) return CancelResult.FROZEN;
+        if (store == null || env == null || actor == null || orderId == null) return CancelResult.NOT_FOUND;
+        return store.book().cancel(env, orderId, account(actor));
     }
 }

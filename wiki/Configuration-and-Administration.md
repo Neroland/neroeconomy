@@ -34,7 +34,7 @@ each time they are used, so a change applies as soon as Core has reloaded the fi
 | `systemJobDailyPayoutCap` | 5000 | 0 to 1,000,000,000 | Total payout of the server-funded jobs that may be posted per day. |
 | `playerBountiesEnabled` | false | true or false | Allows bounties on a named player. Posting one also needs permission level 2. |
 | `remoteTradeEnabled` | true | true or false | Allows the companion app's `trade` action. |
-| `telemetryEnabled` | true | true or false | Opt-out for crash telemetry. Telemetry is inert in published builds; see [Privacy](Privacy-and-Erasure.md). |
+| `telemetryEnabled` | true | true or false | Crash reporting is on by default; set `false` to opt out (local to this installation, read at start-up). Telemetry is inert in published builds; see [Privacy](Privacy-and-Erasure.md). |
 
 Back up the world before changing economic policy on a live server.
 
@@ -112,5 +112,6 @@ operation that failed or the exception class.
 ## Telemetry
 
 The mod contains a crash reporter that is inert in published builds: it has no address to report
-to until a build is made with one. `telemetryEnabled=false` opts an installation out regardless.
+to until a build is made with one. Once it has one, reporting is on by default and opt-out:
+`telemetryEnabled=false` in `config/neroeconomy.properties` opts an installation out regardless.
 [Privacy](Privacy-and-Erasure.md) describes what a report would contain.

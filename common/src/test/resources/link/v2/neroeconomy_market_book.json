@@ -2,8 +2,8 @@
   "ok": true,
   "data": {
     "view": "book",
-    "item": "minecraft:wheat",
-    "displayName": "Wheat",
+    "item": "minecraft:oak_log",
+    "displayName": "Oak Log",
     "bids": [
       {
         "unitPrice": 5,

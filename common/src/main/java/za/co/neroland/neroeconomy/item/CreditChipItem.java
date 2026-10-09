@@ -10,7 +10,7 @@ import za.co.neroland.neroeconomy.NeroEconomyCommon;
 import za.co.neroland.neroeconomy.block.BankTerminalBlock;
 import za.co.neroland.neroeconomy.block.BankTerminalBlockEntity;
 import za.co.neroland.neroeconomy.config.EconomyConfig;
-import za.co.neroland.neroeconomy.economy.BudgetKind;
+import za.co.neroland.neroeconomy.economy.CreditChipRules;
 import za.co.neroland.neroeconomy.economy.CreditChipSchedule;
 import za.co.neroland.neroeconomy.economy.EconomyHealth;
 import za.co.neroland.neroeconomy.economy.LedgerResult;
@@ -33,16 +33,13 @@ public final class CreditChipItem extends Item {
         if (!(context.getPlayer() instanceof ServerPlayer player)) return InteractionResult.FAIL;
         ItemStack held = context.getItemInHand();
         if (held.isEmpty()) return InteractionResult.FAIL;
-        if (EconomyHealth.frozen()) {
-            player.sendSystemMessage(net.minecraft.network.chat.Component.translatable(EconomyHealth.FROZEN_KEY));
-            return InteractionResult.FAIL;
-        }
-        // The chip is a faucet, so it is rate limited per account and economy day. Both refusals
-        // happen before the chip is touched, so the player simply keeps it.
+        // The chip is a faucet, so it is rate limited per account and economy day. Every refusal
+        // happens before the chip is touched, so the player simply keeps it.
         int dailyLimit = EconomyConfig.CREDIT_CHIP_DAILY_LIMIT.get();
-        if (dailyLimit <= 0) {
-            player.sendSystemMessage(net.minecraft.network.chat.Component.translatable(
-                    "item.neroeconomy.credit_chip.disabled"));
+        String refusal = CreditChipRules.refusal(EconomyHealth.frozen(), player.isCreative(), player.isSpectator(),
+                player.hasInfiniteMaterials(), dailyLimit);
+        if (refusal != null) {
+            player.sendSystemMessage(net.minecraft.network.chat.Component.translatable(refusal));
             return InteractionResult.FAIL;
         }
         // What this chip is worth depends on how many the account has already redeemed today.
@@ -56,7 +53,7 @@ public final class CreditChipItem extends Item {
         // Consume first: a chip that is spent before the payment can never be redeemed twice, and a
         // refused payment gives it straight back along with the reservation it took.
         held.shrink(1);
-        LedgerResult paid = NeroEconomyCommon.CURRENCY_PROVIDER.payFromReserve(BudgetKind.UNBUDGETED,
+        LedgerResult paid = NeroEconomyCommon.CURRENCY_PROVIDER.payFromReserve(CreditChipRules.BUDGET,
                 player.getUUID(), value, TransactionType.CREDIT_CHIP_REDEMPTION);
         if (!paid.ok()) {
             held.grow(1);
@@ -64,6 +61,7 @@ public final class CreditChipItem extends Item {
             player.sendSystemMessage(net.minecraft.network.chat.Component.translatable(
                     paid == LedgerResult.FROZEN ? EconomyHealth.FROZEN_KEY
                             : paid == LedgerResult.RESERVE_SHORT ? "item.neroeconomy.credit_chip.reserve_empty"
+                            : paid == LedgerResult.BUDGET_SPENT ? "item.neroeconomy.credit_chip.budget_spent"
                             : "item.neroeconomy.credit_chip.refused"));
             return InteractionResult.FAIL;
         }

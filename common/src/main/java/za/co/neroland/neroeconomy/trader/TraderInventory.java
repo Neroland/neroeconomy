@@ -60,6 +60,7 @@ public final class TraderInventory implements RuleInventory {
     private final Slots slots;
     private final boolean sells;
     private final Consumer<Lot> overflow;
+    private final boolean supplies;
 
     /**
      * @param sells    whether the rule bound to the block sells: goods coming back then go to the
@@ -68,16 +69,26 @@ public final class TraderInventory implements RuleInventory {
      *                 reached; must always take them (the owner's vault)
      */
     public TraderInventory(Slots slots, boolean sells, Consumer<Lot> overflow) {
+        this(slots, sells, overflow, true);
+    }
+
+    /**
+     * @param supplies false while the goods in the slots may not reach the market: the block's owner
+     *                 is in creative or spectator mode, or has an endless supply of items. The rule
+     *                 then finds nothing to take; goods still come back into the slots as usual.
+     */
+    public TraderInventory(Slots slots, boolean sells, Consumer<Lot> overflow, boolean supplies) {
         if (slots == null || overflow == null) throw new IllegalArgumentException("trader inventory");
         this.slots = slots;
         this.sells = sells;
         this.overflow = overflow;
+        this.supplies = supplies;
     }
 
     @Override public boolean reachable() { return slots.reachable(); }
 
     @Override public long available(String item) {
-        if (item == null || !reachable()) return 0L;
+        if (item == null || !reachable() || !supplies) return 0L;
         long total = 0L;
         for (int slot = 0; slot < INPUTS; slot++) {
             Lot held = slots.unmodified(slot);
@@ -88,7 +99,7 @@ public final class TraderInventory implements RuleInventory {
 
     @Override public Map<String, Long> goods() {
         Map<String, Long> out = new TreeMap<>();
-        if (!reachable()) return out;
+        if (!reachable() || !supplies) return out;
         for (int slot = 0; slot < INPUTS; slot++) {
             Lot held = slots.unmodified(slot);
             if (held != null) out.merge(held.item(), (long) held.count(), Long::sum);

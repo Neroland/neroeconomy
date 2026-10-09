@@ -82,11 +82,9 @@ public final class AdminOps {
             default -> false;
         };
         if (!success) return false;
-        count(server, switch (type) {
-            case ADMIN_GRANT -> AdminSection.Action.GRANT;
-            case ADMIN_TAKE -> AdminSection.Action.TAKE;
-            default -> AdminSection.Action.SET;
-        });
+        // The ledger counts every grant, take and set that changes a balance, wherever it came from;
+        // a set to the balance already there changes nothing in the ledger and is counted here.
+        if (type == TransactionType.ADMIN_SET && amount == balance) count(server, AdminSection.Action.SET);
         // Neither the account nor the amount is logged; the reason is a fixed word.
         NeroEconomyCommon.LOGGER.debug("[NeroEconomy] Administrative mutation completed (reason={}).", type);
         return true;

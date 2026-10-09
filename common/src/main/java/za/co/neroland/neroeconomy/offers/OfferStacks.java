@@ -67,7 +67,20 @@ public final class OfferStacks {
         if (recipient == null) return OfferOutcome.refused(OfferResult.UNKNOWN_RECIPIENT);
         if (sender.equals(recipient)) return OfferOutcome.refused(OfferResult.SELF);
         EconomyStore store = EconomyStore.get(server);
-        TradeEnv env = Trading.env(store);
+        return send(store, Trading.env(store), sender, live, recipient, terms, requestId);
+    }
+
+    /**
+     * {@link #send(MinecraftServer, UUID, ServerPlayer, UUID, Terms, UUID)} against a store already
+     * resolved, with the environment its trading rules are given: the same checks in the same order.
+     */
+    public static OfferOutcome send(EconomyStore store, TradeEnv env, UUID sender, ServerPlayer live, UUID recipient,
+            Terms terms, UUID requestId) {
+        if (EconomyHealth.frozen()) return OfferOutcome.refused(OfferResult.FROZEN);
+        if (store == null || env == null || sender == null || terms == null || requestId == null
+                || terms.handCount() < 0) return OfferOutcome.refused(OfferResult.INVALID);
+        if (recipient == null) return OfferOutcome.refused(OfferResult.UNKNOWN_RECIPIENT);
+        if (sender.equals(recipient)) return OfferOutcome.refused(OfferResult.SELF);
         AccountId account = account(sender);
         List<OffersSection.Given> given = new ArrayList<>();
         if (terms.handCount() > 0) {
@@ -120,8 +133,16 @@ public final class OfferStacks {
         if (server == null || actor == null || offerId == null || requestId == null)
             return OfferOutcome.refused(OfferResult.INVALID);
         EconomyStore store = EconomyStore.get(server);
+        return accept(store, Trading.env(store), actor, offerId, requestId);
+    }
+
+    /** {@link #accept(MinecraftServer, UUID, UUID, UUID)} against a store already resolved. */
+    public static OfferOutcome accept(EconomyStore store, TradeEnv env, UUID actor, UUID offerId, UUID requestId) {
+        if (EconomyHealth.frozen()) return OfferOutcome.refused(OfferResult.FROZEN);
+        if (store == null || env == null || actor == null || offerId == null || requestId == null)
+            return OfferOutcome.refused(OfferResult.INVALID);
         if (!store.market().rememberRequest(actor, requestId)) return OfferOutcome.refused(OfferResult.STALE_REQUEST);
-        return store.offers().accept(Trading.env(store), offerId, account(actor));
+        return store.offers().accept(env, offerId, account(actor));
     }
 
     /** Declines an offer as its recipient. Idempotent: a second call finds nothing. */
@@ -129,7 +150,15 @@ public final class OfferStacks {
         if (EconomyHealth.frozen()) return OfferOutcome.refused(OfferResult.FROZEN);
         if (server == null || actor == null || offerId == null) return OfferOutcome.refused(OfferResult.NOT_FOUND);
         EconomyStore store = EconomyStore.get(server);
-        return store.offers().decline(Trading.env(store), offerId, account(actor));
+        return decline(store, Trading.env(store), actor, offerId);
+    }
+
+    /** {@link #decline(MinecraftServer, UUID, UUID)} against a store already resolved. */
+    public static OfferOutcome decline(EconomyStore store, TradeEnv env, UUID actor, UUID offerId) {
+        if (EconomyHealth.frozen()) return OfferOutcome.refused(OfferResult.FROZEN);
+        if (store == null || env == null || actor == null || offerId == null)
+            return OfferOutcome.refused(OfferResult.NOT_FOUND);
+        return store.offers().decline(env, offerId, account(actor));
     }
 
     /** Cancels an offer as its sender. Idempotent: a second call finds nothing. */
@@ -137,7 +166,15 @@ public final class OfferStacks {
         if (EconomyHealth.frozen()) return OfferOutcome.refused(OfferResult.FROZEN);
         if (server == null || actor == null || offerId == null) return OfferOutcome.refused(OfferResult.NOT_FOUND);
         EconomyStore store = EconomyStore.get(server);
-        return store.offers().cancel(Trading.env(store), offerId, account(actor));
+        return cancel(store, Trading.env(store), actor, offerId);
+    }
+
+    /** {@link #cancel(MinecraftServer, UUID, UUID)} against a store already resolved. */
+    public static OfferOutcome cancel(EconomyStore store, TradeEnv env, UUID actor, UUID offerId) {
+        if (EconomyHealth.frozen()) return OfferOutcome.refused(OfferResult.FROZEN);
+        if (store == null || env == null || actor == null || offerId == null)
+            return OfferOutcome.refused(OfferResult.NOT_FOUND);
+        return store.offers().cancel(env, offerId, account(actor));
     }
 
     /** Mutes or unmutes offers and trade requests for a player. Moves no value. */

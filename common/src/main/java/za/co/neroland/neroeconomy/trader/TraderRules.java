@@ -2,6 +2,7 @@ package za.co.neroland.neroeconomy.trader;
 
 import java.util.UUID;
 import java.util.function.Consumer;
+import java.util.function.Predicate;
 
 import za.co.neroland.neroeconomy.api.AccountId;
 import za.co.neroland.neroeconomy.book.VaultGoods;
@@ -60,12 +61,21 @@ public final class TraderRules {
     public static String binding(String location) { return BINDING_PREFIX + location; }
 
     /** A binder that knows the Auto-Traders {@code blocks} can find. */
-    public static RuleBinder binder(Blocks blocks) {
-        if (blocks == null) throw new IllegalArgumentException("trader blocks");
-        return (store, env, owner, binding) -> resolve(blocks, store, env, owner, binding);
+    public static RuleBinder binder(Blocks blocks) { return binder(blocks, owner -> true); }
+
+    /**
+     * A binder that knows the Auto-Traders {@code blocks} can find, whose sell rules take goods from
+     * the slots only while {@code maySupply} says their owner may be a source of goods (not in
+     * creative or spectator mode, no endless supply). Nothing a creative player does reaches the
+     * market through an Auto-Trader; buying into the slots is never refused.
+     */
+    public static RuleBinder binder(Blocks blocks, Predicate<UUID> maySupply) {
+        if (blocks == null || maySupply == null) throw new IllegalArgumentException("trader blocks");
+        return (store, env, owner, binding) -> resolve(blocks, maySupply, store, env, owner, binding);
     }
 
-    private static RuleInventory resolve(Blocks blocks, EconomyStore store, TradeEnv env, AccountId owner, String binding) {
+    private static RuleInventory resolve(Blocks blocks, Predicate<UUID> maySupply, EconomyStore store, TradeEnv env,
+            AccountId owner, String binding) {
         if (store == null || binding == null || !binding.startsWith(BINDING_PREFIX)) return null;
         String location = binding.substring(BINDING_PREFIX.length());
         UUID player = Accounts.player(owner);
@@ -74,7 +84,8 @@ public final class TraderRules {
         TradeRule rule = store.rules().boundTo(owner, binding);
         Consumer<Lot> vault = lot -> VaultGoods.deliver(store, env, owner, lot);
         TraderInventory.Slots slots = blocks.at(location);
-        return new TraderInventory(slots == null ? UNLOADED : slots, rule != null && !rule.buys(), vault);
+        boolean sells = rule != null && !rule.buys();
+        return new TraderInventory(slots == null ? UNLOADED : slots, sells, vault, !sells || maySupply.test(player));
     }
 
     /**
