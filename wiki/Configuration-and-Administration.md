@@ -274,7 +274,6 @@ reason code, at debug level. Warnings name the operation that failed or the exce
 
 ## Telemetry
 
-The mod contains a crash reporter that is inert in published builds: it has no address to report
-to until a build is made with one. Once it has one, reporting is on by default and opt-out:
-`telemetryEnabled=false` in `config/neroeconomy.properties` opts an installation out regardless.
-[Privacy](Privacy-and-Erasure.md) describes what a report would contain.
+The mod sends anonymous crash reports to Sentry (EU servers). Reporting is on by default and
+opt-out: `telemetryEnabled=false` in `config/neroeconomy.properties` opts an installation out.
+[Privacy](Privacy-and-Erasure.md) describes what a report contains.

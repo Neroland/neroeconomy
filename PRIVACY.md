@@ -7,8 +7,8 @@ a config key in `config/neroeconomy.properties`, to a command, or to a named fil
 
 All storage is **server-side world data**, held in the world folder of the server that runs the
 mod. NeroEconomy sends nothing to Neroland. The only paths by which data leaves the server are the
-optional companion-app module and the crash telemetry, both described below; telemetry is inert in
-every published build.
+optional companion-app module and the crash telemetry, both described below. Telemetry is on by
+default and can be turned off per installation.
 
 ## Who is responsible and who to contact
 
@@ -383,17 +383,15 @@ not control.
 
 NeroEconomy embeds the Sentry client for crash reporting. Stated precisely:
 
-- **It is inert in every published build.** The DSN (the address reports are sent to) is a
-  placeholder compiled into the mod, and there is no config key for it. While the placeholder is in
-  place the client is never started and nothing is sent. The rest of this section describes what a
-  build with a real DSN would do.
-- **On by default, opt-out.** In a build with a real DSN, reporting runs unless you set
+- **Where reports go.** The DSN (the address reports are sent to) is compiled into the mod and
+  points at Neroland's Sentry project on Sentry's EU servers; there is no config key for it.
+- **On by default, opt-out.** Reporting runs unless you set
   `telemetryEnabled=false` in `config/neroeconomy.properties`. The key defaults to `true`, is read at
   start-up (a change takes effect on restart) and is the one setting that belongs to each
   installation rather than to the server.
 - **Scope.** Only failures whose stack trace includes `za.co.neroland.neroeconomy` are considered.
 - **Cap.** At most 10 events per session, and one per distinct failure.
-- **What an event would contain.** The mod release (`neroeconomy@<version>`), the environment name
+- **What an event contains.** The mod release (`neroeconomy@<version>`), the environment name
   (`development` or `production`), a fixed operation label, the exception class, its message and
   its stack trace, plus whatever runtime information the Sentry client attaches by default.
 - **Scrubbing.** The user and server name are cleared, absolute stack-frame paths are dropped, and
@@ -402,10 +400,10 @@ NeroEconomy embeds the Sentry client for crash reporting. Stated precisely:
   file path and the file name is the player's UUID. A failure thrown by another mod's currency
   listener is likewise reported by class only.
 - **Not attached.** `sendDefaultPii` is off, and the mod attaches no player identifier, name,
-  balance, item or transaction value. As with any network request, the receiving service would see
-  the network address of the machine that sent the report.
+  balance, item or transaction value. As with any network request, the receiving service sees the
+  network address of the machine that sent the report; NeroEconomy does not add it to the report.
 
-Once a published build carries a real DSN, the store pages will carry this notice:
+The store pages carry this notice:
 
 > **Telemetry notice:** NeroEconomy sends anonymous error reports (stack trace + mod/game versions
 > only — never IPs, usernames, UUIDs, or world data) to the developers via Sentry (EU servers) so

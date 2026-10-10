@@ -79,8 +79,7 @@ The wiki's [commands page](wiki/Credits-and-Commands.md) has the full syntax.
 Core writes `config/neroeconomy.properties`. Settings cover the Reserve and its budgets, fees,
 caps, retention, the simulation, Merchant Houses, the exchange, trading limits, the companion app's
 daily limits and more. `telemetryEnabled` is local to each installation, defaults to `true` (crash
-reporting on by default) and is set to `false` to opt out; telemetry remains inert until a build is
-made with a real DSN. The wiki's [configuration page](wiki/Configuration-and-Administration.md)
+reporting on by default) and is set to `false` to opt out. The wiki's [configuration page](wiki/Configuration-and-Administration.md)
 lists every key, and its [data packs page](wiki/Data-Packs.md) documents the file formats.
 
 The stable `za.co.neroland.neroeconomy.api` package exposes abstract accounts, deterministic pricing,
@@ -129,8 +128,8 @@ auctions, shop ownership and opt-out choices keyed to player UUIDs, never names,
 transaction history whose rows hold a reason code, amount, currency, time and salted one-way
 pseudonyms rather than UUIDs. Retention is purged at load and daily. `/eco export` writes a
 subject-access JSON file covering every section under the world folder; `/eco erase` invokes
-Core-wide erasure. No log line carries a player, an amount or a transaction. Sentry telemetry is
-inert in published builds; once live it is on by default, capped, scrubbed and opt-out
+Core-wide erasure. No log line carries a player, an amount or a transaction. Sentry crash telemetry
+(EU servers) is on by default, capped, scrubbed and opt-out
 (`telemetryEnabled=false` in `config/neroeconomy.properties`).
 
 See [the wiki](wiki/Home.md), [the privacy notice](PRIVACY.md), [building against Core](USING-CORE.md),
