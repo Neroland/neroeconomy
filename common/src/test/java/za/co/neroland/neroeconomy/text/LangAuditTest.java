@@ -72,7 +72,11 @@ class LangAuditTest {
         List<String> sorted = new ArrayList<>(keys);
         sorted.sort(null);
         assertEquals(sorted, keys, "en_us.json is not sorted by key");
-        assertTrue(raw.contains("\r\n") && !raw.replace("\r\n", "").contains("\n"), "en_us.json is not CRLF throughout");
+        // Git stores the file with LF (.gitattributes: text=auto) and a Windows checkout turns it into CRLF,
+        // so either is fine; what must not happen is a file that mixes the two.
+        boolean crlf = raw.contains("\r\n");
+        assertTrue(crlf ? !raw.replace("\r\n", "").contains("\n") : !raw.contains("\r"),
+                "en_us.json mixes CRLF and LF line endings");
     }
 
     @Test void everyKeyTheCodeNamesExists() {
