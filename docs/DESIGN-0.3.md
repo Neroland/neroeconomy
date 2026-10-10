@@ -69,10 +69,16 @@ not history. Where this document and older notes disagree, this document wins; t
 ### Faucets under control
 
 - **Starting balance** is locked until the account has `startingBalanceVestMinutes` (30) of play
-  time: locked credits can be spent with system counterparties (Merchant Houses, the exchange,
-  fees) but cannot be paid, offered, traded or used to buy from another player.
+  time: locked credits can pay fees and buy from Merchant Houses but cannot be paid, offered,
+  traded, used to buy from another player, or put into shares or bonds. Share and bond principal is
+  only ever taken from credits the account has earned, so an early sale or redemption cannot turn a
+  locked balance into a spendable one. Goods bought from a House with locked credits are accepted
+  as a bounded spread loss: a House sells above its reference and buys below it, so the goods
+  return less than was spent, at most the starting balance per account.
 - **Credit Chip**: `creditChipDailyLimit` redemptions per account per day, with the value stepping
   down across the day (100 %, 80 %, 60 %, 40 %, 20 % of `creditChipValue`), paid from the Reserve.
+  All accounts together may draw at most `creditChipDailyBudget` (3000) a day, so many accounts
+  cannot out-drain the daily mint. A creative or spectator player cannot redeem one.
 - **System jobs** escrow their payout from the Reserve when posted and are refused when the daily
   cap or the Reserve cannot cover them.
 
@@ -108,7 +114,14 @@ House or exchange quotes.
   operation is refused and operators are told. `/eco admin health` shows the state and lets a
   level-3 operator accept a fresh start.
 - **Inventory boundary.** Goods crossing between the store and a live inventory are the only
-  operations that span two files. The store is saved within a second of each one.
+  operations that span two files: the store and the player's data. Neither is saved on its own
+  schedule. The store is saved only by the game's own save (autosave, `/save-all`, shutdown), which
+  writes player data first and then chunks and saved data in one pass, so a hard kill rolls the
+  inventory and the store back to the same save and an item is left in exactly one place. Nothing
+  in the mod requests an early save of the store; a source-scan test fails if any code does. The
+  residual window is a crash in the instant of a save itself, while the player files are written
+  and the store is still being written: the same class of risk as any item in vanilla Minecraft,
+  and the only one left.
 - Every section has hard bounds, a purge, an eraser and an export.
 
 ### Goods
@@ -158,7 +171,9 @@ a player can mute them.
 
 An offer sends lots and credits to a named account and may ask for an item id and quantity and
 credits in return. Everything offered is escrowed at send. The recipient accepts or declines in
-game or in the app; an unanswered offer expires after `offerDurationHours` (48) and refunds.
+game or in the app; an unanswered offer expires after `offerDurationHours` (48) and refunds. A
+sender may have at most four open offers waiting with the same recipient (on top of the per-sender
+and per-inbox caps), so filling one inbox takes many accounts, and a recipient can mute offers.
 
 ### Auto-trade
 
@@ -214,7 +229,13 @@ companies ship, one index fund and three bond terms.
   and per account. A house is funded from the Reserve within `npcDailyBudget` and its income is
   swept back.
 - **Reference prices** drift toward what players pay each other: volume-weighted, capped per
-  account, ignoring self-matches and tiny trades, clamped per step.
+  account, ignoring self-matches and tiny trades, clamped per step. A reference moves only when at
+  least `referenceMinPairs` (3) distinct pairs of accounts traded the commodity since the last
+  step, and each pair counts for no more than the pair ranked that many places from the top, so
+  two accounts washing one trade after another move nothing. The pairs are kept in memory only, as
+  one-way hashes, and cleared every step. Over a day a reference stays within
+  `referenceDriftDayPercent` (10 %) of where the day began. The arbitrage guard re-checks every step
+  in which any reference moved, not only once a day.
 - The step also runs NPC auctions and posts system jobs, funded as above.
 - **Empty server.** Steps are counted in economy time. On boot or un-pause the missed steps are
   replayed a few per tick, never more than `simCatchUpMaxHours` (72) worth.
@@ -273,6 +294,19 @@ Every action needs a `requestId`, is re-validated and re-priced on the server, h
 `remoteTradeEnabled`, counts against `remoteDailySpendLimit` (5000 credits per account per day)
 and is rate-limited per action.
 
+Goods leaving an account through the app are limited too, by value: `remoteDailyGoodsLimit` (5000
+credits' worth per account per day) counts goods in offers, sell orders, sell rules (including
+resuming a paused one) and the goods an accepted offer asks for. A unit is valued at the higher of
+its data reference and its live House reference; a non-commodity unmodified unit counts
+`remoteGoodsFloorValue` (10) and a modified one (for example a filled shulker box)
+`remoteModifiedGoodsValue` (500) or its item's reference if higher. Goods count at their full
+worth, not by the price asked, so a sell order at 1 credit counts the same as one at fair price.
+The two limits are counted apart and together bound what a stolen token can cost in a day.
+
+The request-id ledger remembers the latest 128 ids per player for 10 minutes, across restarts. An
+id older than that, or pushed out by 128 newer ones, is accepted again; only the account owner or
+token holder can produce that many requests, so a replay gains nothing a fresh id would not.
+
 ## Abuse rules
 
 Nothing overrides these.
@@ -291,9 +325,14 @@ Nothing overrides these.
   that can never go negative.
 - Nothing a creative-mode player or the gallery does can put value into the real economy except
   through the audited operator commands.
-- A stolen app token can spend at most the daily remote limit.
+- A stolen app token can spend at most the daily remote limit and move goods worth at most the
+  daily remote goods limit.
 - Every store has a hard bound and a purge.
 - Operators and `online-mode=false` servers are outside what a mod can defend; this is documented.
+
+The 0.3 review of these rules, attempt by attempt and with the tests that hold each one, is in
+[ABUSE-REVIEW-2026-10](ABUSE-REVIEW-2026-10.md). "Reason-coded" administrator changes means a fixed
+transaction type (`ADMIN_GRANT`, `ADMIN_TAKE`, `ADMIN_SET`), never operator-typed text.
 
 ## Privacy
 

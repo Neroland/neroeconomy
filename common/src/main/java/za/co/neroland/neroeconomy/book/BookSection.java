@@ -21,6 +21,7 @@ import com.mojang.serialization.codecs.RecordCodecBuilder;
 
 import za.co.neroland.neroeconomy.NeroEconomyCommon;
 import za.co.neroland.neroeconomy.api.AccountId;
+import za.co.neroland.neroeconomy.api.EconomyEvents;
 import za.co.neroland.neroeconomy.api.PlayerAccountId;
 import za.co.neroland.neroeconomy.api.SystemAccountId;
 import za.co.neroland.neroeconomy.economy.BudgetKind;
@@ -39,6 +40,7 @@ import za.co.neroland.neroeconomy.goods.LotHolder;
 import za.co.neroland.neroeconomy.market.CancelResult;
 import za.co.neroland.neroeconomy.market.MarketLimits;
 import za.co.neroland.neroeconomy.market.Settlement;
+import za.co.neroland.neroeconomy.sibling.EconomyEventBus;
 import za.co.neroland.neroeconomy.trade.Accounts;
 import za.co.neroland.neroeconomy.trade.SystemDelivery;
 import za.co.neroland.neroeconomy.trade.TradeEnv;
@@ -329,7 +331,7 @@ public final class BookSection extends EconomySection implements LotHolder, Escr
             if (quantity < 0) break;
             if (quantity == 0) continue;
             Fill fill = settle(env, store, seller, buyer, item, Lot.PRISTINE, quantity, base, true, bid.unitPrice(),
-                    bid.escrow(), now, null);
+                    bid.escrow(), now, true, null);
             if (fill == null) continue;
             fills.add(fill);
             left -= quantity;
@@ -411,7 +413,7 @@ public final class BookSection extends EconomySection implements LotHolder, Escr
             if (amount < 0) break;
             if (amount == 0) continue;
             Fill fill = settle(env, store, seller, buyer, item, Lot.PRISTINE, amount, ask.unitPrice(), true, unitPrice,
-                    escrow, now, null);
+                    escrow, now, false, null);
             if (fill == null) continue;
             fills.add(fill);
             left -= amount;
@@ -465,7 +467,7 @@ public final class BookSection extends EconomySection implements LotHolder, Escr
             return Traded.refused(seller.house() ? BookResult.DAILY_LIMIT : BookResult.OUT_OF_STOCK);
         BookResult[] why = new BookResult[1];
         Fill fill = settle(env, store, seller, taker, ask.item(), ask.lot().payload(), quantity, ask.unitPrice(),
-                false, ceiling, 0L, now, why);
+                false, ceiling, 0L, now, false, why);
         if (fill == null) return Traded.refused(why[0] == null ? BookResult.INTERNAL : why[0]);
         afterSellFill(env, ask, quantity);
         boolean toVault = receiver.give(goods);
@@ -502,7 +504,7 @@ public final class BookSection extends EconomySection implements LotHolder, Escr
         if (!origin.take(lot)) return Traded.refused(BookResult.NOT_HOLDING);
         BookResult[] why = new BookResult[1];
         Fill fill = settle(env, store, giver, buyer, lot.item(), Lot.PRISTINE, lot.count(), base, true,
-                bid.unitPrice(), bid.escrow(), now, why);
+                bid.unitPrice(), bid.escrow(), now, true, why);
         if (fill == null) {
             origin.restore(lot);
             return Traded.refused(why[0] == null ? BookResult.INTERNAL : why[0]);
@@ -546,7 +548,7 @@ public final class BookSection extends EconomySection implements LotHolder, Escr
         if (overflows(unit, quantity) || unit * quantity > budget) return Traded.refused(BookResult.INSUFFICIENT_FUNDS);
         BookResult[] why = new BookResult[1];
         Fill fill = settle(env, store, seller, taker, ask.item(), Lot.PRISTINE, quantity, ask.unitPrice(), true, unit,
-                budget, now, why);
+                budget, now, false, why);
         if (fill == null) return Traded.refused(why[0] == null ? BookResult.INTERNAL : why[0]);
         afterSellFill(env, ask, quantity);
         receiver.give(goods);
@@ -578,11 +580,14 @@ public final class BookSection extends EconomySection implements LotHolder, Escr
      *                    budget); false when they pay from their balance now
      * @param limit       the most the buyer pays per unit
      * @param escrowHeld  with {@code fromEscrow}, how much of the buyer's escrow is there to draw on
+     * @param restingBuy  which side's order was resting on the book: the buy order (true) or the sell
+     *                    order (false); its owner, when a player, is told the order filled
      * @param why         when not null, told the reason a fill was refused
      * @return the fill, or null when nothing moved
      */
     private Fill settle(TradeEnv env, EconomyStore store, Party seller, Party buyer, String item, int payload,
-            int quantity, long unitBase, boolean fromEscrow, long limit, long escrowHeld, long now, BookResult[] why) {
+            int quantity, long unitBase, boolean fromEscrow, long limit, long escrowHeld, long now, boolean restingBuy,
+            BookResult[] why) {
         if (quantity < 1 || unitBase < 1L || overflows(unitBase, quantity) || overflows(limit, quantity))
             return refuse(why, BookResult.INVALID);
         long base = unitBase * quantity;
@@ -629,7 +634,28 @@ public final class BookSection extends EconomySection implements LotHolder, Escr
         // players toward the drift of reference prices.
         HouseOrders houses = store.houseOrders();
         if (houses != null) houses.filled(fill, now);
+        announce(seller, buyer, item, quantity, unitBase, paid, restingBuy, now);
         return fill;
+    }
+
+    /**
+     * Queues the cross-mod events of one settled fill: the seller's side and the buyer's side as
+     * two events that never name each other, and the resting order's owner told it filled. A
+     * Merchant House gets no event and is never named; the venue says a House was involved.
+     */
+    private static void announce(Party seller, Party buyer, String item, int quantity, long unitBase, long paid,
+            boolean restingBuy, long now) {
+        EconomyEvents.Venue sellerVenue = buyer.house() ? EconomyEvents.Venue.HOUSE
+                : seller.rule() ? EconomyEvents.Venue.AUTO_TRADER : EconomyEvents.Venue.BOARD;
+        EconomyEvents.Venue buyerVenue = seller.house() ? EconomyEvents.Venue.HOUSE
+                : buyer.rule() ? EconomyEvents.Venue.AUTO_TRADER : EconomyEvents.Venue.BOARD;
+        if (seller.account() instanceof PlayerAccountId sellerId)
+            EconomyEventBus.sold(sellerId.playerId(), item, quantity, unitBase, sellerVenue, now);
+        if (buyer.account() instanceof PlayerAccountId buyerId)
+            EconomyEventBus.bought(buyerId.playerId(), item, quantity, paid / quantity, buyerVenue, now);
+        Party resting = restingBuy ? buyer : seller;
+        if (resting.orderId() != null && resting.account() instanceof PlayerAccountId owner)
+            EconomyEventBus.filled(owner.playerId(), item, quantity, unitBase, restingBuy, now);
     }
 
     private static Fill refuse(BookResult[] why, BookResult reason) {

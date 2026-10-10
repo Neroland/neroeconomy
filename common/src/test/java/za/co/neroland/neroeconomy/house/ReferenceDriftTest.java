@@ -1,9 +1,13 @@
 package za.co.neroland.neroeconomy.house;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.List;
 import java.util.Random;
+import java.util.UUID;
 
 import org.junit.jupiter.api.Test;
 
@@ -35,6 +39,39 @@ class ReferenceDriftTest {
         assertEquals(10_001L, ReferenceDrift.next(10_000L, 1L, 11L, 10_000L, TEN));
         // Down as well as up.
         assertEquals(9_900L, ReferenceDrift.next(10_000L, 100L, 100L, 10L, TEN));
+    }
+
+    @Test void tooFewPairsCountForNothingAndNoPairOutweighsTheOneRankedAtTheMinimum() {
+        // Two pairs where three are needed: nothing counts, however much they traded.
+        assertArrayEquals(new long[] {0L, 0L},
+                ReferenceDrift.counted(List.of(new long[] {100L, 3_000L}, new long[] {100L, 3_000L}), 3));
+        // A wash pair worth 10 000 next to two honest pairs of 20: it counts for 20, its units in proportion.
+        assertArrayEquals(new long[] {1L + 2L + 2L, 60L}, ReferenceDrift.counted(List.of(
+                new long[] {500L, 10_000L}, new long[] {2L, 20L}, new long[] {2L, 20L}), 3));
+        // Empty and malformed rows are ignored; one pair is enough when one is asked for.
+        assertArrayEquals(new long[] {4L, 40L}, ReferenceDrift.counted(List.of(new long[] {4L, 40L}, new long[] {0L, 9L}), 1));
+        assertArrayEquals(new long[] {0L, 0L}, ReferenceDrift.counted(null, 3));
+    }
+
+    @Test void aPairHasOneKeyWhicheverSideSoldAndDifferentPairsDiffer() {
+        UUID a = new UUID(1L, 2L);
+        UUID b = new UUID(3L, 4L);
+        UUID c = new UUID(5L, 6L);
+        assertEquals(ReferenceDrift.pairKey(a, b), ReferenceDrift.pairKey(b, a));
+        assertNotEquals(ReferenceDrift.pairKey(a, b), ReferenceDrift.pairKey(a, c));
+        assertNotEquals(ReferenceDrift.pairKey(a, b), ReferenceDrift.pairKey(b, c));
+    }
+
+    @Test void aDayNeverTakesTheReferenceFurtherThanItsReachFromWhereTheDayBegan() {
+        ReferenceDrift.Bounds day = TEN.today(10_000L, 1_000);
+        assertEquals(9_000L, day.minMillis());
+        assertEquals(11_000L, day.maxMillis());
+        long reference = 10_000L;
+        for (int step = 0; step < 500; step++) reference = ReferenceDrift.next(reference, 1L, 30L, 11L, day);
+        assertEquals(11_000L, reference);
+        // The day's reach never widens the band, and 0 holds the reference where the day began.
+        assertEquals(20_000L, TEN.today(19_900L, 1_000).maxMillis());
+        assertEquals(12_345L, ReferenceDrift.next(12_345L, 1L, 30L, 11L, TEN.today(12_345L, 0)));
     }
 
     @Test void neitherSideOfTheBandIsEverPassed() {

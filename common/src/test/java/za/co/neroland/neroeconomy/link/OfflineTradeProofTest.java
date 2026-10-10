@@ -374,6 +374,71 @@ class OfflineTradeProofTest {
         return result;
     }
 
+    /**
+     * §13 Input (J1 I4): every number an offline app action reads, set to {@code Long.MIN_VALUE},
+     * -1, {@code Long.MAX_VALUE}, a number past 64 bits and a fraction, is refused by name before
+     * anything moves (act() checks that nothing was made or lost after every call).
+     */
+    @Test void everyNumberAnOfflineActionReadsIsRefusedAtTheExtremesAndMovesNothing() {
+        Object[] extremes = {Long.MIN_VALUE, -1L, Long.MAX_VALUE, new java.math.BigDecimal("1e30"), 1.5D};
+        List<Object[]> cases = List.of(
+                new Object[] {"pay", "amount", new Object[] {"recipient", BOB.toString(), "amount", 1}},
+                new Object[] {"offer_send", "credits", new Object[] {"recipient", BOB.toString(), "credits", 1}},
+                new Object[] {"offer_send", "askCredits", new Object[] {"recipient", BOB.toString(), "credits", 1,
+                        "askCredits", 1}},
+                new Object[] {"offer_send", "askQty", new Object[] {"recipient", BOB.toString(), "credits", 1,
+                        "askItem", DIAMOND, "askQty", 1}},
+                new Object[] {"order_place", "qty", new Object[] {"side", "sell", "item", DIAMOND, "qty", 1,
+                        "unitPrice", 5}},
+                new Object[] {"order_place", "unitPrice", new Object[] {"side", "buy", "item", DIAMOND, "qty", 1,
+                        "unitPrice", 5}},
+                new Object[] {"order_place", "payload", new Object[] {"side", "sell", "item", DIAMOND, "qty", 1,
+                        "unitPrice", 5, "payload", 0}},
+                new Object[] {"rule_set", "limitPrice", new Object[] {"side", "buy", "target", DIAMOND, "limitPrice", 5,
+                        "perDay", 1, "total", 10}},
+                new Object[] {"rule_set", "perDay", new Object[] {"side", "buy", "target", DIAMOND, "limitPrice", 5,
+                        "perDay", 1, "total", 10}},
+                new Object[] {"rule_set", "total", new Object[] {"side", "sell", "target", DIAMOND, "limitPrice", 5,
+                        "perDay", 1, "total", 10}},
+                new Object[] {"bond_buy", "principal", new Object[] {"term", "1d", "principal", 10}});
+        for (Object[] row : cases) {
+            String action = (String) row[0];
+            String key = (String) row[1];
+            for (Object extreme : extremes) {
+                Object[] pairs = ((Object[]) row[2]).clone();
+                boolean set = false;
+                for (int index = 0; index < pairs.length; index += 2)
+                    if (pairs[index].equals(key)) {
+                        pairs[index + 1] = extreme;
+                        set = true;
+                    }
+                if (!set) {
+                    pairs = java.util.Arrays.copyOf(pairs, pairs.length + 2);
+                    pairs[pairs.length - 2] = key;
+                    pairs[pairs.length - 1] = extreme;
+                }
+                String before = holdings();
+                LinkActionResult result = act(ALICE, action, params(UUID.randomUUID(), pairs));
+                String what = action + " " + key + "=" + extreme;
+                assertFalse(result.ok(), what);
+                assertTrue(result.message().contains(key), what + ": " + result.message());
+                assertEquals(before, holdings(), what);
+            }
+        }
+        // Inside a goods line the same numbers are refused as bad goods.
+        for (Object extreme : extremes) for (String key : List.of("qty", "payload")) {
+            JsonObject offer = params(UUID.randomUUID(), "recipient", BOB.toString());
+            JsonArray goods = lines(DIAMOND, 1);
+            if (extreme instanceof Number number) goods.get(0).getAsJsonObject().addProperty(key, number);
+            offer.add("goods", goods);
+            String before = holdings();
+            LinkActionResult result = act(ALICE, "offer_send", offer);
+            assertFalse(result.ok(), key + "=" + extreme);
+            assertTrue(result.message().contains("goods"), result.message());
+            assertEquals(before, holdings());
+        }
+    }
+
     /** Every credit there is here: both players, the Reserve, and what escrow holds for offers, orders and claims. */
     private long creditsEverywhere() {
         return balance(ALICE) + balance(BOB) + ledger.balance(SystemAccountId.RESERVE)

@@ -30,6 +30,11 @@ public record TradeSettings(double marketFeePercent, long listingFee, int maxSel
         int ruleEvaluationsPerTick) {
     /** Most open offers one account may have waiting for its answer, so nobody can be flooded. */
     public static final int MAX_OFFERS_IN = 64;
+    /**
+     * Most open offers one account may have waiting with any one recipient, so a few accounts cannot
+     * fill someone's {@link #MAX_OFFERS_IN} between them.
+     */
+    public static final int MAX_OFFERS_PER_RECIPIENT = 4;
     /** Most rule evaluations in one tick; the rest wait their turn. */
     public static final int RULE_EVALUATIONS_PER_TICK = 64;
     private static final long MILLIS_PER_HOUR = 3_600_000L;

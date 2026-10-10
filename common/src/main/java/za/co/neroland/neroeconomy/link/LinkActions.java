@@ -877,8 +877,6 @@ final class LinkActions {
         if (!call.store().vault().deposit(call.account(), List.of(lot), VaultStacks.cap(), call.store().goods().limits()))
             return invalid(LinkText.get("link.neroeconomy.vault_no_room"));
         held.shrink(quantity.intValue());
-        // Goods left a live inventory for the store; get the store to disk promptly.
-        NeroEconomyCommon.CURRENCY_PROVIDER.requestSave();
         JsonObject detail = LinkViews.deposited(LinkReads.goods(call.store(), lot));
         return ok(call, VAULT_DEPOSIT, LinkText.get("link.neroeconomy.deposited", quantity), detail, false);
     }

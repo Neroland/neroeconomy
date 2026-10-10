@@ -270,17 +270,21 @@ class HouseSectionTest {
         houses.step();
         UUID washer = houses.player(1, 1_000_000L);
         UUID partner = houses.player(2, 1_000_000L);
+        UUID third = houses.player(3, 1_000_000L);
         // Fills with a House do not count.
         assertTrue(buyFromHouse(washer, HouseWorld.WHEAT, 10).result().ok());
         // Nor does a sale worth less than the minimum.
         trade(partner, washer, 1, 15L);
+        trade(third, washer, 1, 15L);
+        trade(partner, third, 1, 15L);
         houses.step();
         assertEquals(10_000L, houses.section().referenceMillis(HouseWorld.WHEAT));
-        // Two accounts trade wheat back and forth at three times its reference, all day long.
+        // Three accounts (three pairs) trade wheat round at three times its reference, all day long.
         long previous = houses.section().referenceMillis(HouseWorld.WHEAT);
         for (int step = 0; step < 90; step++) {
             trade(washer, partner, 10, 30L);
-            trade(partner, washer, 10, 30L);
+            trade(partner, third, 10, 30L);
+            trade(third, washer, 10, 30L);
             houses.step();
             long now = houses.section().referenceMillis(HouseWorld.WHEAT);
             assertTrue(now >= previous);
@@ -290,14 +294,66 @@ class HouseSectionTest {
         }
         long moved = previous - 10_000L;
         assertTrue(moved > 0L, "the reference should move toward what players pay");
-        // Both accounts' counted volume together is at most one account's daily cap, so against a day
-        // of House trade (10 × 1024 credits) the pull is at most 2000 / 10240 of the 20-credit gap.
-        assertTrue(moved <= 20_000L * 2_000L / 10_240L + 1L, "moved " + moved);
+        // Each fill uses both accounts' daily caps, so three accounts count at most 3 × 2000 / 2 credits;
+        // against a day of House trade (10 × 1024 credits) the pull is at most 3000 / 10240 of the
+        // 20-credit gap, and never past the day's reach of 10 % of the data reference.
+        assertTrue(moved <= 20_000L * 3_000L / 10_240L + 1L, "moved " + moved);
+        assertTrue(moved <= 1_000L, "moved " + moved);
         JsonObject export = houses.section().exportFor(washer);
         assertTrue(export.get("counted_toward_reference_prices_today").getAsLong() <= 2_000L);
         // The House quotes from the drifted reference.
         houses.section().quote(HouseWorld.WHEAT).ifPresent(quote -> assertTrue(quote.ask() >= 12L));
         assertTrue(world().invariants());
+    }
+
+    @Test void twoAltsWashTradingEveryStepForTwoHundredStepsMoveNoReference() {
+        houses = HouseWorld.standard();
+        houses.step();
+        UUID alt = houses.player(1, 10_000_000L);
+        UUID other = houses.player(2, 10_000_000L);
+        List<Long> checked = new ArrayList<>();
+        houses.guard = quotes -> {
+            checked.add(houses.world.wall);
+            return Set.of();
+        };
+        for (int step = 0; step < 200; step++) {
+            // The cheapest wash the red team found (one unit at the minimum value), both ways round.
+            trade(alt, other, 1, 16L);
+            trade(other, alt, 1, 30L);
+            houses.step();
+            assertEquals(10_000L, houses.section().referenceMillis(HouseWorld.WHEAT), "step " + step);
+        }
+        // Nothing moved, so the guard ran only at each day's start (200 ten-minute steps span three days at most).
+        assertTrue(checked.size() <= 3, "checked " + checked.size());
+        assertTrue(world().invariants());
+    }
+
+    @Test void aReferenceThatMovesIsCheckedByTheGuardTheSameStepNotTomorrow() {
+        houses = HouseWorld.standard();
+        CommodityDefinition wheat = houses.commodities.commodities().stream()
+                .filter(commodity -> commodity.key().equals(HouseWorld.WHEAT)).findFirst().orElseThrow();
+        long[] firstAsk = {-1L};
+        // A stand-in guard: a chain that only opens once wheat's price has moved from where it started.
+        houses.guard = quotes -> {
+            if (firstAsk[0] < 0L) firstAsk[0] = quotes.ask(wheat);
+            return quotes.ask(wheat) > firstAsk[0] ? Set.of(HouseWorld.WHEAT) : Set.of();
+        };
+        houses.step();
+        assertTrue(houses.section().driftBuyOff().isEmpty());
+        UUID a = houses.player(1, 1_000_000L);
+        UUID b = houses.player(2, 1_000_000L);
+        UUID c = houses.player(3, 1_000_000L);
+        long day = houses.day();
+        for (int step = 0; step < 6 && houses.section().driftBuyOff().isEmpty(); step++) {
+            trade(a, b, 10, 30L);
+            trade(b, c, 10, 30L);
+            trade(c, a, 10, 30L);
+            houses.step();
+        }
+        assertEquals(day, houses.day(), "the test must stay inside one economy-day");
+        assertTrue(houses.section().referenceMillis(HouseWorld.WHEAT) > 10_000L);
+        assertEquals(Set.of(HouseWorld.WHEAT), houses.section().driftBuyOff());
+        assertNull(houses.bid(HouseWorld.WHEAT));
     }
 
     /** {@code seller} lists {@code quantity} wheat at {@code price} and {@code buyer} buys it all. */

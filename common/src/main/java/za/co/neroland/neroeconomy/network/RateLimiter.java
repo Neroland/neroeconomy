@@ -22,7 +22,9 @@ public final class RateLimiter {
         /** Read-only requests: page queries, tab switches, price nudges. */
         QUERY(10, 5),
         /** Anything that moves credits, goods or an obligation. */
-        VALUE(6, 2);
+        VALUE(6, 2),
+        /** Another mod's calls through the cross-mod API, per calling mod (not per player). */
+        SIBLING(64, 16);
 
         private final int burst;
         private final int perSecond;

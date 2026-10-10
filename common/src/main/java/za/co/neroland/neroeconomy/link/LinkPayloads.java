@@ -267,7 +267,7 @@ public final class LinkPayloads {
             case WITHDRAWAL, SIBLING_CHARGE -> "withdrawal";
             case ADMIN_GRANT, ADMIN_TAKE, ADMIN_SET -> "admin";
             case SIBLING_PAYOUT -> "deposit";
-            case FEE_MARKET, FEE_LISTING, FEE_AUCTION, FEE_EXCHANGE, TRADE_TAX -> "fee";
+            case FEE_MARKET, FEE_LISTING, FEE_AUCTION, FEE_EXCHANGE, TRADE_TAX, SIBLING_FEE -> "fee";
             case PRICE_ADJUSTMENT -> "adjustment";
             // The exchange: what goes into a position, what comes back out of it, and what it earned.
             case SHARE_BUY, BOND_BUY -> "investment";

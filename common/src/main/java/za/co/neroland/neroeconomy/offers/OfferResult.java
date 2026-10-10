@@ -56,7 +56,9 @@ public enum OfferResult {
     /** The swap could not be settled; nothing moved. */
     INTERNAL,
     /** An operator has closed the market for now; reads, collecting and refunds still work. */
-    MARKET_CLOSED;
+    MARKET_CLOSED,
+    /** The sender already has as many open offers waiting with this recipient as one account may. */
+    PAIR_LIMIT;
 
     public boolean ok() { return this == OK; }
 

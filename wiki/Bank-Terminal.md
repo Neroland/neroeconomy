@@ -1,7 +1,7 @@
 # Bank Terminal
 
-The Bank Terminal shows your balance, sends credits to another player, collects what you are owed,
-and redeems Credit Chips. Everything is decided on the server; the screen holds no balance,
+The Bank Terminal opens the Wallet tab of the Economy Hub. It shows your balance, sends credits to
+another player, collects what you are owed, opens your [Vault](Vault.md), and redeems Credit Chips. Everything is decided on the server; the screen holds no balance,
 recipient or price that the server trusts.
 
 ## Paying
@@ -18,9 +18,14 @@ Enter a recipient and a whole number of credits, then press Send.
 ## Collecting
 
 The Collect button pays out every credit you are owed (market proceeds, job and auction payouts,
-refunds) and delivers every item you are owed (purchases, returned stock, auction lots). Items that
-do not fit in your inventory stay in your claim until you collect again. Claims have no time limit.
-The same Collect button exists on the Trading Terminal and the Market Board.
+refunds). Claims have no time limit. Goods you are owed (purchases made while away, returned stock,
+auction lots) are not collected here: they are already in your [Vault](Vault.md), which you open
+from the same screen. The same Collect button exists on the Trading Terminal and the Market Board.
+
+## The Vault
+
+The Vault button opens a chest-style screen over your private store of goods, beside your inventory.
+Deposit and withdraw by clicking, shift-clicking or dragging. See [Vault](Vault.md).
 
 ## Credit Chips
 
@@ -34,3 +39,5 @@ Use a Credit Chip on the block to redeem it. See [Credit Chip](Credit-Chip.md).
 - You must stay within 8 blocks of the terminal, in the same dimension. A spectator can open the
   screen but cannot pay or collect.
 - Actions are rate-limited; see [Markets and terminals](Markets-and-Terminals.md).
+- Your starting balance is locked for the first `startingBalanceVestMinutes` of play time: it cannot be
+  sent to another player until then. See [Fair play](Fair-Play.md).

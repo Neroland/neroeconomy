@@ -44,17 +44,56 @@ the delivery-job seam. Names in this package are only ever added, never renamed 
   `minecraft:overworld|120|64|-40`. It is not validated when the job is posted; a destination in
   any other form can never be fulfilled, so the job would only expire and refund.
 - `DeliveryJobApi.postSystem(server, itemOrTag, quantity, destination, payout, expiresAt)` posts a
-  server-funded job with no player issuer. The payout is minted when the job is fulfilled and the
-  delivered goods are consumed. It returns `null` when `systemJobsEnabled` is off or when the job
-  would take the day's total past `systemJobDailyPayoutCap`.
+  server-funded job with no player issuer. The payout is moved from the Reserve into escrow when the
+  job is posted, and the delivered goods are consumed. It returns `null` when `systemJobsEnabled` is
+  off, when the job would take the day's total past `systemJobDailyPayoutCap`, or when the Reserve
+  cannot cover the payout. An expired job returns its payout to the Reserve.
 - `DeliveryJobApi.logisticsPresent()` reports whether NeroLogistics is installed.
+
+### Currency from other mods
+
+Core's `CurrencyApi` is the facade other mods use. Since 0.3 every credit it moves is a transfer with
+a typed reason, never a mint:
+
+- An untyped `deposit` is a transfer from the **Reserve**, counted against `siblingDailyBudget`
+  (5,000 credits a day by default). It returns `false` when that budget or the Reserve is
+  exhausted, so a caller must check the result.
+- An untyped `withdraw` is a transfer **into** the Reserve.
+- `CommodityApi` is a read-only view of the commodities the Merchant Houses trade: reference prices,
+  the daily limits, what a House is quoting now, and what one player may still trade today.
+
+The repository's `docs` folder also holds a set of short integration notes, one per sibling mod, that
+describe what each mod can do with NeroEconomy using only data, a Core channel or a call into the
+public `api` package. They are the place to look before adding a bridge class.
 
 ## Companion-app module
 
-The Core Link module is `neroeconomy`, schema version 1. It has three snapshot sections
-(`balance`, `transactions`, `market`), one action (`trade`) and one event (`balance`). Everything
-is scoped to the requesting player and runs on the server thread. The module keeps no copy of any
-economy state.
+The Core Link module is `neroeconomy`, **schema version 2**. Everything is scoped to the requesting
+player and runs on the server thread, and a reply never names another player. The module keeps no
+copy of any economy state beyond the daily remote-spend row described in [Privacy](Privacy-and-Erasure.md).
+
+| Kind | Names |
+| --- | --- |
+| Sections | `balance`, `transactions`, `market`, `summary`, `orders`, `vault`, `stocks`, `portfolio`, `offers`, `jobs`, `auctions` |
+| Actions | `trade`, `order_place`, `order_cancel`, `rule_set`, `rule_delete`, `rules_pause`, `stock_buy`, `stock_sell`, `bond_buy`, `pay`, `offer_send`, `offer_accept`, `offer_decline`, `offer_cancel`, `claim_collect`, `vault_deposit`, `vault_withdraw` |
+| Live topics | `balance`, `orders`, `offers`, `portfolio`, `alerts` |
+
+Schema 1 keys (the `balance`, `transactions` and `market` sections and the `trade` action, described
+below) are unchanged and kept for one release; the other sections and actions are new in schema 2.
+The full wire format, with a sample of every section and action, is in the NeroLink wiki. In short:
+
+- **Offline.** Every action works while the player is offline except `vault_deposit` and
+  `vault_withdraw`, which touch a live inventory (a schema 1 `trade` *sell from the hand* also needs
+  the player in game). Goods come from and go to the player's [Vault](Vault.md), and rules made from
+  the app are vault-backed.
+- **Every action needs a request id**, is re-validated and re-priced on the server, honours
+  `remoteTradeEnabled`, counts against `remoteDailySpendLimit` and `remoteDailyGoodsLimit`, and is
+  rate-limited per action. See [Fair play](Fair-Play.md).
+- **`market` with `view=book&item=<id>`** returns one item's book as price levels (at most 10 a side;
+  counts only, no owner or order id). `stocks` carries `feeBps` and `holdMinutes`. `vault` carries
+  `inGame` and `liveActions`. `stock_sell` with `structuredRefusal: true` returns a reduced-gain
+  refusal as an ok result (`sold: false`, `payable`, `acceptParam`, `acceptValue`), accepted by
+  sending the sale again with a new request id.
 
 Schema 1 originally shipped keys that the companion app does not read. Each object now carries both
 the original keys and the keys the app reads. All times are wall-clock milliseconds since the Unix
@@ -145,8 +184,8 @@ One object. It can be disabled with `remoteTradeEnabled=false`.
 | `quotedUnitPrice` | No (`buy`) | The most the buyer agreed to pay per item. Without it, the ceiling is the server's own quote at execution. |
 | `unitPrice` | No (`sell`) | With it, the main-hand stack is posted as a new Market Board listing at that price. Without it, the buy offer named by `listingId` is filled from the main hand. |
 
-- `buy` works while the player is logged out: the goods are booked to their item claim and wait at
-  a terminal. When the player is online the goods go to their inventory.
+- `buy` works while the player is logged out: the goods are delivered to their Vault. When the player
+  is online the goods go to their inventory when they fit, and to the Vault otherwise.
 - `sell` always takes the stack from the player's main hand, so the player must be in the game. A
   buy offer is filled only with unmodified items.
 
@@ -160,7 +199,7 @@ A successful result is the `balance` object as it stands after the trade, plus:
 | `price` | number | The unit price actually traded at, or the asking price of a new listing. |
 | `total` | number | The credits that moved, or the asking total of a new listing. |
 | `filled` | boolean | `true` when goods and credits changed hands; `false` when a listing was only posted. |
-| `delivery` | string | `inventory`, `claim`, `credit_claim` or `listed`. |
+| `delivery` | string | `inventory`, `claim` (the goods went to the player's Vault), `credit_claim` or `listed`. |
 
 When a buy offer is filled, the proceeds are booked to the seller's credit claim, so the balance in
 the result has not changed yet.
@@ -195,6 +234,16 @@ at most one alert of a kind is raised per player in 30 seconds.
 | `neroeconomy:outbid` | You were outbid. |
 | `neroeconomy:auction_won` | You won an auction. |
 | `neroeconomy:shop_sold_out` | A player shop sold out. |
+| `neroeconomy:offer_received` | You received a trade offer. |
+| `neroeconomy:offer_accepted` | A trade offer you sent was accepted. |
+| `neroeconomy:offer_expired` | A trade offer you sent expired and was returned to you. |
+| `neroeconomy:rule_paused` | One of your auto-trade rules has paused. |
+| `neroeconomy:rule_filled` | One of your auto-trade rules is complete. |
+| `neroeconomy:bond_matured` | A Savings Bond matured and was paid into your balance. |
+| `neroeconomy:dividend_paid` | Your shares paid a dividend. |
+| `neroeconomy:stock_delisted` | A company you held shares in left the exchange, and you were paid out. |
+| `neroeconomy:order_filled` | One of your market orders was filled. |
+| `neroeconomy:vault_full` | Your vault is full. Take some items out before more can arrive. |
 
 ## Soft integrations
 

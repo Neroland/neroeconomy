@@ -42,7 +42,6 @@ public final class ServerCurrencyProvider implements CurrencyProvider {
     /** Market and buy-offer expiry cannot wait for the daily sweep, or escrow outlives a restart. */
     private static final int MARKET_SWEEP_TICKS = 600;
     /** A requested save is coalesced: the stores are flushed at most once in this many ticks. */
-    private static final int SAVE_COOLDOWN_TICKS = 20;
     /** Play time is counted in ticks; this many make a minute. */
     private static final long TICKS_PER_MINUTE = 1_200L;
 
@@ -55,11 +54,17 @@ public final class ServerCurrencyProvider implements CurrencyProvider {
         private final TransactionType type;
         private final BudgetKind budget;
         private final LedgerPlan plan;
+        /** Which other mod's call this is, as {@code <modid>/<reason>}; empty for this mod's own. */
+        private final String origin;
         private LedgerResult result;
         private TypedCall(TransactionType type, BudgetKind budget, LedgerPlan plan) {
+            this(type, budget, plan, "");
+        }
+        private TypedCall(TransactionType type, BudgetKind budget, LedgerPlan plan, String origin) {
             this.type = type;
             this.budget = budget;
             this.plan = plan;
+            this.origin = origin == null ? "" : origin;
         }
     }
 
@@ -68,18 +73,18 @@ public final class ServerCurrencyProvider implements CurrencyProvider {
     private final ThreadLocal<TypedCall> pending = new ThreadLocal<>();
     private final AtomicBoolean unboundReported = new AtomicBoolean();
     private final AtomicBoolean listenerFailureReported = new AtomicBoolean();
-    private volatile boolean saveRequested;
     /** Optional listeners for the companion-app module; see {@link #setLifecycleHooks}. */
     private volatile Runnable tickHook;
     private volatile Runnable unbindHook;
     private int marketSweepCountdown;
-    private int saveCooldown;
 
     public synchronized void bind(MinecraftServer nextServer) {
         if (nextServer == null) {
             throw new IllegalArgumentException("server");
         }
         server = nextServer;
+        // Other mods claim their cross-mod API handles at init; once a server runs, no class can claim one.
+        za.co.neroland.neroeconomy.sibling.CallerRegistry.GAME.close();
         // Resolves the economy store: loads it, migrates the older stores into it, or freezes.
         active = EconomySavedData.get(nextServer);
         long now = active.now();
@@ -101,8 +106,6 @@ public final class ServerCurrencyProvider implements CurrencyProvider {
             NeroEconomyCommon.LOGGER.warn("[NeroEconomy] The commodity data could not be read at start-up ({}).",
                     failure.getClass().getName());
         }
-        saveCooldown = 0;
-        saveRequested = false;
         unboundReported.set(false);
         listenerFailureReported.set(false);
     }
@@ -139,7 +142,8 @@ public final class ServerCurrencyProvider implements CurrencyProvider {
         za.co.neroland.neroeconomy.direct.DirectTrades.tick(currentServer);
         // The gallery's sample tickers and Auto-Trader loop move on their labels; nothing else is touched.
         za.co.neroland.neroeconomy.command.GalleryBuilder.tick(currentServer);
-        flushRequestedSave(currentServer);
+        // Economy events for other mods, queued where each operation settled, are handed out last.
+        za.co.neroland.neroeconomy.sibling.EconomyEventBus.drain();
         runHook(tickHook);
     }
 
@@ -147,7 +151,6 @@ public final class ServerCurrencyProvider implements CurrencyProvider {
         if (server == stoppedServer) {
             active = null;
             server = null;
-            saveRequested = false;
             // The resolved store and the frozen flag belong to the world that just stopped.
             EconomyStore.close(stoppedServer);
             // Shocks are world-scoped state: drop them entirely so a freshly loaded
@@ -163,6 +166,9 @@ public final class ServerCurrencyProvider implements CurrencyProvider {
             za.co.neroland.neroeconomy.command.GalleryBuilder.reset();
             // And the exchange's per-account rate limits.
             za.co.neroland.neroeconomy.exchange.Investing.clear();
+            // And the cross-mod API's per-caller rate buckets.
+            za.co.neroland.neroeconomy.sibling.SiblingPayments.clear();
+            za.co.neroland.neroeconomy.sibling.EconomyEventBus.clearPending();
             // A new session reports each failing simulation handler once again.
             Simulation.reset();
             // Nor whatever the companion-app module holds per player.
@@ -234,26 +240,12 @@ public final class ServerCurrencyProvider implements CurrencyProvider {
         return data == null ? 0 : data.chipRedemptionsToday(player);
     }
 
-    /**
-     * Asks for the economy store to be written to disk soon. Called after goods have moved between
-     * the store and a live inventory — the one kind of operation that spans two files — so a crash
-     * cannot leave them in both places.
+    /*
+     * The store is never written ahead of the world. Goods that cross between it and a live inventory,
+     * a chunk or a block entity are saved by the game's own save, which writes the players, the chunks
+     * and the store in one pass; a crash between two saves then rolls both sides back together instead
+     * of leaving the goods in two places. SaveOrderAuditTest keeps it that way.
      */
-    public void requestSave() { saveRequested = true; }
-
-    /** Coalesces requested saves into one asynchronous write of the overworld's dirty saved data. */
-    private void flushRequestedSave(MinecraftServer currentServer) {
-        if (saveCooldown > 0) saveCooldown--;
-        if (!saveRequested || saveCooldown > 0) return;
-        saveRequested = false;
-        saveCooldown = SAVE_COOLDOWN_TICKS;
-        try {
-            currentServer.overworld().getDataStorage().scheduleSave();
-        } catch (RuntimeException failure) {
-            // A storage that is already closing saves everything itself; nothing to add here.
-            NeroEconomyCommon.LOGGER.debug("[NeroEconomy] Prompt economy save was skipped.");
-        }
-    }
 
     /**
      * Core refreshes a store's recovery backup when the store is fetched through its guard. The
@@ -386,9 +378,9 @@ public final class ServerCurrencyProvider implements CurrencyProvider {
         EconomySavedData data = boundData("deposit");
         if (data == null) return settled(call, LedgerResult.UNAVAILABLE);
         if (call == null) return data.deposit(player, currency, amount);
-        if (call.plan != null) return settled(call, data.apply(call.plan));
+        if (call.plan != null) return settled(call, data.apply(call.plan, call.origin));
         if (call.budget != null) return settled(call, player == null ? LedgerResult.INVALID
-                : data.payFromReserve(call.budget, new PlayerAccountId(player), amount, call.type));
+                : data.payFromReserve(call.budget, new PlayerAccountId(player), amount, call.type, call.origin));
         return settled(call, data.deposit(player, currency, amount, call.type)
                 ? LedgerResult.APPLIED : LedgerResult.INVALID);
     }
@@ -399,7 +391,7 @@ public final class ServerCurrencyProvider implements CurrencyProvider {
         EconomySavedData data = boundData("withdraw");
         if (data == null) return settled(call, LedgerResult.UNAVAILABLE);
         if (call == null) return data.withdraw(player, currency, amount);
-        if (call.plan != null) return settled(call, data.apply(call.plan));
+        if (call.plan != null) return settled(call, data.apply(call.plan, call.origin));
         return settled(call, data.withdraw(player, currency, amount, call.type)
                 ? LedgerResult.APPLIED : LedgerResult.INVALID);
     }
@@ -416,7 +408,7 @@ public final class ServerCurrencyProvider implements CurrencyProvider {
             vestIfDue(data, from);
             return data.transfer(from, to, currency, amount);
         }
-        if (call.plan != null) return settled(call, data.apply(call.plan));
+        if (call.plan != null) return settled(call, data.apply(call.plan, call.origin));
         return settled(call, from == null || to == null ? LedgerResult.INVALID
                 : data.apply(LedgerPlan.of(new PlayerAccountId(from), new PlayerAccountId(to), amount, call.type)));
     }
@@ -449,16 +441,22 @@ public final class ServerCurrencyProvider implements CurrencyProvider {
      * <p>If the plan is refused only because a payer's starting grant is still locked, the payer's
      * play time is checked there and then, and the plan retried once if they have in fact vested.
      */
-    public LedgerResult execute(LedgerPlan plan) {
+    public LedgerResult execute(LedgerPlan plan) { return execute(plan, ""); }
+
+    /**
+     * {@link #execute(LedgerPlan)} for another mod's call: every row the plan writes carries
+     * {@code origin} ({@code <modid>/<reason>}), so the audit shows which mod moved what.
+     */
+    public LedgerResult execute(LedgerPlan plan, String origin) {
         EconomySavedData data = boundData("plan");
         if (data == null) return LedgerResult.UNAVAILABLE;
         if (plan == null) return LedgerResult.INVALID;
-        LedgerResult result = executeOnce(data, plan);
-        if (result == LedgerResult.FUNDS_LOCKED && vestPayers(data, plan)) result = executeOnce(data, plan);
+        LedgerResult result = executeOnce(data, plan, origin);
+        if (result == LedgerResult.FUNDS_LOCKED && vestPayers(data, plan)) result = executeOnce(data, plan, origin);
         return result;
     }
 
-    private LedgerResult executeOnce(EconomySavedData data, LedgerPlan plan) {
+    private LedgerResult executeOnce(EconomySavedData data, LedgerPlan plan, String origin) {
         Map<UUID, Long> changes = new LinkedHashMap<>();
         try {
             for (UUID player : players(plan)) {
@@ -468,7 +466,7 @@ public final class ServerCurrencyProvider implements CurrencyProvider {
         } catch (ArithmeticException overflow) {
             return LedgerResult.INVALID;
         }
-        if (changes.isEmpty()) return data.apply(plan);
+        if (changes.isEmpty()) return data.apply(plan, origin);
         UUID payer = null;
         UUID payee = null;
         for (Map.Entry<UUID, Long> change : changes.entrySet()) {
@@ -477,7 +475,7 @@ public final class ServerCurrencyProvider implements CurrencyProvider {
             if (pays) payer = change.getKey();
             else payee = change.getKey();
         }
-        TypedCall call = new TypedCall(null, null, plan);
+        TypedCall call = new TypedCall(null, null, plan, origin);
         pending.set(call);
         try {
             // The amount is only what Core is told; the plan is what the ledger applies.
@@ -510,11 +508,14 @@ public final class ServerCurrencyProvider implements CurrencyProvider {
      * that changes more than one paying or more than one receiving player is refused, so a rule
      * tested against a bare ledger is held to what the running game accepts.
      */
-    public LedgerResult executeOn(EconomySavedData ledger, LedgerPlan plan) {
+    public LedgerResult executeOn(EconomySavedData ledger, LedgerPlan plan) { return executeOn(ledger, plan, ""); }
+
+    /** {@link #executeOn(EconomySavedData, LedgerPlan)} for another mod's call, tagged with {@code origin}. */
+    public LedgerResult executeOn(EconomySavedData ledger, LedgerPlan plan, String origin) {
         if (ledger == null) return LedgerResult.UNAVAILABLE;
         if (plan == null) return LedgerResult.INVALID;
-        if (active == ledger) return execute(plan);
-        return reportable(plan) ? ledger.apply(plan) : LedgerResult.INVALID;
+        if (active == ledger) return execute(plan, origin);
+        return reportable(plan) ? ledger.apply(plan, origin) : LedgerResult.INVALID;
     }
 
     /** Whether a plan changes the balance of at most one paying and at most one receiving player. */
@@ -546,8 +547,13 @@ public final class ServerCurrencyProvider implements CurrencyProvider {
      * ({@code BUDGET_SPENT}) cannot cover it.
      */
     public LedgerResult payFromReserve(BudgetKind kind, UUID player, long amount, TransactionType type) {
+        return payFromReserve(kind, player, amount, type, "");
+    }
+
+    /** {@link #payFromReserve(BudgetKind, UUID, long, TransactionType)} for another mod's call, tagged with {@code origin}. */
+    public LedgerResult payFromReserve(BudgetKind kind, UUID player, long amount, TransactionType type, String origin) {
         if (kind == null || player == null || type == null || amount < 0L) return LedgerResult.INVALID;
-        TypedCall call = new TypedCall(type, kind, null);
+        TypedCall call = new TypedCall(type, kind, null, origin);
         pending.set(call);
         try {
             CurrencyApi.deposit(player, NeroEconomyCommon.CREDITS, amount);
@@ -589,6 +595,19 @@ public final class ServerCurrencyProvider implements CurrencyProvider {
      * that is the ledger of the server this provider is bound to, and straight to the ledger
      * otherwise — a store in a unit test, or one that is not bound yet.
      */
+    /**
+     * One payment out of the Reserve to a player of {@code ledger}, tagged with {@code origin}:
+     * through Core when that is the bound ledger, so balance listeners hear of it, and straight to
+     * the ledger otherwise — a store in a unit test.
+     */
+    public LedgerResult payFromReserveOn(EconomySavedData ledger, BudgetKind kind, UUID player, long amount,
+            TransactionType type, String origin) {
+        if (ledger == null) return LedgerResult.UNAVAILABLE;
+        if (active == ledger) return payFromReserve(kind, player, amount, type, origin);
+        if (kind == null || player == null || type == null || amount < 0L) return LedgerResult.INVALID;
+        return ledger.payFromReserve(kind, new PlayerAccountId(player), amount, type, origin);
+    }
+
     public Reserve.ProRata payProRataOn(EconomySavedData ledger, BudgetKind kind, Map<UUID, Long> amounts,
             TransactionType type) {
         if (ledger != null && active == ledger) return payProRata(kind, amounts, type);

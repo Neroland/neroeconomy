@@ -346,7 +346,7 @@ public final class HubRouter {
         boolean ok = switch (action) {
             case OPEN_TAB -> true;
             case PAGE -> a >= 0L && a <= MAX_PAGE;
-            case WALLET_PAY -> a >= 1L;
+            case WALLET_PAY -> credits(a);
             case WALLET_LOGGING, RULE_PAUSE, RULE_PAUSE_ALL, MARKET_MODE -> flag(a);
             case MARKET_QUOTE -> quantity(a);
             case MARKET_BUY, MARKET_SELL_QUOTE, MARKET_SELL, MARKET_BID_QUOTE, MARKET_BID -> quantity(a) && b >= 1L;

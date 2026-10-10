@@ -26,7 +26,6 @@ import net.minecraft.world.level.storage.ValueOutput;
 
 import org.jetbrains.annotations.Nullable;
 
-import za.co.neroland.neroeconomy.NeroEconomyCommon;
 import za.co.neroland.neroeconomy.goods.Lot;
 import za.co.neroland.neroeconomy.market.MarketSavedData;
 import za.co.neroland.neroeconomy.menu.AutoTraderMenu;
@@ -130,8 +129,6 @@ public final class AutoTraderBlockEntity extends BlockEntity implements WorldlyC
             items.set(slot, stack);
             // Marks the chunk to be saved without waking the rule: this change is the rule's own.
             AutoTraderBlockEntity.super.setChanged();
-            // Goods crossed between the world and the store; get the store to disk promptly.
-            NeroEconomyCommon.CURRENCY_PROVIDER.requestSave();
         }
 
         @Override public int limit(String id) {

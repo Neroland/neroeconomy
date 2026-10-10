@@ -25,6 +25,9 @@ For example, `/eco bounty post entity minecraft:zombie 50 10` pays 50 credits fo
   that only your kills count; `/eco bounty release <id>` gives it up, and an unfulfilled claim
   lapses after `jobClaimTimeoutMinutes` (120 by default).
 - The payout becomes a credit claim. Collect it at a terminal.
+- A **server bounty** has no player issuer: the server posts a few per day on hostile mobs (see
+  `systemBountiesPerDay`), funded from the Reserve within `systemJobDailyPayoutCap`. An expired one
+  returns its payout to the Reserve.
 - The issuer can cancel an unclaimed bounty with `/eco market cancel <id>`.
 
 ### Bounties on players
@@ -64,9 +67,10 @@ Market Board.
   get an "outbid" alert in the companion app. Raising your own bid takes only the difference.
 - A bid placed within `auctionAntiSnipeSeconds` of the end (60 by default) moves the end to that
   many seconds after the bid.
-- You cannot bid on your own auction, and you need room in your claim list to bid.
-- When the auction ends, the winner receives the lot as an item claim and the seller receives the
-  winning bid as a credit claim. With no bid, the lot returns to the seller's item claim.
+- You cannot bid on your own auction, and your [Vault](Vault.md) must have room for the lot.
+- When the auction ends, the winner receives the lot in their Vault and the seller receives the
+  winning bid as a credit claim, less the auction fee (`auctionFeePercent`, 5 % by default, rounded
+  up and paid to the Reserve). With no bid, the lot returns to the seller's Vault.
 - The seller can cancel an auction that has no bid with `/eco market cancel <id>`. Once anyone has
   bid, the lot is committed.
 

@@ -39,6 +39,7 @@ import za.co.neroland.neroeconomy.link.EconomyAlerts;
 import za.co.neroland.neroeconomy.market.MarketLimits;
 import za.co.neroland.neroeconomy.trade.Accounts;
 import za.co.neroland.neroeconomy.trade.TradeEnv;
+import za.co.neroland.neroeconomy.trade.TradeSettings;
 import za.co.neroland.neroeconomy.vault.VaultSection;
 
 /**
@@ -90,6 +91,15 @@ public final class OffersSection extends EconomySection implements LotHolder, Es
     public synchronized int size() { return offers.size(); }
     public synchronized int outgoing(AccountId sender) { return outgoing.getOrDefault(sender, 0); }
     public synchronized int incoming(AccountId recipient) { return incoming.getOrDefault(recipient, 0); }
+
+    /** Open offers from {@code sender} waiting with {@code recipient}. */
+    public synchronized int between(AccountId sender, AccountId recipient) {
+        if (outgoing(sender) == 0) return 0;
+        int count = 0;
+        for (Offer offer : offers.values())
+            if (offer.sender().equals(sender) && offer.recipient().equals(recipient)) count++;
+        return count;
+    }
 
     /** The open offers the account sent, oldest first. */
     public synchronized List<Offer> sentBy(AccountId sender) {
@@ -163,6 +173,9 @@ public final class OffersSection extends EconomySection implements LotHolder, Es
         }
         if (!MarketLimits.withinCap(outgoing(sender), 1, env.settings().maxOffersOut()))
             return OfferOutcome.refused(OfferResult.LIMIT_REACHED);
+        // F1: one sender's offers to one recipient are capped, so it takes many accounts to fill an inbox.
+        if (!MarketLimits.withinCap(between(sender, recipient), 1, TradeSettings.MAX_OFFERS_PER_RECIPIENT))
+            return OfferOutcome.refused(OfferResult.PAIR_LIMIT);
         // Muted, or already holding as many unanswered offers as an account may: the same answer.
         if (muted.contains(recipient) || !MarketLimits.withinCap(incoming(recipient), 1, env.settings().maxOffersIn()))
             return OfferOutcome.refused(OfferResult.NOT_ACCEPTING);

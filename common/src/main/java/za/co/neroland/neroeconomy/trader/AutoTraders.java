@@ -184,9 +184,8 @@ public final class AutoTraders {
         // Nothing is written while frozen; the sweep settles the records once the store is back.
         if (level == null || EconomyHealth.frozen()) return;
         EconomyStore store = EconomyStore.get(level.getServer());
-        // Goods may have crossed between the book and a vault; get the store to disk promptly.
-        if (TraderRules.release(store, Trading.env(store), location(level, pos)))
-            NeroEconomyCommon.CURRENCY_PROVIDER.requestSave();
+        // Goods may cross between the book and a vault; the store is saved with the world, never ahead of it.
+        TraderRules.release(store, Trading.env(store), location(level, pos));
     }
 
     // --- the sweep ---------------------------------------------------------------------------
@@ -218,8 +217,6 @@ public final class AutoTraders {
             if (chunk == null || chunk.getBlockState(pos).getBlock() instanceof AutoTraderBlock) continue;
             if (TraderRules.release(store, Trading.env(store), location)) released++;
         }
-        // A released rule's goods went from the book to a vault; get the store to disk promptly.
-        if (released > 0) NeroEconomyCommon.CURRENCY_PROVIDER.requestSave();
         return released;
     }
 }

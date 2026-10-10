@@ -141,8 +141,6 @@ public final class LiveTrade {
         // The contents were frozen and changed all the same, which no click can do: nobody agreed
         // to what is there now, so the trade is open again and both must confirm afresh.
         if (session.goodsChanged(side) == Change.LOCKED) session.swapRefused();
-        // Goods crossed between a live inventory and the store; get the store to disk promptly.
-        NeroEconomyCommon.CURRENCY_PROVIDER.requestSave();
     }
 
     /**
@@ -348,7 +346,6 @@ public final class LiveTrade {
         session.swapped();
         offers[0].empty();
         offers[1].empty();
-        NeroEconomyCommon.CURRENCY_PROVIDER.requestSave();
         TradeSwap.Terms terms = outcome.terms();
         long firstItems = itemCount(outcome.first());
         long secondItems = itemCount(outcome.second());
@@ -398,7 +395,6 @@ public final class LiveTrade {
                     Component.translatable(session.cancelReason().translationKey()), itemCount(back)));
             if (vaulted[0] > 0L) tell(side, Component.translatable("message.neroeconomy.direct_trade.to_vault", vaulted[0]));
         }
-        NeroEconomyCommon.CURRENCY_PROVIDER.requestSave();
         finish();
     }
 

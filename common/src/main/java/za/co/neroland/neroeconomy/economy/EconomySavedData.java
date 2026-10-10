@@ -102,6 +102,11 @@ public final class EconomySavedData extends EconomySection implements CurrencyPr
      */
     private Thread pinnedThread;
     private long pinnedMillis;
+    /**
+     * Which other mod's call is running now, as {@code <modid>/<reason>}: written on every row the
+     * call appends, so an operator can tell which mod paid or charged what. Empty otherwise. Not saved.
+     */
+    private String origin = "";
 
     private final Reserve.Book book = new Reserve.Book() {
         @Override public long reserveBalance() { return balanceOf(SystemAccountId.RESERVE); }
@@ -380,6 +385,17 @@ public final class EconomySavedData extends EconomySection implements CurrencyPr
      * (which is a write of its own, as it always was); then every leg is checked against the
      * balances as the earlier legs leave them, and only when all of them pass does anything move.
      */
+    public synchronized LedgerResult apply(LedgerPlan plan, String callOrigin) {
+        String before = origin;
+        origin = za.co.neroland.neroeconomy.sibling.SiblingRules.validOrigin(callOrigin) ? callOrigin : "";
+        try {
+            return apply(plan);
+        } finally {
+            origin = before;
+        }
+    }
+
+    /** {@link #apply(LedgerPlan, String)} with no origin: every plan this mod makes on its own. */
     public synchronized LedgerResult apply(LedgerPlan plan) {
         if (plan == null) return LedgerResult.INVALID;
         if (EconomyHealth.frozen()) return LedgerResult.FROZEN;
@@ -449,6 +465,18 @@ public final class EconomySavedData extends EconomySection implements CurrencyPr
      * does not hold it ({@code RESERVE_SHORT}) or the day's budget for {@code kind} is used up
      * ({@code BUDGET_SPENT}).
      */
+    public synchronized LedgerResult payFromReserve(BudgetKind kind, AccountId account, long amount,
+            TransactionType reason, String callOrigin) {
+        String before = origin;
+        origin = za.co.neroland.neroeconomy.sibling.SiblingRules.validOrigin(callOrigin) ? callOrigin : "";
+        try {
+            return payFromReserve(kind, account, amount, reason);
+        } finally {
+            origin = before;
+        }
+    }
+
+    /** One payment out of the Reserve with no origin; see {@link #payFromReserve(BudgetKind, AccountId, long, TransactionType, String)}. */
     public synchronized LedgerResult payFromReserve(BudgetKind kind, AccountId account, long amount,
             TransactionType reason) {
         AccountId id = canonical(account);
@@ -693,7 +721,7 @@ public final class EconomySavedData extends EconomySection implements CurrencyPr
         String ref = reference(account);
         List<TransactionRecord> rows = retained(ref).stream().map(row -> new TransactionRecord(row.type(),
                 row.amount(), row.currency(), row.timestamp(), redact(row.sourceAccount(), ref),
-                redact(row.destinationAccount(), ref))).toList();
+                redact(row.destinationAccount(), ref), row.origin())).toList();
         ChipCount chips = chipRedemptions.get(account);
         return new PlayerLedgerExport(player, balance, CREDITS_ID, loggingOptOut.contains(account), rows, ref,
                 chips == null ? 0L : chips.day(), chips == null ? 0 : chips.count(), lockedOf(account),
@@ -818,7 +846,8 @@ public final class EconomySavedData extends EconomySection implements CurrencyPr
         long cutoff = days <= 0 ? Long.MAX_VALUE : now - days * MILLIS_PER_DAY;
         transactions.removeIf(row -> row.timestamp() < cutoff);
         int max = EconomyConfig.MAX_TRANSACTION_RECORDS.get();
-        if (transactions.size() > max) transactions.subList(0, transactions.size() - max).clear();
+        // Past the bound the oldest ordinary rows go first; minting, burning and large rows outlive them.
+        AuditRetention.trim(transactions, max, row -> AuditRetention.kept(row.type(), row.amount()));
         // A chip counter only matters on its own day; keeping older rows would be storage for nothing.
         long today = economyDay(now);
         boolean changed = chipRedemptions.values().removeIf(row -> row.day() < today);
@@ -912,7 +941,8 @@ public final class EconomySavedData extends EconomySection implements CurrencyPr
     private void append(TransactionType type, long amount, AccountId source, AccountId target, long now) {
         int max = EconomyConfig.MAX_TRANSACTION_RECORDS.get();
         if (amount == 0L || max == 0 || EconomyConfig.TRANSACTION_RETENTION_DAYS.get() == 0) return;
-        transactions.add(new TransactionRecord(type, amount, CREDITS_ID, now, pseudonym(source), pseudonym(target)));
+        transactions.add(new TransactionRecord(type, amount, CREDITS_ID, now, pseudonym(source), pseudonym(target),
+                origin));
         if (transactions.size() > max + PURGE_SLACK) purgeExpired(now);
     }
 
@@ -965,14 +995,16 @@ public final class EconomySavedData extends EconomySection implements CurrencyPr
     }
 
     private record AuditRow(String type, long amount, String currency, long timestamp, String source,
-            String destination) {
+            String destination, String origin) {
         static final Codec<AuditRow> CODEC = RecordCodecBuilder.create(instance -> instance.group(
                 Codec.STRING.fieldOf("type").forGetter(AuditRow::type),
                 Codec.LONG.fieldOf("amount").forGetter(AuditRow::amount),
                 Codec.STRING.fieldOf("currency").forGetter(AuditRow::currency),
                 Codec.LONG.fieldOf("timestamp").forGetter(AuditRow::timestamp),
                 Codec.STRING.optionalFieldOf("source", "").forGetter(AuditRow::source),
-                Codec.STRING.optionalFieldOf("destination", "").forGetter(AuditRow::destination))
+                Codec.STRING.optionalFieldOf("destination", "").forGetter(AuditRow::destination),
+                // Added with the cross-mod API: absent on every older row, which no other mod made.
+                Codec.STRING.optionalFieldOf("origin", "").forGetter(AuditRow::origin))
                 .apply(instance, AuditRow::new));
     }
 
@@ -1059,7 +1091,7 @@ public final class EconomySavedData extends EconomySection implements CurrencyPr
     }
     private List<AuditRow> auditRows() {
         return transactions.stream().map(row -> new AuditRow(row.type().name(), row.amount(), row.currency(),
-                row.timestamp(), row.sourceAccount(), row.destinationAccount())).toList();
+                row.timestamp(), row.sourceAccount(), row.destinationAccount(), row.origin())).toList();
     }
     private Optional<SupplyRows> supplyRows() {
         if (!supplyTracked) return Optional.empty();
@@ -1111,7 +1143,8 @@ public final class EconomySavedData extends EconomySection implements CurrencyPr
         for (AuditRow row : transactions) try {
             TransactionType type = TransactionType.valueOf(row.type());
             if (row.amount() >= 0L) data.transactions.add(new TransactionRecord(type, row.amount(), row.currency(),
-                    row.timestamp(), row.source(), row.destination()));
+                    row.timestamp(), row.source(), row.destination(),
+                    za.co.neroland.neroeconomy.sibling.SiblingRules.validOrigin(row.origin()) ? row.origin() : ""));
         } catch (IllegalArgumentException ignored) { }
         data.supplyTracked = supplyRows.isPresent();
         supplyRows.ifPresent(rows -> {

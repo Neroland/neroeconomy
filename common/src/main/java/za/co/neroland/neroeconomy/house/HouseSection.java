@@ -54,8 +54,9 @@ import za.co.neroland.neroeconomy.trade.TradeEnv;
  * Houses today; and the player-to-player trade counted toward reference drift since the last step.
  *
  * <p><b>Each simulation step</b> ({@link #step}, autonomous only): the day rolls over; references
- * drift toward what players paid each other (E3); once per economy-day the arbitrage guard runs
- * again at the drifted prices and any failing NPC buy side is switched off; pressure decays; stock
+ * drift toward what players paid each other (E3) when enough distinct pairs of players traded, within
+ * a daily reach; once per economy-day, and on every step in which a reference moved, the arbitrage
+ * guard runs again at the drifted prices and any failing NPC buy side is switched off; pressure decays; stock
  * is restocked toward a day's supply; each House's working capital is topped up from the Reserve
  * under the NPC budget; every commodity is re-quoted on the book — at most one resting sell order
  * and one resting buy order per covered item; and anything a House holds above its working capital
@@ -86,6 +87,8 @@ public final class HouseSection extends EconomySection implements LotHolder, Hou
     public static final int MAX_ACCOUNT_ROWS = 32_768;
     public static final int MAX_REFERENCE_ACCOUNTS = 8_192;
     public static final int MAX_PENDING_ITEMS = 4_096;
+    /** The most counterparty pairs remembered per item between two steps. */
+    public static final int MAX_PAIRS_PER_ITEM = 256;
     /** A House's order is at most this share of the day's cap, so its price walks as it fills. */
     public static final int CHUNKS = 8;
     /** The ids of House orders: this high half, and a counter in the low half. */
@@ -144,6 +147,8 @@ public final class HouseSection extends EconomySection implements LotHolder, Hou
         final TreeMap<String, UUID> bids = new TreeMap<>();
         /** Traded since it was last quoted: the server tick quotes it again. */
         boolean dirty;
+        /** The reference when the economy-day began; a day's drift stays within reach of it. */
+        long dayOpen;
 
         State(String key) { this.key = key; }
 
@@ -173,6 +178,12 @@ public final class HouseSection extends EconomySection implements LotHolder, Hou
     private final Map<UUID, Long> referenceCounted = new LinkedHashMap<>();
     /** Per item: units and credits of counted player-to-player trade since the last step. */
     private final TreeMap<String, long[]> pending = new TreeMap<>();
+    /**
+     * Per item: {@code [units, credits]} of that counted trade per counterparty pair, keyed by
+     * {@link ReferenceDrift#pairKey}. Memory only and cleared every step, so who traded with whom never
+     * outlives a step; after a restart the step in flight simply does not move a reference.
+     */
+    private final Map<String, Map<Long, long[]>> pendingPairs = new HashMap<>();
     /** Per item, all-time: units restocked (created) and units destroyed. */
     private final TreeMap<String, long[]> goods = new TreeMap<>();
     /** Commodities whose buy side the daily guard re-check switched off. */
@@ -392,6 +403,17 @@ public final class HouseSection extends EconomySection implements LotHolder, Hou
                 : Math.max(1L, (long) ((double) fill.quantity() * counted / fill.base()));
         tally[0] = add(tally[0], units);
         tally[1] = add(tally[1], counted);
+        Map<Long, long[]> pairs = pendingPairs.computeIfAbsent(fill.item(), ignored -> new HashMap<>());
+        long pairKey = ReferenceDrift.pairKey(seller.playerId(), buyer.playerId());
+        long[] pair = pairs.get(pairKey);
+        if (pair == null && pairs.size() < MAX_PAIRS_PER_ITEM) {
+            pair = new long[2];
+            pairs.put(pairKey, pair);
+        }
+        if (pair != null) {
+            pair[0] = add(pair[0], units);
+            pair[1] = add(pair[1], counted);
+        }
         referenceCounted.merge(seller.playerId(), counted, HouseSection::add);
         referenceCounted.merge(buyer.playerId(), counted, HouseSection::add);
         setDirty();
@@ -554,9 +576,12 @@ public final class HouseSection extends EconomySection implements LotHolder, Hou
         minTradeValue = env.settings().minTradeValue();
         accountDailyCap = env.settings().accountDailyCap();
         sync(env);
-        drift(env);
+        boolean moved = drift(env);
         if (guardDay == NEVER || today > guardDay) {
             guardDay = today;
+            recheck(env);
+        } else if (moved) {
+            // N2: a reference that moved may open a recipe chain; it is checked now, not tomorrow.
             recheck(env);
         }
         for (State state : states.values()) {
@@ -605,6 +630,7 @@ public final class HouseSection extends EconomySection implements LotHolder, Hou
                 state.house = house.id();
                 state.dataReference = commodity.referencePrice();
                 state.refMillis = Math.multiplyExact(commodity.referencePrice(), HousePricing.MILLI);
+                state.dayOpen = state.refMillis;
                 states.put(commodity.key(), state);
             }
             if (!state.house.equals(house.id())) {
@@ -615,6 +641,7 @@ public final class HouseSection extends EconomySection implements LotHolder, Hou
             if (state.dataReference != commodity.referencePrice()) {
                 state.dataReference = commodity.referencePrice();
                 state.refMillis = Math.multiplyExact(commodity.referencePrice(), HousePricing.MILLI);
+                state.dayOpen = state.refMillis;
             }
             state.limits = Limits.of(commodity, house, registry.npcSells(commodity), registry.npcBuys(commodity));
             List<String> items = registry.itemsOf(commodity.key());
@@ -633,26 +660,42 @@ public final class HouseSection extends EconomySection implements LotHolder, Hou
         index();
     }
 
-    /** E3: each reference moves toward what players paid each other since the last step. */
-    private void drift(HouseEnv env) {
-        if (pending.isEmpty()) return;
+    /**
+     * E3: each reference moves toward what players paid each other since the last step, counted per
+     * pair of players (N1: too few pairs move nothing, no pair outweighs the rest) and within the
+     * day's reach. @return whether any reference moved
+     */
+    private boolean drift(HouseEnv env) {
+        if (pending.isEmpty()) {
+            pendingPairs.clear();
+            return false;
+        }
+        HouseSettings settings = env.settings();
         Map<State, long[]> totals = new LinkedHashMap<>();
-        for (Map.Entry<String, long[]> entry : pending.entrySet()) {
-            CommodityDefinition commodity = env.commodities().forItem(entry.getKey());
+        for (String item : pending.keySet()) {
+            CommodityDefinition commodity = env.commodities().forItem(item);
             State state = commodity == null ? null : states.get(commodity.key());
             if (state == null) continue;
+            Map<Long, long[]> pairs = pendingPairs.get(item);
+            long[] counted = ReferenceDrift.counted(pairs == null ? List.of() : pairs.values(), settings.minPairs());
             long[] total = totals.computeIfAbsent(state, ignored -> new long[2]);
-            total[0] = add(total[0], entry.getValue()[0]);
-            total[1] = add(total[1], entry.getValue()[1]);
+            total[0] = add(total[0], counted[0]);
+            total[1] = add(total[1], counted[1]);
         }
         pending.clear();
-        HouseSettings settings = env.settings();
-        totals.forEach((state, total) -> {
+        pendingPairs.clear();
+        boolean moved = false;
+        for (Map.Entry<State, long[]> entry : totals.entrySet()) {
+            State state = entry.getKey();
+            long[] total = entry.getValue();
             ReferenceDrift.Bounds bounds = ReferenceDrift.bounds(state.dataReference, settings.driftStepBps(),
-                    settings.bandMinBps(), settings.bandMaxBps());
-            state.refMillis = ReferenceDrift.next(state.refMillis, total[0], total[1],
+                    settings.bandMinBps(), settings.bandMaxBps()).today(state.dayOpen, settings.driftDayBps());
+            long next = ReferenceDrift.next(state.refMillis, total[0], total[1],
                     ReferenceDrift.liquidity(state.dataReference, state.limits.supply(), state.limits.demand()), bounds);
-        });
+            if (next != state.refMillis) moved = true;
+            state.refMillis = next;
+        }
+        return moved;
     }
 
     /** The arbitrage guard again, at the references as they have drifted. */
@@ -905,6 +948,7 @@ public final class HouseSection extends EconomySection implements LotHolder, Hou
             state.sold = 0L;
             state.bought = 0L;
             state.value = 0L;
+            state.dayOpen = state.refMillis;
         }
         houseDays.clear();
         accounts.clear();
@@ -991,7 +1035,7 @@ public final class HouseSection extends EconomySection implements LotHolder, Hou
 
     private record StateRow(String key, String house, long dataReference, long refMillis, List<Count> stock, long sold,
             long bought, long value, long askPressure, long bidPressure, Limits limits, Optional<String> askOrder,
-            List<Bid> bids, boolean dirty) {
+            List<Bid> bids, boolean dirty, Optional<Long> dayOpen) {
         static final Codec<StateRow> CODEC = RecordCodecBuilder.create(instance -> instance.group(
                 Codec.STRING.fieldOf("key").forGetter(StateRow::key),
                 Codec.STRING.fieldOf("house").forGetter(StateRow::house),
@@ -1006,7 +1050,8 @@ public final class HouseSection extends EconomySection implements LotHolder, Hou
                 Limits.CODEC.optionalFieldOf("limits", Limits.NONE).forGetter(StateRow::limits),
                 Codec.STRING.optionalFieldOf("ask_order").forGetter(StateRow::askOrder),
                 Bid.CODEC.listOf().optionalFieldOf("bids", List.of()).forGetter(StateRow::bids),
-                Codec.BOOL.optionalFieldOf("dirty", false).forGetter(StateRow::dirty))
+                Codec.BOOL.optionalFieldOf("dirty", false).forGetter(StateRow::dirty),
+                Codec.LONG.optionalFieldOf("day_open").forGetter(StateRow::dayOpen))
                 .apply(instance, StateRow::new));
     }
 
@@ -1076,7 +1121,9 @@ public final class HouseSection extends EconomySection implements LotHolder, Hou
             state.bids.forEach((item, id) -> bids.add(new Bid(item, id.toString())));
             rows.add(new StateRow(state.key, state.house, state.dataReference, state.refMillis, stock, state.sold,
                     state.bought, state.value, state.askPressure, state.bidPressure, state.limits,
-                    Optional.ofNullable(state.askOrder).map(UUID::toString), bids, state.dirty));
+                    Optional.ofNullable(state.askOrder).map(UUID::toString), bids, state.dirty,
+                    // Written only when the day has moved the reference, so an unchanged store saves as before.
+                    state.dayOpen == state.refMillis ? Optional.empty() : Optional.of(state.dayOpen)));
         }
         return rows;
     }
@@ -1140,6 +1187,8 @@ public final class HouseSection extends EconomySection implements LotHolder, Hou
             state.bidPressure = Math.max(0L, Math.min(HousePricing.MAX_PRESSURE, row.bidPressure()));
             state.limits = row.limits();
             state.dirty = row.dirty();
+            // Saves from before the daily reach start the day where the reference is now.
+            state.dayOpen = row.dayOpen().filter(open -> open >= 1L).orElse(state.refMillis);
             state.askOrder = row.askOrder().map(HouseSection::uuid).orElse(null);
             for (Bid bid : row.bids()) {
                 UUID id = uuid(bid.order());

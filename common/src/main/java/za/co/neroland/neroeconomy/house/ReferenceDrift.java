@@ -1,6 +1,10 @@
 package za.co.neroland.neroeconomy.house;
 
 import java.math.BigInteger;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
+import java.util.UUID;
 
 /**
  * How a commodity's reference price drifts toward what players pay each other (E3). Pure and exact.
@@ -11,6 +15,11 @@ import java.math.BigInteger;
  * {@code V} is the counted value and {@code L} the commodity's liquidity: a full day of House trade
  * at the data reference. The move is then clamped to a fraction of the data reference per step and
  * the result to a band around it. With no counted trade the reference stays where it is.
+ *
+ * <p>Wash trading between a few accounts (N1): the counted trade of a step is kept per counterparty
+ * pair, and a reference moves only when at least {@code minPairs} distinct pairs traded; no pair
+ * counts for more than the pair ranked {@code minPairs} from the top ({@link #counted}). Within a
+ * day the reference also stays within a reach of where the day began ({@link Bounds#today}).
  */
 public final class ReferenceDrift {
     /** The least liquidity a commodity is given, in units at its data reference. */
@@ -29,6 +38,71 @@ public final class ReferenceDrift {
      */
     public record Bounds(long dataMillis, long minMillis, long maxMillis, long stepMillis) {
         public long clamp(long refMillis) { return Math.max(minMillis, Math.min(maxMillis, refMillis)); }
+
+        /**
+         * These bounds narrowed to the day: at most {@code dayBps} of the data reference either side
+         * of {@code dayOpenMillis} (itself clamped into the band). 0 keeps the reference where the day began.
+         */
+        public Bounds today(long dayOpenMillis, int dayBps) {
+            long open = clamp(dayOpenMillis);
+            long reach = Math.multiplyExact(dataMillis, Math.max(0, dayBps)) / BPS;
+            long low = Math.max(minMillis, open - Math.min(open, reach));
+            long high = Math.min(maxMillis, open > Long.MAX_VALUE - reach ? Long.MAX_VALUE : open + reach);
+            return new Bounds(dataMillis, low, high, stepMillis);
+        }
+    }
+
+    /**
+     * A key for the pair of accounts on a fill, the same whichever of them sold. A one-way 64-bit
+     * mix of both ids: it tells pairs apart within a step and names nobody.
+     */
+    public static long pairKey(UUID first, UUID second) {
+        long a = mix(first);
+        long b = mix(second);
+        return mix(Math.min(a, b) * 0x9E3779B97F4A7C15L + Math.max(a, b));
+    }
+
+    private static long mix(UUID id) {
+        return mix(id.getMostSignificantBits() * 0xC2B2AE3D27D4EB4FL ^ id.getLeastSignificantBits());
+    }
+
+    private static long mix(long value) {
+        long h = value ^ (value >>> 33);
+        h *= 0xFF51AFD7ED558CCDL;
+        h ^= h >>> 33;
+        h *= 0xC4CEB9FE1A85EC53L;
+        return h ^ (h >>> 33);
+    }
+
+    /**
+     * What a step's trade counts for, from {@code [units, credits]} per counterparty pair: nothing
+     * when fewer than {@code minPairs} pairs traded; otherwise every pair clipped to the credits of
+     * the pair ranked {@code minPairs} from the top (its units in proportion), summed.
+     *
+     * @return {@code [units, credits]}
+     */
+    public static long[] counted(Collection<long[]> pairs, int minPairs) {
+        int needed = Math.max(1, minPairs);
+        List<long[]> rows = new ArrayList<>();
+        if (pairs != null) for (long[] pair : pairs) if (pair != null && pair[0] > 0L && pair[1] > 0L) rows.add(pair);
+        if (rows.size() < needed) return new long[] {0L, 0L};
+        rows.sort((left, right) -> Long.compare(right[1], left[1]));
+        long cap = rows.get(needed - 1)[1];
+        long units = 0L;
+        long value = 0L;
+        for (long[] pair : rows) {
+            long credits = Math.min(pair[1], cap);
+            long count = credits == pair[1] ? pair[0] : Math.max(1L, BigInteger.valueOf(pair[0])
+                    .multiply(BigInteger.valueOf(credits)).divide(BigInteger.valueOf(pair[1])).longValueExact());
+            units = saturated(units, count);
+            value = saturated(value, credits);
+        }
+        return new long[] {units, value};
+    }
+
+    private static long saturated(long a, long b) {
+        long sum = a + b;
+        return sum < 0L ? Long.MAX_VALUE : sum;
     }
 
     /**

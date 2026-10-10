@@ -745,6 +745,15 @@ public final class MarketSavedData extends EconomySection implements EscrowHolde
         // A sale is activity: it restarts a shop listing's idle-expiry clock.
         else listings.put(listingId, listing.withStock(listing.stock().copyWithCount(remaining)).withActivity(now()));
         setDirty();
+        // The two sides of the sale for other mods, as two events that never name each other.
+        za.co.neroland.neroeconomy.api.EconomyEvents.Venue venue = board
+                ? za.co.neroland.neroeconomy.api.EconomyEvents.Venue.BOARD
+                : za.co.neroland.neroeconomy.api.EconomyEvents.Venue.SHOP;
+        String soldItem = listing.itemId().toString();
+        za.co.neroland.neroeconomy.sibling.EconomyEventBus.sold(listing.seller(), soldItem, quantity,
+                listing.baseUnitPrice(), venue, now());
+        za.co.neroland.neroeconomy.sibling.EconomyEventBus.bought(buyerId, soldItem, quantity, total / quantity,
+                venue, now());
         if (remaining == 0 && listing.source() == ListingSource.PLAYER_SHOP)
             EconomyAlerts.raise(live != null ? live.level().getServer() : server, listing.seller(),
                     EconomyAlerts.Kind.SHOP_SOLD_OUT, LinkAlert.Severity.INFO);

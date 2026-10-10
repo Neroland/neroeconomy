@@ -55,6 +55,8 @@ public final class NeroEconomyCommon {
         //    Each store's eraser also pushes the purge into Core's recovery backup, which is a second
         //    copy of the same rows. The ledger eraser here is the only ledger pass: Core's built-in
         //    currency eraser reaches ServerCurrencyProvider.forgetPlayer, which is deliberately empty.
+        //    New stores' erasers go first (house rule): what other mods paid the player today.
+        PlayerDataErasure.register(za.co.neroland.neroeconomy.sibling.SiblingSection::eraseFor);
         PlayerDataErasure.register(EconomySavedData::eraseFor);
         PlayerDataErasure.register(ShopOwnershipState::eraseFor);
         PlayerDataErasure.register(ObligationSavedData::eraseFor);

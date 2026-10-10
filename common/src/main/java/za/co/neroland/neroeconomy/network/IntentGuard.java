@@ -54,9 +54,11 @@ public final class IntentGuard {
      * has a different menu open, the container id is stale, or {@link #mayAct} refuses.
      */
     public static <M extends AbstractContainerMenu> M openMenu(ServerPlayer player, Class<M> type, int containerId) {
-        if (player == null || !type.isInstance(player.containerMenu)) return null;
-        M menu = type.cast(player.containerMenu);
-        return menu.containerId == containerId && mayAct(player, menu) ? menu : null;
+        if (player == null || player.containerMenu == null) return null;
+        AbstractContainerMenu open = player.containerMenu;
+        if (!IntentRules.addressed(type.isInstance(open), open.containerId, containerId)) return null;
+        M menu = type.cast(open);
+        return mayAct(player, menu) ? menu : null;
     }
 
     /** Takes one token from the player's budget. @return false when the packet must be dropped. */

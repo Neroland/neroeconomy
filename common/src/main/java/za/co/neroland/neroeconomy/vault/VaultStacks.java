@@ -160,8 +160,6 @@ public final class VaultStacks {
             if (moved >= lot.count()) gone++;
             delivered += moved;
         }
-        // The goods are now in live player data; get the reduced vault to disk promptly.
-        if (delivered > 0) NeroEconomyCommon.CURRENCY_PROVIDER.requestSave();
         return delivered;
     }
 
@@ -175,8 +173,6 @@ public final class VaultStacks {
         if (store == null || player == null || stack == null || stack.isEmpty()) return 0;
         int moved = give(player, stack.copy());
         if (moved < stack.getCount()) deliver(store, player.getUUID(), stack.copyWithCount(stack.getCount() - moved));
-        // Goods crossing into a live inventory are the one step that spans two files; save promptly.
-        if (moved > 0) NeroEconomyCommon.CURRENCY_PROVIDER.requestSave();
         return moved;
     }
 

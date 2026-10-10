@@ -12,7 +12,7 @@ ordered by how much they matter. NeroEconomy works around each one today; the wo
 | 4 | Gate checks and opens by UUID | Offline milestones | Pending set, opened at next join |
 | 5 | A cap on stored alerts per player | Unbounded store | Raises few alerts |
 | 6 | An item lookup seam | Goods in a sibling's storage are invisible | Vanilla `Container` only |
-| 7 | A registry-aware backup encode | Backups of stores holding item stacks | Own encode |
+| 7 | A registry-aware backup encode | Backups of stores holding item stacks | Own stack codec supplies the server's registries |
 | 8 | Detect a store that fails to parse on 26.x | Silent empty store | Own marker and freeze |
 | 9 | Publisher identity on `ThresholdEvents` | Any code can fire any channel | Allow-list of source mods |
 | 10 | One shared crash-reporter set-up | Every mod initialises its own | Owner's decision |
@@ -89,9 +89,12 @@ quests can see stored goods without any class reference. Low priority: the Auto-
 
 ## 7. A registry-aware backup encode
 
-`SavedDataRecovery.backupNow` encodes without registry access, so a store that contains item stacks
-(NeroEconomy's vault, book and offers) cannot be backed up through it on 26.x. Ask: an overload that
-takes the server's `RegistryAccess` (or encodes with `level.registryAccess()`).
+`SavedDataRecovery.backupNow` encodes without registry access, so a store holding a stack with
+registry-backed data (an enchantment, a trim, a banner pattern) fails to back up on 26.x, and an erasure
+that calls `backupNow` fails to reach the backup. NeroEconomy works around it: every stored stack goes
+through its own codec (`market/StoredStacks`), which supplies the running server's registries when the
+caller did not. Every other mod that stores stacks needs the same trick. Ask: an overload that takes the
+server's `RegistryAccess` (or encodes with `level.registryAccess()`).
 
 ## 8. Detect a store that fails to parse on 26.x
 

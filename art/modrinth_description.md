@@ -10,7 +10,9 @@
 
 **Buy, sell, haul and bid — a player-driven economy that turns a Neroland server from sixteen solo grinds into one living market.**
 
-NeroEconomy is the **economy** mod of the Neroland ecosystem. It adds credits, bank terminals, offline player shops, trading terminals, market boards, supply contracts, delivery jobs, bounties and server-wide auctions — a whole retail-and-work layer that gives players a reason to specialise and trade instead of every player building every machine. A miner can sell ore to a fabricator, a logistics player can run delivery jobs, and a trader can corner the auction house.
+NeroEconomy is the **economy** mod of the Neroland ecosystem. It adds credits, a private Vault, bank terminals, offline player shops, direct trade, a matching market, auto-trading, a fictional stock exchange, Merchant Houses, supply contracts, delivery jobs, bounties and server-wide auctions — a whole retail-and-work layer that gives players a reason to specialise and trade instead of every player building every machine. A miner can sell ore to a fabricator, a logistics player can run delivery jobs, and a trader can corner the auction house — or buy a share in a fictional company and watch the market move while the server sleeps.
+
+> ⚠️ **Alpha.** NeroEconomy is in alpha (`0.2.0-alpha.1` is the current release; the 0.3 "living economy" work described below is still being finished). Back up your world before upgrading from 0.2 — the four older stores are adopted into one combined store on first start — and expect rough edges. Bug reports are very welcome.
 
 Built on **Neroland Core**, so its currency API, progression gates, config framework, `c:` tags and data-erasure hook are shared with the rest of the lineup — NeroEconomy is the persistent provider behind Core's credits and never re-implements a competing currency.
 
@@ -18,21 +20,30 @@ Built on **Neroland Core**, so its currency API, progression gates, config frame
 
 ## The economy
 
-1. **Credits.** The shared currency unit. NeroEconomy is the persistent provider behind Core's credits API: balances are keyed to abstract account identifiers, new accounts get a one-time configurable starting balance, and every movement is an atomic, server-side ledger operation.
-2. **Bank Terminal.** Check your balance, pay another player by name or offline UUID, redeem a Credit Chip, and collect proceeds and goods that are owed to you — durable, so nothing is lost if you log out mid-settlement.
-3. **Player shops.** Owned block-entities with per-item fixed pricing that keep selling while their chunk is unloaded or their owner is offline. Stock and price from the owner view; buyers get a validated, server-checked purchase.
-4. **Trading terminals.** Searchable access points that browse live server listings from one spot, with prices re-quoted at execution — a purchase is rejected if the price moved beyond the configured tolerance while you were looking at it.
-5. **Market boards.** Server-wide sell offers (goods held in escrow) and standing buy offers (credits held in escrow), with idempotent fills and automatic refunds when an offer expires.
-6. **Contracts, delivery jobs & bounties.** Server-tracked job objects with an escrowed payout and an open → claimed → fulfilled / expired state machine: agree to supply goods, haul a payload to a specific location, or claim a posted entity/player reward — all settled atomically, all durable across restarts.
-7. **Auctions.** Timed, server-global bidding with escrowed bids, outbid refunds and an anti-snipe extension window, settling the lot to the winner and credits to the seller atomically.
-8. **Credit Chips.** A craftable, redeemable chip worth a configurable number of credits — also seeded into the exotic meteor loot pool for servers running Nerospace.
+1. **Credits and the Reserve.** The shared currency unit. NeroEconomy is the persistent provider behind Core's credits API: balances are keyed to abstract account identifiers, and every movement is an atomic, server-side ledger operation. Every payout the system makes comes out of a **Reserve** and every fee goes back into it, within daily budgets, so credits are never created without limit. Starting balances are locked until a player has some play time.
+2. **Bank Terminal.** Check your balance, pay another player by name or offline UUID, redeem a Credit Chip, and open your Vault.
+3. **The Vault.** A private store of goods for every player. Purchases made while you were away, refunds and expired orders are delivered there, so nothing is lost if you log out mid-settlement.
+4. **Trading terminals & the market.** A real order book: sell and buy orders **match each other** (best price first, oldest first), with sell goods and buy credits held in escrow, idempotent fills and automatic refunds on expiry. Terminals search orders and shops side by side, and a purchase never costs more than the price you confirmed.
+5. **Player shops.** Owned block-entities with per-item fixed pricing that keep selling while their chunk is unloaded or their owner is offline; stock and proceeds go to the Vault.
+6. **Direct trade & offers.** `/trade <player>` opens a two-sided window — any change clears both confirmations and the contents freeze briefly before one atomic swap. **Offers** send items and credits to a named player, escrowed until they accept or decline, in game or in the app.
+7. **Auto-buy, auto-sell & the Auto-Trader.** Standing rules keep placing orders while you are offline, within daily value caps, and the **Auto-Trader** block takes feed from hoppers and ducts. Each rule reports a single clear status.
+8. **The Neroland Exchange.** Twelve fictional companies, an index fund and 1-, 3- and 7-day Savings Bonds at the Exchange Terminal, with a published price model, spreads and fees, holding periods, position limits, dividends, splits and daily limits with trading halts. A **practice mode** with play credits lets you learn the ropes without touching real credits. Returns are generous but finite — it is a game economy, not a money printer.
+9. **Merchant Houses & the autonomous economy.** Merchant Houses buy and sell commodities with price pressure and daily caps, reference prices follow real player trade, and Reserve-funded jobs, auctions and bounties keep things moving. The simulation **keeps running — and catches up — when nobody is online**, with an arbitrage guard to keep it honest.
+10. **Contracts, delivery jobs & bounties.** Server-tracked job objects with an escrowed payout and an open → claimed → fulfilled / expired state machine: agree to supply goods, haul a payload to a specific location, or claim a posted entity/player reward — all settled atomically, all durable across restarts.
+11. **Auctions.** Timed, server-global bidding with escrowed bids, outbid refunds and an anti-snipe extension window, settling the lot to the winner and credits to the seller atomically.
+12. **Credit Chips.** A craftable, redeemable chip with a stepped daily value and a shared daily budget — also seeded into the exotic meteor loot pool for servers running Nerospace.
+
+## Everything has a screen
+
+The **Economy Hub** puts the wallet, Vault, market, orders, investing, trading, jobs, auctions and shops in one screen (and, for operators, administration) — `/eco hub` opens it. Every control has a tooltip, every tab has a **"Show me"** in-game walkthrough on clearly labelled sample data, and the **Trader's Handbook** is handed to new players on first join, so nobody needs a wiki to start trading.
 
 ## Built for shared servers
 
 - 🛡️ **Anti-dupe by construction** — every credit and item movement is server-authoritative, escrowed and idempotent, so a crash, a disconnect or a spammed click can never dupe or destroy value.
+- ⚖️ **Fair-play protections** — locked starting credits, wash-trading and alternate-account guards on reference prices, daily limits on the Credit Chip, the exchange and app trading, and no wealth leaderboard. The docs are upfront about what a mod *cannot* defend against (server operators, and `online-mode=false` servers).
 - 🎛️ **Configurable, not prescriptive** — starting balance, retention windows, admin mutations, price-shock caps, execution tolerance, listing duration, auction anti-snipe, chip value, player bounties and remote trade are all server config.
 - 🔭 **A public pricing API** — deterministic quotes, registerable modifiers and capped, expiring market shocks that other mods can drive.
-- 📱 **Companion-app ready** — a per-player Core Link module exposes scoped balance and trend, paged transaction history, market search, validated trades and alerts to the NeroLink companion app.
+- 📱 **Trade from your phone, even logged out** — a per-player Core Link module lets the NeroLink companion app show your balance, orders, Vault, portfolio and offers, and place orders, manage auto-trade rules, buy and sell shares and bonds, pay players and answer offers while you are offline, within daily spend and goods limits you control (and can revoke).
 
 ## Privacy (POPIA / GDPR)
 
@@ -48,7 +59,7 @@ History is **bounded** and has a **configurable, finite retention window**, purg
 
 ### Coming later
 
-Faction and company wallets with role-based spend permissions are **deferred until NeroFactions exists** — the modifier and account seams are already public so they can slot in without a migration. Cross-server/proxy economies and simulated supply/demand are also out of scope for this release.
+Faction and company wallets with role-based spend permissions are **deferred until NeroFactions exists** — the modifier and account seams are already public so they can slot in without a migration. Cross-server/proxy economies are also out of scope for this release.
 
 ## Requirements & compatibility
 

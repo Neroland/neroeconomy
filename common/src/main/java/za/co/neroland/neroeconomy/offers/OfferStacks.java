@@ -8,7 +8,6 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.item.ItemStack;
 
-import za.co.neroland.neroeconomy.NeroEconomyCommon;
 import za.co.neroland.neroeconomy.api.AccountId;
 import za.co.neroland.neroeconomy.api.PlayerAccountId;
 import za.co.neroland.neroeconomy.book.GoodsOrigin;
@@ -105,8 +104,6 @@ public final class OfferStacks {
         if (!store.market().rememberRequest(sender, requestId)) return OfferOutcome.refused(OfferResult.STALE_REQUEST);
         OfferOutcome outcome = store.offers().send(env, account, account(recipient), given, terms.credits(),
                 terms.askItem(), terms.askCount(), terms.askCredits(), null);
-        // Goods may have left a live inventory for the store; get the store to disk promptly.
-        if (outcome.ok() && terms.handCount() > 0) NeroEconomyCommon.CURRENCY_PROVIDER.requestSave();
         return outcome;
     }
 

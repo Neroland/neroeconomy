@@ -124,7 +124,6 @@ final class VaultView implements Container {
             // can cause. The slots are not written over it: only what they gained or lost is applied.
             applyDifference(now, vault, goods);
             load();
-            NeroEconomyCommon.CURRENCY_PROVIDER.requestSave();
             return;
         }
         for (int slot = 0; slot < active; slot++) window.set(slot, now[slot]);
@@ -133,11 +132,9 @@ final class VaultView implements Container {
             now[slot] = window.slot(slot);
             slots.set(slot, goods.stackOf(now[slot]));
         }
-        boolean changed = vault.replaceAll(account, window.contents());
+        vault.replaceAll(account, window.contents());
         System.arraycopy(now, 0, agreed, 0, now.length);
         revision = vault.revision(account);
-        // Goods crossed between the store and a live inventory; get the store to disk promptly.
-        if (changed) NeroEconomyCommon.CURRENCY_PROVIDER.requestSave();
     }
 
     /**

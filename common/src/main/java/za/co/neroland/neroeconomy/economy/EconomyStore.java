@@ -41,6 +41,8 @@ import za.co.neroland.neroeconomy.goods.Lot;
 import za.co.neroland.neroeconomy.goods.LotHolder;
 import za.co.neroland.neroeconomy.house.HouseSection;
 import za.co.neroland.neroeconomy.link.RemoteSpendSection;
+import za.co.neroland.neroeconomy.sibling.MilestoneSection;
+import za.co.neroland.neroeconomy.sibling.SiblingSection;
 import za.co.neroland.neroeconomy.market.ListingSource;
 import za.co.neroland.neroeconomy.market.MarketBuyOffer;
 import za.co.neroland.neroeconomy.market.MarketListing;
@@ -136,10 +138,11 @@ public final class EconomyStore extends SavedData {
     private record Markets(Optional<BookSection> book, Optional<OffersSection> offers, Optional<RulesSection> rules,
             Optional<TradeEscrowSection> tradeEscrow, Optional<AutoTraderSection> autoTraders,
             Optional<ExchangeSection> exchange, Optional<HouseSection> houses, Optional<AdminSection> admin,
-            Optional<GallerySandbox> gallery, Optional<RemoteSpendSection> remoteSpend) {
+            Optional<GallerySandbox> gallery, Optional<RemoteSpendSection> remoteSpend,
+            Optional<SiblingSection> sibling, Optional<MilestoneSection> milestones) {
         static final Markets EMPTY = new Markets(Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
                 Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
-                Optional.empty());
+                Optional.empty(), Optional.empty(), Optional.empty());
 
         static final MapCodec<Markets> CODEC = RecordCodecBuilder.mapCodec(instance -> instance.group(
                 // An older store loads the book empty and its Market Board rows, still in the market
@@ -161,13 +164,18 @@ public final class EconomyStore extends SavedData {
                 // The gallery's sandbox: an older store loads with no gallery standing.
                 GallerySandbox.CODEC.optionalFieldOf("gallery").forGetter(Markets::gallery),
                 // What each account spent through the companion app today: an older store loads with none.
-                RemoteSpendSection.CODEC.optionalFieldOf("remote_spend").forGetter(Markets::remoteSpend))
+                RemoteSpendSection.CODEC.optionalFieldOf("remote_spend").forGetter(Markets::remoteSpend),
+                // What other mods paid out through the cross-mod API today: an older store loads with none.
+                SiblingSection.CODEC.optionalFieldOf("sibling").forGetter(Markets::sibling),
+                // Each player's economy milestones and the gates waiting to open: an older store loads with none.
+                MilestoneSection.CODEC.optionalFieldOf("milestones").forGetter(Markets::milestones))
                 .apply(instance, Markets::new));
 
         static Markets of(EconomyStore store) {
             return new Markets(present(store.book), present(store.offers), present(store.rules),
                     present(store.tradeEscrow), present(store.autoTraders), present(store.exchange),
-                    present(store.houses), present(store.admin), present(store.gallery), present(store.remoteSpend));
+                    present(store.houses), present(store.admin), present(store.gallery), present(store.remoteSpend),
+                    present(store.sibling), present(store.milestones));
         }
     }
 
@@ -203,6 +211,8 @@ public final class EconomyStore extends SavedData {
     private final AdminSection admin;
     private final GallerySandbox gallery;
     private final RemoteSpendSection remoteSpend;
+    private final SiblingSection sibling;
+    private final MilestoneSection milestones;
 
     public EconomyStore() {
         this(Core.EMPTY, Markets.EMPTY, false);
@@ -232,6 +242,8 @@ public final class EconomyStore extends SavedData {
         this.admin = adopt(trading.admin().orElseGet(AdminSection::new));
         this.gallery = adopt(trading.gallery().orElseGet(GallerySandbox::new));
         this.remoteSpend = adopt(trading.remoteSpend().orElseGet(RemoteSpendSection::new));
+        this.sibling = adopt(trading.sibling().orElseGet(SiblingSection::new));
+        this.milestones = adopt(trading.milestones().orElseGet(MilestoneSection::new));
         // A store written before the vault existed still holds item claims in its market section.
         adoptItemClaims(false);
         // And one written before the order book existed still holds its Market Board rows there.
@@ -291,6 +303,12 @@ public final class EconomyStore extends SavedData {
     /** What each account spent through the companion app today, against {@code remoteDailySpendLimit}. */
     public RemoteSpendSection remoteSpend() { return remoteSpend; }
 
+    /** What other mods paid out through the cross-mod API today, and the request keys already applied. */
+    public SiblingSection sibling() { return sibling; }
+
+    /** Each player's economy milestones, which open Core progression gates. */
+    public MilestoneSection milestones() { return milestones; }
+
     /**
      * Whether an operator has closed the market: player trading, the Merchant Houses' orders and the
      * exchange refuse, while reads, collecting and refunds carry on. Not the corruption freeze.
@@ -324,7 +342,7 @@ public final class EconomyStore extends SavedData {
      */
     private List<EconomySection> sections() {
         return List.of(ledger, market, obligations, shopOwners, goods, vault, simulation, book, offers, rules,
-                tradeEscrow, autoTraders, exchange, houses, admin, gallery, remoteSpend);
+                tradeEscrow, autoTraders, exchange, houses, admin, gallery, remoteSpend, sibling, milestones);
     }
 
     /** The names of the sections that hold anything, for the health report. */
@@ -347,6 +365,8 @@ public final class EconomyStore extends SavedData {
         if (!admin.isEmpty()) names.add("admin");
         if (!gallery.isEmpty()) names.add("gallery");
         if (!remoteSpend.isEmpty()) names.add("remote_spend");
+        if (!sibling.isEmpty()) names.add("sibling");
+        if (!milestones.isEmpty()) names.add("milestones");
         return names;
     }
 

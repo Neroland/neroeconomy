@@ -27,4 +27,12 @@ public final class IntentRules {
     public static boolean mayAct(boolean alive, boolean spectator, boolean menuOpen, boolean anchored) {
         return alive && !spectator && menuOpen && anchored;
     }
+
+    /**
+     * Whether a payload is addressed to the menu the player has open: that menu is of the kind the
+     * payload acts through, and the container id the client sent is the open menu's, not a stale one.
+     */
+    public static boolean addressed(boolean openMenuOfType, int openContainerId, int sentContainerId) {
+        return openMenuOfType && openContainerId == sentContainerId;
+    }
 }

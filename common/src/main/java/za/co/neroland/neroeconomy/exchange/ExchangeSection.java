@@ -283,6 +283,10 @@ public final class ExchangeSection extends EconomySection {
         dividends = desk.payDividends(env, day);
         practice.payDividends(env, day);
         setDirty();
+        // World-level only, for other mods: the day, what was paid, the factor and how many companies are listed.
+        za.co.neroland.neroeconomy.sibling.EconomyEventBus.dividends(dividends.day(), dividends.paid(),
+                dividends.denominator() <= 0L ? 0.0D : (double) dividends.numerator() / (double) dividends.denominator(),
+                env.registry().stocks().size());
         // Lots bought before this day roll now count alike for every dividend to come: merge them.
         settle(env);
         return dividends;

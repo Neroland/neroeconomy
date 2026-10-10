@@ -59,6 +59,8 @@ public final class PlayerDataExport {
         json.add("merchant_houses", EconomyStore.get(server).houses().exportFor(player));
         // What the subject spent through the companion app in the current economy-day.
         json.add("remote_spend", EconomyStore.get(server).remoteSpend().exportFor(player));
+        // What other mods paid the subject through the cross-mod API in the current economy-day.
+        json.add("sibling_payouts", EconomyStore.get(server).sibling().exportFor(player));
         return json;
     }
 

@@ -66,7 +66,9 @@ public enum TransactionType {
     /** A Merchant House's working capital topped up from the Reserve, within the NPC budget. */
     HOUSE_FUNDING,
     /** What a Merchant House holds above its working capital, swept back to the Reserve. */
-    HOUSE_SWEEP;
+    HOUSE_SWEEP,
+    /** The fee another mod's player-to-player transfer takes, from the payer to the Reserve. */
+    SIBLING_FEE;
 
     /** Whether this reason may create credits. */
     public boolean mints() {

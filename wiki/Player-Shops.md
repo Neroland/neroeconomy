@@ -13,7 +13,7 @@ the shop's chunk unloads, and it appears in every Trading Terminal search on the
   of 1 or 10 credits and cannot go below 1.
 - A stack that may not be traded (an item in the `neroeconomy:untradeable` tag, or a stack carrying
   more data than `maxStackDataBytes`) is not accepted as stock. If one reaches the shop anyway, it
-  goes to the owner's item claim.
+  goes to the owner's [Vault](Vault.md).
 - Hoppers and other automation cannot insert into or extract from a shop.
 - Shop listings do not count towards `maxListingsPerPlayer`. They are listed by `/eco market mine`,
   but they are not cancelled with `/eco market cancel`: take the stock back at the shop.
@@ -39,7 +39,7 @@ a shop sells out, the owner gets a "shop sold out" alert in the companion app.
 - A shop can be broken by its owner, by an operator with permission level 2, or by anyone if the
   shop has no owner on record.
 - However a shop is removed — mined, blown up or replaced by a command — its unsold stock goes to
-  the owner's item claim and its ownership record is removed. Nothing is dropped and nothing is
+  the owner's Vault and its ownership record is removed. Nothing is dropped and nothing is
   lost.
 - Commands that replace blocks without block updates (`/setblock`, `/fill`, `/clone`, structure
   placement) are caught by a sweep that runs every 30 seconds for loaded chunks.
@@ -47,12 +47,12 @@ a shop sells out, the owner gets a "shop sold out" alert in the companion app.
 ## Idle expiry
 
 A shop listing that has had no sale and no visit from its owner for `shopListingMaxIdleDays` (90 by
-default) expires: the stock goes to the owner's item claim and the shop is left empty. Opening the
+default) expires: the stock goes to the owner's Vault and the shop is left empty. Opening the
 shop as its owner, restocking, changing the price or making a sale restarts the count. Set the key
 to `0` to turn expiry off.
 
 ## Erasure
 
-When a shop owner's data is erased, the ownership record, the listing and its stock are removed. The
+When a shop owner's data is erased, the ownership record, the listing and its stock are removed (the stock is destroyed). The
 shop block stays in the world without an owner, and anyone can break it. See
 [Privacy](Privacy-and-Erasure.md).

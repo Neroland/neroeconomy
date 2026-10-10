@@ -1,13 +1,16 @@
 # Credit Chip
 
-`neroeconomy:credit_chip` is redeemed only by using it on a Bank Terminal. The server deposits
-`creditChipValue` credits (100 by default) and consumes exactly one chip.
+`neroeconomy:credit_chip` is redeemed only by using it on a Bank Terminal. The server pays
+`creditChipValue` credits (100 by default) from the Reserve and consumes exactly one chip.
 
-## Daily limit
+## Daily limits
 
-One account can redeem `creditChipDailyLimit` chips per day (5 by default). When the limit is
-reached the chip is refused with a message and stays in your hand; nothing is lost. Setting the key
-to `0` turns redemption off altogether.
+One account can redeem `creditChipDailyLimit` chips per day (5 by default). Each further chip that
+day pays less: the first pays 100 % of `creditChipValue`, then 80 %, 60 %, 40 % and 20 %. All
+accounts together can draw at most `creditChipDailyBudget` credits (3000 by default) from chips per
+day. When a limit or the budget is reached, or the Reserve cannot pay, the chip is refused with a
+message and stays in your hand; nothing is lost. Setting `creditChipDailyLimit` to `0` turns
+redemption off altogether. A creative-mode or spectator player cannot redeem a chip.
 
 The day is a 24-hour period on the server's economy clock, which normally changes at 00:00 UTC.
 

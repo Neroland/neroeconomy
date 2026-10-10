@@ -6,7 +6,6 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.item.ItemStack;
 
-import za.co.neroland.neroeconomy.NeroEconomyCommon;
 import za.co.neroland.neroeconomy.api.AccountId;
 import za.co.neroland.neroeconomy.api.PlayerAccountId;
 import za.co.neroland.neroeconomy.economy.EconomyHealth;
@@ -64,8 +63,6 @@ public final class BookStacks {
         if (lot == null) return refusedSale(BookResult.NOT_HOLDING);
         Placed placed = store.book().placeSell(Trading.env(store), account(seller.getUUID()), lot, unitPrice,
                 OrderSource.HAND, hand(seller, held, offered), null);
-        // Goods left a live inventory for the store; get the store to disk promptly.
-        if (placed.ok()) NeroEconomyCommon.CURRENCY_PROVIDER.requestSave();
         return new HandSale(placed, offered);
     }
 
@@ -117,8 +114,6 @@ public final class BookStacks {
         ItemStack offered = held.copyWithCount(quantity);
         Traded traded = store.book().sellTo(Trading.env(store), account(seller.getUUID()), orderId,
                 Lot.of(order.item(), quantity), hand(seller, held, offered));
-        // The goods have left a live inventory for a vault; get that vault to disk promptly.
-        if (traded.ok()) NeroEconomyCommon.CURRENCY_PROVIDER.requestSave();
         return traded;
     }
 
@@ -198,8 +193,6 @@ public final class BookStacks {
         TradeEnv env = Trading.env(store);
         AccountId account = account(buyer);
         Traded traded = store.book().buyFrom(env, account, orderId, quantity, ceiling, receiver(store, env, account, live));
-        // Goods that went into a live inventory are the one step that spans two files; save promptly.
-        if (traded.ok() && !traded.toVault()) NeroEconomyCommon.CURRENCY_PROVIDER.requestSave();
         return traded;
     }
 
@@ -220,7 +213,6 @@ public final class BookStacks {
                 int perStack = Math.max(1, whole.getMaxStackSize());
                 for (int left = lot.count(); left > 0; left -= perStack)
                     VaultStacks.giveOrDeliver(store, live, whole.copyWithCount(Math.min(perStack, left)));
-                NeroEconomyCommon.CURRENCY_PROVIDER.requestSave();
                 return false;
             }
 

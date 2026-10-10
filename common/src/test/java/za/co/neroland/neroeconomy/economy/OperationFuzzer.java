@@ -65,12 +65,22 @@ final class OperationFuzzer {
      * @param crash       whether the store is also saved and reloaded at each checkpoint
      */
     static Result run(long seed, int count, Set<Integer> checkpoints, boolean crash) {
+        return run(seed, count, checkpoints, crash, List.of());
+    }
+
+    /**
+     * {@link #run(long, int, Set, boolean)} with {@code extra} operations picked alongside the
+     * standard ones. The standard seeds keep their exact sequences because they run without extras.
+     */
+    static Result run(long seed, int count, Set<Integer> checkpoints, boolean crash, List<FuzzOperation> extra) {
+        List<FuzzOperation> operations = new ArrayList<>(OPERATIONS);
+        operations.addAll(extra);
         FuzzWorld world = new FuzzWorld(seed);
         int totalWeight = 0;
-        for (FuzzOperation operation : OPERATIONS) totalWeight += Math.max(1, operation.weight());
+        for (FuzzOperation operation : operations) totalWeight += Math.max(1, operation.weight());
         Map<String, Integer> calls = new LinkedHashMap<>();
         Map<String, Integer> effects = new LinkedHashMap<>();
-        for (FuzzOperation operation : OPERATIONS) {
+        for (FuzzOperation operation : operations) {
             calls.put(operation.name(), 0);
             effects.put(operation.name(), 0);
         }
@@ -78,7 +88,7 @@ final class OperationFuzzer {
         for (int step = 0; step < count; step++) {
             // Time passes between operations: up to twenty seconds, on the world's own clock.
             world.wall += world.random.nextInt(20_000);
-            FuzzOperation operation = pick(world, totalWeight);
+            FuzzOperation operation = pick(world, operations, totalWeight);
             long outcome = operation.run(world);
             world.digest = world.digest * 31L + outcome * 7L + operation.name().hashCode();
             calls.merge(operation.name(), 1, Integer::sum);
@@ -97,9 +107,9 @@ final class OperationFuzzer {
         return new Result(world, calls, effects);
     }
 
-    private static FuzzOperation pick(FuzzWorld world, int totalWeight) {
+    private static FuzzOperation pick(FuzzWorld world, List<FuzzOperation> operations, int totalWeight) {
         int roll = world.random.nextInt(totalWeight);
-        for (FuzzOperation operation : OPERATIONS) {
+        for (FuzzOperation operation : operations) {
             roll -= Math.max(1, operation.weight());
             if (roll < 0) return operation;
         }

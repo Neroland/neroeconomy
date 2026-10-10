@@ -2,11 +2,154 @@
 
 ## [Unreleased]
 
+NeroEconomy 0.3: a living economy. This release adds trading (an order book, direct trade, offers and
+auto-trade rules), a private Vault, an exchange with Savings Bonds and practice mode, autonomous
+Merchant Houses, a Reserve that every system payout comes from, one Economy Hub screen with
+walkthroughs and a Trader's Handbook, and companion-app link schema 2 for offline trading. It changes
+how credits are created, moves all economy state into one store and adds 68 config keys, so
+operators should read **Changed** and **Migration** before upgrading. `mod_version` stays at
+`0.2.0-alpha.1` until the release is cut. The October 2026 audit remediation that shipped in the
+same release is kept below, under its own heading.
+
+### Added
+
+- **The Reserve.** A system account that every payout comes out of and every fee goes into. It is
+  filled once (`reserveInitial`), topped up daily (`reserveDailyMint`, up to `reserveCap`) and bounded
+  by daily budgets for Merchant Houses, the exchange and other mods. A payout that the Reserve or
+  its budget cannot cover is refused before anything moves. Operators see circulation, Reserve,
+  escrow, exchange, minted and burned today with `/eco admin supply` and on the Admin tab.
+- **The Vault.** Every player has a private store of goods (`vaultStacks`, 54), opened at the Bank
+  Terminal. Purchases made while away, refunds, expired orders and offers, and shop stock all
+  deliver to it.
+- **Order book.** Sell and buy orders that match each other (best price first, oldest first, at the
+  resting order's price), a Trading Terminal search that shows orders and shops side by side, and
+  the commands `/eco order sell|buy|cancel|mine`. A buy order escrows its credits.
+- **Direct trade** (`/trade <player>`, or sneak-use on a player): a two-sided window of nine stacks and
+  a credit amount per side, where any change clears both confirmations and the contents freeze for
+  three seconds before one atomic swap. **Offers** send items and credits to a named player, who
+  answers in game or in the app: `/eco offer send|list|accept|decline|cancel|mute`.
+- **Auto-trade rules** (`/eco rule ...`) that keep placing book orders while the owner is offline,
+  and the **Auto-Trader** block, a vanilla container that hoppers and ducts can feed. Each rule
+  reports one status.
+- **The exchange.** Twelve fictional companies, an index fund and 1-, 3- and 7-day Savings Bonds,
+  at the Exchange Terminal and with `/eco invest ...`. Published price model, a spread, a fee, a
+  holding period, position limits, dividends, splits, daily limits with a halt, and a
+  **practice mode** with play credits that cannot touch the ledger.
+- **Autonomous economy.** Merchant Houses and the Merchant Stall, commodity pricing with daily
+  caps and price pressure, reference prices that follow player trade, Reserve-funded auctions, jobs
+  and server bounties, a simulation that advances in economy time and catches up after a pause
+  (`simCatchUpMaxHours`), and an arbitrage guard (`/eco admin reload-check`).
+- **Data packs:** companies (`stocks/`), commodities (`commodities/`, with `compat/<modid>.json`),
+  Merchant Houses (`houses/`), server bounties (`bounties/`), arbitrage-guard conversions (`guard/`)
+  and the item tag `neroeconomy:never_commodity`.
+- **The Economy Hub** with tabs for Wallet, Vault, Market, My orders, Invest, Trade, Jobs, Auctions,
+  Shop and (level 3) Admin; `/eco hub [tab]`; a tooltip on every control; a **Show me** walkthrough
+  per tab on sample data with a permanent DEMO banner; and the **Trader's Handbook**, given once on
+  first join (`giveHandbookOnFirstJoin`) and craftable from a book and a gold nugget.
+- **Operator tools:** `/eco admin supply|stocks|houses|reload-check|health|market close|open|sim`, an
+  operator market freeze, and a freeze of the whole economy when its store is missing or
+  unreadable. The gallery now builds eleven clusters, one per system, from sandboxed data.
+- **Companion app (link schema 2).** New sections `summary`, `orders`, `vault`, `stocks`, `portfolio`,
+  `offers`, `jobs` and `auctions`, topics `orders`, `offers`, `portfolio` and `alerts`, and actions
+  `order_place`, `order_cancel`, `rule_set`, `rule_delete`, `rules_pause`, `stock_buy`, `stock_sell`,
+  `bond_buy`, `pay`, `offer_send`, `offer_accept`, `offer_decline`, `offer_cancel`, `claim_collect`,
+  `vault_deposit` and `vault_withdraw`. Everything except the two vault moves works while the player
+  is offline. Ten more fixed alerts (offers, rules, bonds, dividends, delisting, filled orders, a
+  full vault).
+- **Config keys** (defaults in brackets):
+  - Reserve, budgets and faucets: `startingBalanceVestMinutes` (30), `reserveInitial` (250000), `reserveDailyMint` (5000), `reserveCap` (2000000), `npcDailyBudget` (20000), `exchangeDailyBudget` (15000), `siblingDailyBudget` (5000), `creditChipDailyBudget` (3000).
+  - Fees and trading: `marketFeePercent` (2), `listingFee` (1), `auctionFeePercent` (5), `exchangeFeePercent` (1), `tradeTaxPercent` (0), `tradeRangeBlocks` (16), `offerDurationHours` (48), `maxOffersPerPlayer` (16), `maxRulesPerPlayer` (8), `ruleDailyValueCap` (10000), `vaultStacks` (54).
+  - Simulation and Merchant Houses: `autonomousEconomy` (true), `simStepMinutes` (10), `simCatchUpMaxHours` (72), `commoditySpreadPercent` (10), `arbitrageGuardDepth` (3), `referenceDriftStepPercent` (1), `referenceBandMinPercent` (50), `referenceBandMaxPercent` (200), `referenceMinTradeValue` (16), `referenceAccountDailyCap` (2000), `referenceMinPairs` (3), `referenceDriftDayPercent` (10), `npcAuctionsPerDay` (4), `npcAuctionHours` (24), `houseJobPremiumPercent` (15), `houseJobsPerHouse` (2), `houseJobHours` (24), `systemBountiesPerDay` (2), `debugFastSim` (false).
+  - The exchange: `exchangeEnabled` (true), `exchangeStepLimitSteadyPercent` (2), `exchangeStepLimitRiskyPercent` (6), `exchangeDayLimitSteadyPercent` (10), `exchangeDayLimitRiskyPercent` (40), `exchangeHaltSteps` (6), `exchangeReversionPercent` (0.05), `exchangeVolumeNudgeCapPercent` (0.5), `exchangeVolumeScale` (2000), `exchangeVolumePairCap` (250), `exchangeVolumeAccountCap` (1000), `exchangeShockStepPercent` (1), `exchangeFloorPercent` (5), `bondRate1DayPercent` (0.8), `bondRate3DayPercent` (3), `bondRate7DayPercent` (8), `exchangeSpreadSteadyPercent` (1), `exchangeSpreadRiskyPercent` (2), `exchangeSpreadIndexPercent` (1), `shareHoldMinutes` (60), `maxPositionPerStock` (5000), `maxPortfolio` (20000), `maxBondsPerPlayer` (8), `practiceStartingCredits` (10000), `exchangeActionsPerMinute` (20).
+  - Companion app and onboarding: `remoteDailySpendLimit` (5000), `remoteDailyGoodsLimit` (5000), `remoteGoodsFloorValue` (10), `remoteModifiedGoodsValue` (500), `giveHandbookOnFirstJoin` (true).
+- **Wiki:** pages for trading, auto-trading, the exchange, the Vault, the autonomous economy, demos
+  and the Handbook, fair play and data packs.
+
+### Changed
+
+- **Credits come from the Reserve, not from nowhere.** Starting balances, Credit Chips, system job
+  and bounty payouts, Merchant House and exchange payouts and other mods' untyped deposits are
+  transfers from the Reserve, within a daily budget, and a payout it cannot cover is refused.
+  Fees go back to the Reserve. Credits are created only by the Reserve's fill and daily top-up, the
+  one-time migration of escrow and an operator's grant.
+- **Server-funded jobs are funded from the Reserve when posted.** The payout is escrowed at posting
+  (it used to be minted at fulfilment) and an expired job returns it to the Reserve. Merchant Houses
+  and the server also post contracts and bounties this way.
+- **Item claims are now Vault contents.** Goods owed to a player are delivered to their Vault, and
+  `maxClaimStacksPerPlayer` bounds the Vault (the smaller of it and `vaultStacks` applies).
+  Idle-shop and removed-shop stock goes to the Vault.
+- **Market Board listings and buy offers are orders on the book.** They match each other, keep
+  their ids, and are cancelled with `/eco market cancel <id>` or `/eco order cancel <id>`.
+- **The starting balance is locked** for `startingBalanceVestMinutes` (30) of play time: it can pay
+  Merchant Houses and fees but cannot be paid, offered, traded or put into shares and bonds.
+- **Credit Chips** pay less across the day (100 %, 80 %, 60 %, 40 %, 20 %), draw on a shared
+  `creditChipDailyBudget`, and cannot be redeemed by creative or spectator players.
+- **Fees:** a market fee on every sale, a flat listing fee, an auction fee on the winning bid, an
+  exchange fee and an optional trade tax; see the wiki for the table. A price modifier changes only
+  the buyer's price.
+- **Erasure and export cover every section.** Erasing a player destroys their goods and moves their
+  escrow, exchange principal and rule budgets to the Reserve, refunds what other players are owed,
+  and ends an open trade; `/eco export` gains `vault`, `book`, `offers`, `rules`, `trade_escrow`,
+  `auto_traders`, `exchange`, `merchant_houses`, `remote_spend`, `starting_balance_vesting` and
+  `handbook_given`.
+- **Saving.** The economy store is saved with the game's own save, together with player data and
+  chunks. The old save within about a second of an inventory move is gone, because it let a crash
+  copy or lose items; a hard kill now rolls player data and store back together.
+- **Link schema 2.** The module reports schema 2. Schema 1 sections, the `trade` action and their
+  keys are kept for one release. `trade` and its `claim` delivery now mean the Vault.
+- **`PRIVACY.md`** describes the combined store, every section, the memory-only data, retention,
+  export and erasure of the new data, and states that nothing ranks players by wealth.
+- **Gallery.** Its blocks and label stands are recorded, so `gallery clear` removes exactly what it
+  placed, and it builds sandboxed sample data only.
+
+### Fixed
+
+- **Wash trading and alternate accounts.** A reference price moves only when at least
+  `referenceMinPairs` different pairs of accounts traded, with no pair counting for more than the
+  pair ranked `referenceMinPairs` from the top, and a daily reach limit; the pair tally is held in memory only as one-way hashes.
+  The arbitrage guard re-runs whenever a reference moves.
+- **A stolen app token could drain goods.** Goods leaving an account through the app are now capped
+  per day (`remoteDailyGoodsLimit`) apart from credits.
+- **Locked starting credits could be laundered** through the exchange (a bond bought and cashed in
+  early). Share and bond principal now needs earned credits.
+- **The Credit Chip was an unlimited faucet for alternate accounts and creative players.** It now has
+  a shared daily budget and refuses creative and spectator players.
+- **An Auto-Trader fed by a creative player's hopper** could list free goods; its sell rule now does
+  not run while its owner is in the game in creative or spectator mode.
+- **An offer inbox could be filled by a few accounts.** A sender may keep at most four open offers
+  with the same recipient.
+- **The audit trail could drop its mint and burn rows first.** When the row bound is reached, ordinary
+  rows go first.
+- **Operator credit changes were not all counted.** Every grant, take and set is counted wherever it
+  enters (command, Hub or API).
+- **A vault slot could keep surplus goods** a non-source player added by clicking; the surplus is
+  now handed back.
+- **A very large wallet payment** from the Hub passed an unchecked number to the ledger.
+- **A crash could duplicate or lose goods** crossing between an inventory and the store (see Changed).
+
+### Migration
+
+- On the first start with 0.3, the four 0.2 stores are read once, adopted as sections of
+  `neroeconomy:economy`, and emptied on disk only after the new store has been saved and read back,
+  so a crash during the first save cannot lose both copies. They are never imported twice.
+- Item claims become Vault contents (delivered, not deposited, so a long claim list is booked in
+  full). Board listings and buy offers become orders on the book, with the same ids, prices and
+  expiries. Credit escrow that 0.2 had written off the ledger is restored to the escrow account.
+- The Reserve is filled once with `reserveInitial` credits. Existing balances are not touched.
+- A world whose economy exists but whose store cannot be read **freezes** instead of starting
+  empty; an operator can accept a fresh start with `/eco admin health accept`.
+- Take a backup of the world before the first start. Do not run 0.2 on a world 0.3 has opened.
+- The link module reports schema 2; an older NeroLink app keeps working on the schema 1 keys for one
+  release.
+- No name in the public `api` package was renamed or removed.
+
+### Audit remediation (earlier in this release)
+
 Audit remediation: the fixes for the October 2026 audit. This pass changes command syntax, the
 companion-app payloads and the export file, and adds config keys, so server operators should read
 **Changed** before upgrading. `mod_version` stays at `0.2.0-alpha.1` until the release is cut.
 
-### Added
+#### Added
 
 - **Seeing and cancelling your own rows.** `/eco market mine` lists your open Market Board
   listings, shop listings, buy offers, jobs and auctions. `/eco market cancel <id>` cancels a board
@@ -33,7 +176,7 @@ companion-app payloads and the export file, and adds config keys, so server oper
   their item claim), and a `balance` event is published when a balance changes.
 - **API.** `PricingEngine.executionPriceWithinQuote` is the price rule purchases now settle under.
 
-### Changed
+#### Changed
 
 - **Job posting syntax.** The target kind is now a word of its own, and ids are typed in full:
   - `contract post item|tag <id> <quantity> <payout>`
@@ -100,13 +243,13 @@ companion-app payloads and the export file, and adds config keys, so server oper
 - **Requires Neroland Core 1.13.0** (unchanged pin), now for its `SavedDataRecovery` backup guard
   as well.
 
-### Removed
+#### Removed
 
 - The unused `ShopSettlement` class and the mod's local copy of `SavedDataRecovery` (Core's is used
   instead).
 - The `syncModels` Gradle task, which called a script that does not exist.
 
-### Fixed (audit)
+#### Fixed (audit)
 
 Jobs, bounties and auctions:
 

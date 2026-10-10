@@ -21,6 +21,7 @@ import za.co.neroland.neroeconomy.book.GoodsOrigin;
 import za.co.neroland.neroeconomy.book.VaultGoods;
 import za.co.neroland.neroeconomy.goods.Lot;
 import za.co.neroland.neroeconomy.link.EconomyAlerts;
+import za.co.neroland.neroeconomy.trade.TradeSettings;
 import za.co.neroland.neroeconomy.trade.TradeWorld;
 
 /**
@@ -328,6 +329,29 @@ class OffersSectionTest {
         assertTrue(offers().decline(world.env, second, TradeWorld.account(recipient)).ok());
         assertTrue(send(third, recipient, List.of(), 1L, null, 0, 0L).ok());
         assertTrue(send(sender, other, List.of(), 1L, null, 0, 0L).ok());
+    }
+
+    @Test void oneSenderMayKeepOnlyAFewOffersWaitingWithOneRecipientSoAFewAltsCannotFillAnInbox() {
+        UUID sender = world.player(1, 500L);
+        UUID recipient = world.player(2, 100L);
+        UUID other = world.player(3, 100L);
+        UUID first = null;
+        for (int i = 0; i < TradeSettings.MAX_OFFERS_PER_RECIPIENT; i++) {
+            OfferOutcome sent = send(sender, recipient, List.of(), 1L, null, 0, 0L);
+            assertTrue(sent.ok());
+            if (first == null) first = sent.offer().id();
+        }
+        long balance = world.balance(sender);
+        assertEquals(OfferResult.PAIR_LIMIT, send(sender, recipient, List.of(), 1L, null, 0, 0L).result());
+        assertEquals(balance, world.balance(sender), "a refused offer escrows nothing");
+        assertEquals(TradeSettings.MAX_OFFERS_PER_RECIPIENT, offers().between(TradeWorld.account(sender),
+                TradeWorld.account(recipient)));
+        // Another recipient is not affected, and an answered offer frees its place.
+        assertTrue(send(sender, other, List.of(), 1L, null, 0, 0L).ok());
+        assertTrue(offers().decline(world.env, first, TradeWorld.account(recipient)).ok());
+        assertTrue(send(sender, recipient, List.of(), 1L, null, 0, 0L).ok());
+        // Filling the 64-offer inbox now takes at least 64 / 4 accounts.
+        assertTrue(TradeSettings.MAX_OFFERS_IN / TradeSettings.MAX_OFFERS_PER_RECIPIENT >= 16);
     }
 
     @Test void aMutedRecipientGetsNoOffersAndTheSenderIsToldNothingAboutThem() {

@@ -54,9 +54,9 @@ select the job and press Act.
 - **Only unmodified items count.** A stack that is renamed, enchanted, filled or damaged is not
   accepted. If you carry enough items but some are modified, the message says so.
 - For a delivery you must be in the destination's dimension and within 4 blocks of it.
-- The payout becomes a credit claim for you, and the goods become an item claim for the issuer.
-  Collect at a Trading Terminal, Market Board or Bank Terminal.
-- If the issuer's claim list is full, the job cannot be fulfilled until they collect.
+- The payout becomes a credit claim for you, and the goods go to the issuer's [Vault](Vault.md).
+  Collect the credits at a Trading Terminal, Market Board or Bank Terminal.
+- If the issuer's Vault is full, the job cannot be fulfilled until they take items out.
 
 Every refusal happens before anything is taken from your inventory, and the message says what is
 missing.
@@ -71,7 +71,11 @@ missing.
 
 NeroLogistics may post delivery jobs through a string-keyed runtime seam. Its absence is a no-op.
 
-A mod can also post a **server-funded** delivery job that has no player issuer. Nothing is escrowed for it:
-the payout is created when the job is fulfilled, and the delivered goods are consumed. Operators
-control this with `systemJobsEnabled` (on by default) and `systemJobDailyPayoutCap` (5000 credits of
-such jobs may be posted per day by default).
+A mod can also post a **server-funded** delivery job that has no player issuer. Its payout is moved
+from the Reserve into escrow when the job is posted, and the delivered goods are consumed. The job
+is refused when the Reserve or the day's cap cannot cover it, and an expired one returns its payout
+to the Reserve. Operators control this with `systemJobsEnabled` (on by default) and
+`systemJobDailyPayoutCap` (5000 credits of such jobs may be posted per day by default).
+
+Merchant Houses also post contracts for goods they are short of; see
+[Autonomous economy](Autonomous-Economy.md).

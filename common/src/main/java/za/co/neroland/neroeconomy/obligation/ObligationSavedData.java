@@ -308,7 +308,6 @@ public final class ObligationSavedData extends EconomySection implements EscrowH
                 stack.shrink(take);
                 remaining -= take;
             }
-            NeroEconomyCommon.CURRENCY_PROVIDER.requestSave();
             return FulfillResult.SUCCESS;
         }
         // System jobs consume the goods; a vault for the system account could never be emptied.
@@ -329,8 +328,6 @@ public final class ObligationSavedData extends EconomySection implements EscrowH
         EconomyAlerts.raise(player.level().getServer(), job.issuer(), EconomyAlerts.Kind.CONTRACT_FULFILLED,
                 LinkAlert.Severity.INFO);
         jobs.put(id, job.withState(JobState.FULFILLED)); invalidateSchedule(); setDirty();
-        // The goods have left a live inventory for a vault; get the store to disk promptly.
-        NeroEconomyCommon.CURRENCY_PROVIDER.requestSave();
         return FulfillResult.SUCCESS;
     }
 
@@ -536,12 +533,27 @@ public final class ObligationSavedData extends EconomySection implements EscrowH
                 if (proceeds > 0L) market.addCreditClaim(auction.seller(), proceeds, TransactionType.AUCTION_PAYOUT);
                 VaultStacks.deliver(EconomyStore.get(server), winner, auction.lot());
                 EconomyAlerts.raise(server, winner, EconomyAlerts.Kind.AUCTION_WON, LinkAlert.Severity.INFO);
+                announceAuction(auction.seller(), winner, net.minecraft.core.registries.BuiltInRegistries.ITEM
+                        .getKey(auction.lot().getItem()).toString(), auction.lot().getCount(), auction.highestBid(), now);
             }
             auctions.put(auction.id(), new AuctionRecord(auction.id(), auction.seller(), auction.lot(),
                     auction.minimumBid(), auction.highestBid(), auction.highestBidder(), auction.endsAt(),
                     auction.interplanetary(), JobState.FULFILLED)); changed = true;
         }
         return changed;
+    }
+
+    /**
+     * The cross-mod events of one settled auction: the seller's side (a player's auction only) and
+     * the winner's side, never in one event. The unit price is the winning bid over the count,
+     * rounded down.
+     */
+    private static void announceAuction(UUID seller, UUID winner, String item, long count, long bid, long now) {
+        if (count <= 0L) return;
+        za.co.neroland.neroeconomy.sibling.EconomyEventBus.sold(seller, item, count, bid / count,
+                za.co.neroland.neroeconomy.api.EconomyEvents.Venue.AUCTION, now);
+        za.co.neroland.neroeconomy.sibling.EconomyEventBus.bought(winner, item, count, bid / count,
+                za.co.neroland.neroeconomy.api.EconomyEvents.Venue.AUCTION, now);
     }
 
     /** Settled rows are dead weight once the audit window has passed; drop them with the ledger. */
@@ -711,6 +723,8 @@ public final class ObligationSavedData extends EconomySection implements EscrowH
                 store.vault().deliver(new PlayerAccountId(winner), List.of(auction.lot()), env.settings().vaultCap(),
                         env.settings().vaultHardBound(), env.limit());
                 winners.add(winner);
+                // The House is never named: the winner's side only.
+                announceAuction(null, winner, auction.lot().item(), auction.lot().count(), auction.highestBid(), now);
             }
             houseAuctions.put(auction.id(), auction.settled());
             changed = true;

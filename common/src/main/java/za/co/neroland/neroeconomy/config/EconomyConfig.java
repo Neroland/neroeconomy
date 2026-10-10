@@ -126,6 +126,17 @@ public final class EconomyConfig {
             "Credits of one player account's sales and purchases with other players that count toward "
                     + "reference prices per economy day, so a few accounts trading with each other cannot "
                     + "move a price far. 0 counts none.");
+    public static final ConfigValue<Integer> REFERENCE_MIN_PAIRS = SCHEMA.intRange(
+            "referenceMinPairs", 3, 1, 64, true,
+            "How many different pairs of players must have traded a commodity with each other since the "
+                    + "last simulation step before its reference price moves at all, so two accounts trading "
+                    + "with each other cannot move it. No one pair counts for more than the pair that ranks "
+                    + "this many places from the top.");
+    public static final ConfigValue<Double> REFERENCE_DRIFT_DAY_PERCENT = SCHEMA.doubleRange(
+            "referenceDriftDayPercent", 10.0D, 0.0D, 100.0D, true,
+            "The most a commodity's reference price may move in one economy day, up or down from where "
+                    + "the day began, as a percentage of the reference price in its data file. 0 keeps "
+                    + "every reference price where the day began.");
     public static final ConfigValue<Integer> NPC_AUCTIONS_PER_DAY = SCHEMA.intRange(
             "npcAuctionsPerDay", 4, 0, 64, true,
             "Auctions the Merchant Houses start from their own stock per economy day, server-wide: "
@@ -196,8 +207,27 @@ public final class EconomyConfig {
             "Most the exchange may pay in gains, dividends and newly reserved bond interest per economy day.");
     public static final ConfigValue<Long> SIBLING_DAILY_BUDGET = SCHEMA.longRange(
             "siblingDailyBudget", 5_000L, 0L, 1_000_000_000L, true,
-            "Most that deposits made by other mods without a reason of their own may draw from the "
-                    + "Reserve per economy day; a deposit past it is refused.");
+            "Most that other mods together may draw from the Reserve per economy day: payouts through "
+                    + "the cross-mod API and deposits made without a reason of their own. A payout past it is refused.");
+    public static final ConfigValue<Long> SIBLING_CALLER_DAILY_BUDGET = SCHEMA.longRange(
+            "siblingCallerDailyBudget", 2_500L, 0L, 1_000_000_000L, true,
+            "Most one other mod may pay out through the cross-mod API per economy day, unless "
+                    + "siblingCallerBudgets names it. siblingDailyBudget still caps all of them together.");
+    public static final ConfigValue<String> SIBLING_CALLER_BUDGETS = SCHEMA.string(
+            "siblingCallerBudgets", "", true,
+            "Per-mod daily payout limits that replace siblingCallerDailyBudget, as a comma-separated list "
+                    + "of modid=amount, for example neroquests=3000,nerocolonies=1500.");
+    public static final ConfigValue<Long> SIBLING_PER_PLAYER_DAILY_CAP = SCHEMA.longRange(
+            "siblingPerPlayerDailyCap", 2_000L, 0L, 1_000_000_000L, true,
+            "Most all other mods together may pay one player through the cross-mod API per economy day; "
+                    + "0 turns the cap off and keeps no per-player count.");
+    public static final ConfigValue<Long> SIBLING_MAX_SINGLE_PAYOUT = SCHEMA.longRange(
+            "siblingMaxSinglePayout", 1_000L, 1L, 1_000_000_000L, true,
+            "Largest single payout another mod may make through the cross-mod API.");
+    public static final ConfigValue<Double> SIBLING_TRANSFER_FEE_PERCENT = SCHEMA.doubleRange(
+            "siblingTransferFeePercent", 5.0D, 0.0D, 50.0D, true,
+            "Fee on a player-to-player transfer another mod makes through the cross-mod API, taken from "
+                    + "what the payee receives, rounded up and at least 1 credit; 0 charges nothing. Paid to the Reserve.");
     public static final ConfigValue<Double> MARKET_FEE_PERCENT = SCHEMA.doubleRange(
             "marketFeePercent", 2.0D, 0.0D, 50.0D, true,
             "Fee on the seller's proceeds of every Market Board sale, shop sale and filled buy offer, "
