@@ -19,7 +19,8 @@ import za.co.neroland.neroeconomy.platform.Services;
 /** Opt-out, PII-free NeroEconomy-only Sentry reporting. */
 public final class NeroEconomyTelemetry {
     static final String PLACEHOLDER_DSN = "https://REPLACE-ME@sentry.invalid/0";
-    private static final String DSN = PLACEHOLDER_DSN;
+    private static final String DSN =
+            "https://535ff9d6800f491194551d7dc5e23d64@o4511183823241216.ingest.de.sentry.io/4512233482092624";
     private static final String PACKAGE = "za.co.neroland.neroeconomy";
     public static final int MAX_EVENTS_PER_SESSION = 10;
     private static final Pattern USER_PATH = Pattern.compile(

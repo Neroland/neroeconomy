@@ -1,6 +1,6 @@
 # NeroEconomy 0.3 — progress report
 
-The running record of the 0.3.0-alpha.1 build. It is updated after every item so work can stop at
+The running record of the 0.3 build (released as 0.3.0-beta.1). It is updated after every item so work can stop at
 any point and resume from the **Next** line without redoing anything. The specification is
 `DESIGN-0.3.md`; the audit and its resolutions are `AUDIT-2026-10.md`.
 
@@ -13,7 +13,7 @@ any point and resume from the **Next** line without redoing anything. The specif
 
 ## Next
 
-All stages A–K are done for `0.3.0-alpha.1`. What remains is the owner's runtime pass in `SMOKE-TEST.md`
+All stages A–K are done; released as `0.3.0-beta.1`. What remains is the owner's runtime pass in `SMOKE-TEST.md`
 (nothing has been run in a game client) and the open items in `docs/ABUSE-REVIEW-2026-10.md`.
 
 ## Status

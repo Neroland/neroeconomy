@@ -4,7 +4,7 @@ NeroEconomy supplies the persistent credits economy for Neroland servers: a ledg
 order book, shops, direct trade and offers, standing auto-trade rules, a private Vault, an exchange
 with companies and Savings Bonds, Merchant Houses that keep the market alive, jobs and auctions,
 and a companion app that can trade for you while you are offline. These pages describe the current
-alpha release line for Minecraft 26.1.2, 26.2 and 26.3 on Fabric, Forge and NeoForge. The changelog
+beta release line for Minecraft 26.1.2, 26.2 and 26.3 on Fabric, Forge and NeoForge. The changelog
 in the repository lists what each version changed.
 
 ## Playing

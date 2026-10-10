@@ -510,7 +510,7 @@ no RNG leak, size-bomb stacks, the `untradeable` tag, renamed-item scams, `actio
 `readOnly`, per-account listing caps, bounded search cost and the creative call sites. Each has its
 missing test named in the notes above, and each is an open item below.
 
-## Open items after 0.3.0-alpha.1
+## Open items after 0.3.0-beta.1
 
 None of these is a known way to take value out of the economy. They are missing tests, a missing
 document line and two places in the companion app's server that this repository does not own.

@@ -1,8 +1,8 @@
 # NeroEconomy
 
 NeroEconomy is a server-authoritative economy for the Neroland family of Minecraft mods. It is in
-alpha: the version is `mod_version` in `gradle.properties` (`0.3.0-alpha.1` at the time of
-writing; the 0.3 work is listed under Unreleased in the changelog). It targets Minecraft 26.1.2,
+beta: the version is `mod_version` in `gradle.properties` (`0.3.0-beta.1` at the time of
+writing; the changelog lists what each version changed). It targets Minecraft 26.1.2,
 26.2 and 26.3 on Fabric, Forge, and NeoForge (nine builds) and requires Neroland Core at the version
 pinned by `nerolandcore_version` in the same file (`1.13.0`) or a newer 1.x release.
 
