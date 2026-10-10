@@ -181,7 +181,10 @@ public final class Investing {
             UUID requestId) {
         TradeResult gate = admit(server, player, requestId);
         if (!gate.ok()) return TradeQuote.refused(gate, TradeSide.BUY, stockId, units);
-        return section(server).desk().buy(env(server), account(player), stockId, units, maxSpend);
+        TradeQuote quote = section(server).desk().buy(env(server), account(player), stockId, units, maxSpend);
+        if (quote.ok()) za.co.neroland.neroeconomy.sibling.EconomyChannels.earn(server, player,
+                za.co.neroland.neroeconomy.sibling.MilestoneSection.Milestone.FIRST_INVESTMENT);
+        return quote;
     }
 
     /** See {@link ExchangeDesk#buyForCredits}. */
@@ -189,7 +192,10 @@ public final class Investing {
             UUID requestId) {
         TradeResult gate = admit(server, player, requestId);
         if (!gate.ok()) return TradeQuote.refused(gate, TradeSide.BUY, stockId, 0L);
-        return section(server).desk().buyForCredits(env(server), account(player), stockId, credits);
+        TradeQuote quote = section(server).desk().buyForCredits(env(server), account(player), stockId, credits);
+        if (quote.ok()) za.co.neroland.neroeconomy.sibling.EconomyChannels.earn(server, player,
+                za.co.neroland.neroeconomy.sibling.MilestoneSection.Milestone.FIRST_INVESTMENT);
+        return quote;
     }
 
     /** {@code units} may be {@link Quotes#ALL}. */
@@ -212,7 +218,10 @@ public final class Investing {
             UUID requestId) {
         TradeResult gate = admit(server, player, requestId);
         if (!gate.ok()) return BondOutcome.refused(gate);
-        return section(server).desk().buyBond(env(server), account(player), term, principal, requestId);
+        BondOutcome bought = section(server).desk().buyBond(env(server), account(player), term, principal, requestId);
+        if (bought.ok()) za.co.neroland.neroeconomy.sibling.EconomyChannels.earn(server, player,
+                za.co.neroland.neroeconomy.sibling.MilestoneSection.Milestone.FIRST_BOND);
+        return bought;
     }
 
     /** See {@link ExchangeDesk#redeemBond}. */

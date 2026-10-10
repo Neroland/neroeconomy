@@ -47,14 +47,25 @@ EconomyResult r = caller.transfer(server, payer, payee, amount, "reason_a", requ
 if (!r.ok()) player.sendSystemMessage(Component.translatable(r.translationKey()));
 ```
 
-- Claim from common init; a mod id can be claimed once, only by a loaded mod, and not after the server
-  starts. Reason codes are a closed set of `[a-z0-9_]{1,32}`.
+- Claim from common init; a mod id can be claimed once, only by a loaded mod, and not after the first
+  server has started. Reason codes are a closed set of `[a-z0-9_]{1,32}`, at most 32.
+- `SiblingEconomy.API_VERSION` is 1; it rises by one with every add-only change.
 - Payouts are refused **before anything moves** when the Reserve, the calling mod's daily budget
-  (`siblingCallerDailyBudget`, 2,500 by default, overridable per mod), the shared sibling budget
+  (`siblingCallerDailyBudget`, 2,500 by default, overridable per mod in `siblingCallerBudgets`, a
+  comma-separated `modid=amount` list such as `neroquests=3000,nerocolonies=1500`), the shared sibling budget
   (`siblingDailyBudget`, 5,000) or the player's daily total from all mods (`siblingPerPlayerDailyCap`,
   2,000) cannot cover them. One payout is at most `siblingMaxSinglePayout` (1,000).
-- A request key (at most 64 characters, never a UUID or a name) makes a retry safe: the same key within
-  24 hours returns `DUPLICATE` and moves nothing. `null` means no replay protection.
+- A request key (1 to 64 characters of `A-Z a-z 0-9 _ . : / # -`, never a UUID or a name; a key that
+  reads as a UUID or holds 32 hex digits in a row is refused as `INVALID`) makes a retry safe: the same
+  key from the same mod within 24 economy-hours returns `DUPLICATE` and moves nothing. Only an applied
+  request's key is remembered, so a refused one may be retried with the same key. `null` means no replay
+  protection.
+- Calls are rate-limited per calling mod (burst 64, 16 a second): `RATE_LIMITED`.
+- Each ledger row carries the origin `<modid>/<reason>`, which operators and the player's own data
+  export see.
+- `deposit`/`withdraw`/`balance` move credits between a player and the caller's own accounts
+  (`new ForeignAccountId("<modid>", "<id>")`, for example a faction treasury); a caller can only touch
+  accounts of its own kind.
 - Core's untyped `CurrencyApi.deposit` still works, counted against the shared budget only.
 
 ## Class-free channels
@@ -65,15 +76,19 @@ These need no NeroEconomy class: only Neroland Core. Scopes name places, sectors
 
 | Channel | Scope | Value | Threshold | `rising` |
 | --- | --- | --- | --- | --- |
-| `neroeconomy:sector_index` | Sector word (`mining`, `space`, …) | Sector index in hundredths of a credit | Each configured band (`sectorBands`, ±5 % and ±10 % of the day's open) | `true` above the band, `false` back below |
+| `neroeconomy:sector_index` | Sector word (`mining`, `space`, …) | Sector index in hundredths of a credit | The level of each configured band (`sectorBands`, ±5 % and ±10 % of the day's open) | Upper band: `true` above it, `false` back below. Lower band: `false` below it, `true` back above |
 | `neroeconomy:market_shock` | Item id or `#tag` | Multiplier × 1000 | 1000 | `true` when a shock starts, `false` when it ends |
 | `neroeconomy:reserve` | `world` | The Reserve's balance | `reserveAlertLow` (25,000) | `false` when it falls below, `true` when it recovers |
-| `neroeconomy:house_stock` | Commodity key | Units a Merchant House holds | 0 | `false` when a House sells out |
+| `neroeconomy:house_stock` | Commodity key | Units a Merchant House holds | 0 | `false` when a House sells out, `true` when it has stock again |
+
+The Reserve, House stock and sector channels are checked every 30 seconds (the market-sweep cadence);
+the first check after a start only records where each value stands, so a restart announces nothing.
+A shock's channel fires when it is applied, cleared or lapses.
 
 ### Accepted by NeroEconomy: market-shock requests (added in 0.3.0)
 
 Fire a crossing on channel `<yourmod>:market_shock_request`, where `<yourmod>` is listed in NeroEconomy's
-`shockSources` config (default `["neroevents"]`):
+`shockSources` config (a comma-separated list, default `neroevents`):
 
 | Field | Meaning |
 | --- | --- |

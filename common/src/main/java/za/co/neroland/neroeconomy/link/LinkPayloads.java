@@ -260,7 +260,7 @@ public final class LinkPayloads {
             case MARKET_PAYOUT -> "sale";
             case MARKET_ESCROW -> "escrow";
             case ESCROW_REFUND -> "refund";
-            case PLAYER_PAYMENT -> "transfer";
+            case PLAYER_PAYMENT, FOREIGN_DEPOSIT, FOREIGN_WITHDRAWAL -> "transfer";
             case CONTRACT_PAYOUT, BOUNTY_PAYOUT, AUCTION_PAYOUT -> "payout";
             case AUCTION_BID -> "bid";
             case STARTING_BALANCE, DEPOSIT, CREDIT_CHIP_REDEMPTION -> "deposit";

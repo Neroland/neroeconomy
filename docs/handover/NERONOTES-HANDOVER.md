@@ -59,4 +59,5 @@ NeroNotesIntegrations.setExchangerPricing(new ExchangerPricing() {
 ## Privacy
 
 The author UUID is passed to NeroEconomy only to route the royalty. The composer sees the credit in their
-own history as a payment with source `neronotes/library_copy`; neither side is shown the other.
+own history as a payment; the ledger row carries the origin `neronotes/library_copy` (shown to operators
+and in the composer's own data export), and neither side is shown the other.

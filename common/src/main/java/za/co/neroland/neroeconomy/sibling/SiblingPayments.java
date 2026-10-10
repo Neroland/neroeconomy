@@ -6,7 +6,9 @@ import java.util.Set;
 import java.util.UUID;
 
 import za.co.neroland.neroeconomy.NeroEconomyCommon;
+import za.co.neroland.neroeconomy.api.AccountId;
 import za.co.neroland.neroeconomy.api.EconomyResult;
+import za.co.neroland.neroeconomy.api.ForeignAccountId;
 import za.co.neroland.neroeconomy.api.PlayerAccountId;
 import za.co.neroland.neroeconomy.api.SystemAccountId;
 import za.co.neroland.neroeconomy.config.EconomyConfig;
@@ -113,6 +115,45 @@ public final class SiblingPayments {
                 SiblingRules.origin(modId, reason)));
         if (result == EconomyResult.APPLIED && requestKey != null) store.sibling().remember(modId, requestKey, now);
         return finish(modId, reason, "transfer", result);
+    }
+
+    /** Player to one of the caller's own accounts ({@code kind} = its mod id). Unvested credits cannot be used. */
+    public static EconomyResult deposit(EconomyStore store, String modId, Set<String> reasons, UUID player,
+            AccountId to, long amount, String reason, String requestKey) {
+        if (player == null || !ownAccount(modId, to) || amount < 1L) return EconomyResult.INVALID;
+        return foreignMove(store, modId, reasons, LedgerPlan.builder().movePlayerFacing(new PlayerAccountId(player), to,
+                amount, TransactionType.FOREIGN_DEPOSIT).build(), reason, requestKey, "deposit");
+    }
+
+    /** One of the caller's own accounts to a player. */
+    public static EconomyResult withdraw(EconomyStore store, String modId, Set<String> reasons, AccountId from,
+            UUID player, long amount, String reason, String requestKey) {
+        if (player == null || !ownAccount(modId, from) || amount < 1L) return EconomyResult.INVALID;
+        return foreignMove(store, modId, reasons, LedgerPlan.builder().move(from, new PlayerAccountId(player), amount,
+                TransactionType.FOREIGN_WITHDRAWAL).build(), reason, requestKey, "withdraw");
+    }
+
+    /** What one of the caller's own accounts holds; 0 for an account of another kind or with no store. */
+    public static long balance(EconomyStore store, String modId, AccountId account) {
+        if (store == null || !ownAccount(modId, account)) return 0L;
+        return store.ledger().getBalance(account, NeroEconomyCommon.CREDITS);
+    }
+
+    private static boolean ownAccount(String modId, AccountId account) {
+        return account instanceof ForeignAccountId foreign && foreign.kind().equals(modId);
+    }
+
+    private static EconomyResult foreignMove(EconomyStore store, String modId, Set<String> reasons, LedgerPlan plan,
+            String reason, String requestKey, String call) {
+        EconomyResult refused = guard(store, modId, reasons, reason, requestKey);
+        if (refused != null) return finish(modId, reason, call, refused);
+        long now = store.ledger().now();
+        if (requestKey != null && !store.sibling().hasKeyRoom(now))
+            return finish(modId, reason, call, EconomyResult.RATE_LIMITED);
+        EconomyResult result = map(NeroEconomyCommon.CURRENCY_PROVIDER.executeOn(store.ledger(), plan,
+                SiblingRules.origin(modId, reason)));
+        if (result == EconomyResult.APPLIED && requestKey != null) store.sibling().remember(modId, requestKey, now);
+        return finish(modId, reason, call, result);
     }
 
     /** The refuse-before-move decision for {@link #pay}: nothing moves, nothing is counted, no rate token is spent. */

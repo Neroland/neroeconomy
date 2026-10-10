@@ -39,6 +39,9 @@ public final class MilestoneSection extends EconomySection {
         /** The gate path and data-file name, such as {@code first_sale}. */
         public String id() { return name().toLowerCase(Locale.ROOT); }
 
+        /** The lang key of the gate's title, for a quest pack or screen that shows it. */
+        public String translationKey() { return "gate.neroeconomy." + id(); }
+
         long bit() { return 1L << ordinal(); }
     }
 
@@ -100,7 +103,8 @@ public final class MilestoneSection extends EconomySection {
 
     /** The gate of {@code milestone} was opened for {@code player}. */
     public synchronized void opened(UUID player, Milestone milestone) {
-        Row row = player == null || milestone == null ? null : rows.get(player);
+        if (player == null || milestone == null) return;
+        Row row = rows.get(player);
         if (row == null || (row.pending() & milestone.bit()) == 0L) return;
         rows.put(player, new Row(row.earned(), row.pending() & ~milestone.bit(), row.sales()));
         setDirty();

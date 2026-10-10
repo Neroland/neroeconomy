@@ -58,7 +58,9 @@ NeroEconomy's `EconomyEvents`:
 | `onFilled` | A resting order filled (owner may be offline) | owner UUID, item id, quantity, unit price, side |
 | `onSiblingPaid` | A budgeted payout from any mod landed | player UUID, mod id, reason, amount |
 
-Events never name the other party. Count them against the quest; do not store them anywhere else.
+Events are queued where the trade settles and handed to listeners at the end of that server tick, so a
+listener may make economy calls of its own. Events never name the other party. Count them against the
+quest; do not store them anywhere else.
 Exclude `onSiblingPaid` with `modId == "neroquests"` from "earned", or quest rewards will complete
 "earn N" quests by themselves.
 

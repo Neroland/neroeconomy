@@ -61,6 +61,8 @@ public final class PlayerDataExport {
         json.add("remote_spend", EconomyStore.get(server).remoteSpend().exportFor(player));
         // What other mods paid the subject through the cross-mod API in the current economy-day.
         json.add("sibling_payouts", EconomyStore.get(server).sibling().exportFor(player));
+        // The subject's economy milestones, and the gates still waiting to open for them.
+        json.add("milestones", EconomyStore.get(server).milestones().exportFor(player));
         return json;
     }
 

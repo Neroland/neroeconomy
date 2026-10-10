@@ -19,8 +19,8 @@ A shock multiplies the price of an item or tag for a while, clamped to NeroEcono
 | `threshold` | Duration in economy-minutes, 1 … `shockMaxMinutes` (1,440 by default) |
 | `rising` | `true` applies the shock, `false` ends the shock on that key early |
 
-NeroEconomy accepts requests only from mods listed in its `shockSources` config (default
-`["neroevents"]`), allows at most `maxActiveShocks` (64) at once and ignores a malformed request.
+NeroEconomy accepts requests only from loaded mods listed in its `shockSources` config (a
+comma-separated list, default `neroevents`), allows at most `maxActiveShocks` (64) at once and ignores a malformed request.
 
 **Typed (exists since 0.2).** `MarketShocks.applyShock(String tagOrItem, double multiplier, Duration)`,
 compiled `compileOnly` against NeroEconomy's jar behind `isModLoaded("neroeconomy")`.

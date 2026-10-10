@@ -61,6 +61,27 @@ public final class EconomyCaller {
         return SiblingPayments.transfer(store(server), modId, reasons, payer, payee, amount, reason, requestKey);
     }
 
+    /**
+     * Player to one of this caller's own accounts ({@link ForeignAccountId} with {@code kind} =
+     * {@link #modId()}), such as a faction treasury. A starting balance that has not vested cannot
+     * be used. Any other account is {@code INVALID}.
+     */
+    public EconomyResult deposit(MinecraftServer server, UUID player, AccountId to, long amount, String reason,
+            String requestKey) {
+        return SiblingPayments.deposit(store(server), modId, reasons, player, to, amount, reason, requestKey);
+    }
+
+    /** One of this caller's own accounts to a player. Never funded by the Reserve. */
+    public EconomyResult withdraw(MinecraftServer server, AccountId from, UUID player, long amount, String reason,
+            String requestKey) {
+        return SiblingPayments.withdraw(store(server), modId, reasons, from, player, amount, reason, requestKey);
+    }
+
+    /** What one of this caller's own accounts holds; 0 for an account of another kind. */
+    public long balance(MinecraftServer server, AccountId account) {
+        return SiblingPayments.balance(store(server), modId, account);
+    }
+
     /** Whether {@link #pay} of {@code amount} would pass the Reserve and budget checks now; nothing moves or is counted. */
     public EconomyResult canPay(MinecraftServer server, UUID player, long amount) {
         return SiblingPayments.canPay(store(server), modId, player, amount);

@@ -57,6 +57,8 @@ public final class NeroEconomyCommon {
         //    currency eraser reaches ServerCurrencyProvider.forgetPlayer, which is deliberately empty.
         //    New stores' erasers go first (house rule): what other mods paid the player today.
         PlayerDataErasure.register(za.co.neroland.neroeconomy.sibling.SiblingSection::eraseFor);
+        //    And the player's economy milestones and the gates waiting to open for them.
+        PlayerDataErasure.register(za.co.neroland.neroeconomy.sibling.MilestoneSection::eraseFor);
         PlayerDataErasure.register(EconomySavedData::eraseFor);
         PlayerDataErasure.register(ShopOwnershipState::eraseFor);
         PlayerDataErasure.register(ObligationSavedData::eraseFor);
@@ -85,6 +87,8 @@ public final class NeroEconomyCommon {
         Services.PLATFORM.getPlatformName();
         Services.NETWORK.getClass();
         NeroEconomyNetwork.init();
+        // The class-free channels to other mods: shock requests in, milestone counting out.
+        za.co.neroland.neroeconomy.sibling.EconomyChannels.init();
         // The trading rules' simulation handlers, after the housekeeping ones the pipeline starts with.
         TradingSteps.register(Simulation.PIPELINE, context -> Trading.env(context.store()));
         // The exchange's price step. Not housekeeping: autonomousEconomy=false switches it off.

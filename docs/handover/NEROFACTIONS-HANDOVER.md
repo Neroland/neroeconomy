@@ -43,7 +43,10 @@ caller.balance(server, treasury);
 ```
 
 Only `nerofactions` can move `nerofactions` accounts. Balances survive restarts and count in the
-economy's supply checks. A faction id is not personal data.
+economy's supply checks; `/eco admin supply` shows one total per mod. A faction id is not personal data;
+the account value is `[a-z0-9_.:/-]{1,64}` (a lower-case faction UUID fits), never a name. A member's
+unvested starting credits cannot be paid into a treasury (`FUNDS_LOCKED`). A `FactionAccountId` (kind
+`faction`) is still refused by the ledger.
 
 | Reason code | When |
 | --- | --- |

@@ -228,6 +228,24 @@ public final class EconomyConfig {
             "siblingTransferFeePercent", 5.0D, 0.0D, 50.0D, true,
             "Fee on a player-to-player transfer another mod makes through the cross-mod API, taken from "
                     + "what the payee receives, rounded up and at least 1 credit; 0 charges nothing. Paid to the Reserve.");
+    public static final ConfigValue<Long> RESERVE_ALERT_LOW = SCHEMA.longRange(
+            "reserveAlertLow", 25_000L, 0L, 1_000_000_000_000L, true,
+            "Reserve level other mods are told about through Core (neroeconomy:reserve): once when it "
+                    + "falls below this, once when it recovers.");
+    public static final ConfigValue<String> SECTOR_BANDS = SCHEMA.string(
+            "sectorBands", "5,10", true,
+            "Percent moves from a sector's day open that other mods are told about through Core "
+                    + "(neroeconomy:sector_index), as a comma-separated list, for example 5,10.");
+    public static final ConfigValue<String> SHOCK_SOURCES = SCHEMA.string(
+            "shockSources", "neroevents", true,
+            "Mods whose market-shock requests through Core (<modid>:market_shock_request) are applied, as a "
+                    + "comma-separated list of mod ids. Empty hears none.");
+    public static final ConfigValue<Integer> SHOCK_MAX_MINUTES = SCHEMA.intRange(
+            "shockMaxMinutes", 1440, 1, 43200, true,
+            "Longest market shock another mod may request, in economy-minutes.");
+    public static final ConfigValue<Integer> MAX_ACTIVE_SHOCKS = SCHEMA.intRange(
+            "maxActiveShocks", 64, 0, 4096, true,
+            "Most market shocks requested by other mods that may be active at once.");
     public static final ConfigValue<Double> MARKET_FEE_PERCENT = SCHEMA.doubleRange(
             "marketFeePercent", 2.0D, 0.0D, 50.0D, true,
             "Fee on the seller's proceeds of every Market Board sale, shop sale and filled buy offer, "

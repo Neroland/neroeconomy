@@ -68,7 +68,11 @@ public enum TransactionType {
     /** What a Merchant House holds above its working capital, swept back to the Reserve. */
     HOUSE_SWEEP,
     /** The fee another mod's player-to-player transfer takes, from the payer to the Reserve. */
-    SIBLING_FEE;
+    SIBLING_FEE,
+    /** A player paying into another mod's account (a faction treasury, say). */
+    FOREIGN_DEPOSIT,
+    /** Another mod's account paying a player. */
+    FOREIGN_WITHDRAWAL;
 
     /** Whether this reason may create credits. */
     public boolean mints() {

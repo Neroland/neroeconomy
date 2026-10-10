@@ -213,6 +213,11 @@ public final class EconomyCommands {
         long[] held = EconomyStore.get(source.getServer()).exchange().desk().heldParts();
         source.sendSuccess(() -> Component.translatable("command.neroeconomy.supply.exchange_held",
                 report.exchangeHeld(), held[0], held[1], held[2]), false);
+        // Other mods' accounts, one line per mod; one whose mod no longer claims them is marked.
+        EconomyStore.get(source.getServer()).ledger().foreignBalances().forEach((kind, amount) -> source.sendSuccess(
+                () -> Component.translatable(za.co.neroland.neroeconomy.sibling.CallerRegistry.GAME.claimed(kind)
+                        ? "command.neroeconomy.supply.foreign" : "command.neroeconomy.supply.foreign_orphan", kind,
+                        amount), false));
         source.sendSuccess(() -> checkLine("command.neroeconomy.supply.check_supply", report.supplyBalanced()), false);
         source.sendSuccess(() -> checkLine("command.neroeconomy.supply.check_escrow", report.escrowBalanced()), false);
         source.sendSuccess(() -> checkLine("command.neroeconomy.supply.check_exchange", report.exchangeBalanced()), false);

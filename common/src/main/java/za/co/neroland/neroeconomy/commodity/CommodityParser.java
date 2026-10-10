@@ -218,6 +218,16 @@ public final class CommodityParser {
      */
     public static CommodityRegistry registry(Map<String, JsonElement> files, double defaultSpreadPercent,
             CommodityCatalog catalog) {
+        return registry(files, Map.of(), defaultSpreadPercent, catalog);
+    }
+
+    /**
+     * {@link #registry(Map, double, CommodityCatalog)} with other mods' code defaults
+     * ({@link CommodityDefaults#files()}): read after every data file, and a default whose key a data
+     * entry already has is left out, so data always wins.
+     */
+    public static CommodityRegistry registry(Map<String, JsonElement> files, Map<String, JsonElement> codeDefaults,
+            double defaultSpreadPercent, CommodityCatalog catalog) {
         List<CommodityDefinition> definitions = new ArrayList<>();
         List<Integer> places = new ArrayList<>();
         List<Problem> problems = new ArrayList<>();
@@ -240,6 +250,18 @@ public final class CommodityParser {
             ParsedFile parsed = parseFile(file.getKey(), file.getValue(), defaultSpreadPercent);
             definitions.addAll(parsed.definitions());
             places.addAll(parsed.entries());
+            problems.addAll(parsed.problems());
+        }
+        java.util.Set<String> fromData = new java.util.HashSet<>();
+        for (CommodityDefinition definition : definitions) fromData.add(definition.key());
+        if (codeDefaults != null) for (Map.Entry<String, JsonElement> file : new TreeMap<>(codeDefaults).entrySet()) {
+            read++;
+            ParsedFile parsed = parseFile(file.getKey(), file.getValue(), defaultSpreadPercent);
+            for (int index = 0; index < parsed.definitions().size(); index++) {
+                if (fromData.contains(parsed.definitions().get(index).key())) continue;
+                definitions.add(parsed.definitions().get(index));
+                places.add(parsed.entries().get(index));
+            }
             problems.addAll(parsed.problems());
         }
         int[] entries = new int[places.size()];

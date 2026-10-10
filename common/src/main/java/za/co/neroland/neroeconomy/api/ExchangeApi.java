@@ -79,6 +79,28 @@ public final class ExchangeApi {
      */
     public record BondQuote(String id, String nameKey, int days, int rateBasisPoints) { }
 
+    /**
+     * A sector index: the equal-weighted mean of the prices of the sector's listed companies.
+     *
+     * @param sector               the sector word; its name is the lang key {@code sector.neroeconomy.<sector>}
+     * @param indexCents           the index now
+     * @param dayOpenCents         the index at the start of the economy-day
+     * @param dayChangeBasisPoints how far the index is from its day open, in hundredths of a percent
+     * @param members              how many listed companies it averages
+     */
+    public record SectorQuote(String sector, long indexCents, long dayOpenCents, int dayChangeBasisPoints, int members) { }
+
+    /** Every sector with at least one listed company, in sector order. Delisted companies are left out. */
+    public static List<SectorQuote> sectors(MinecraftServer server) {
+        return za.co.neroland.neroeconomy.sibling.Sectors.of(stocks(server));
+    }
+
+    /** One sector's index, or empty when it has no listed company. */
+    public static Optional<SectorQuote> sector(MinecraftServer server, String sector) {
+        if (sector == null) return Optional.empty();
+        return sectors(server).stream().filter(quote -> quote.sector().equals(sector)).findFirst();
+    }
+
     /** Whether the exchange is switched on ({@code exchangeEnabled}); prices stand still while it is off. */
     public static boolean enabled() { return EconomyConfig.EXCHANGE_ENABLED.get(); }
 

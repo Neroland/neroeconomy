@@ -127,6 +127,8 @@ public final class ServerCurrencyProvider implements CurrencyProvider {
             sweepMarket(currentServer, now);
             // Vesting needs the players who are online, so it stays on this cadence too.
             sweepVesting(currentServer);
+            // The Reserve's level and the Houses' stock, told to other mods through Core.
+            za.co.neroland.neroeconomy.sibling.EconomyChannels.sweep(currentServer);
             // Prototypes nothing refers to are dropped before the backup below is refreshed.
             EconomyStore.get(currentServer).goods().sweepIfDue(System.currentTimeMillis());
             refreshBackups(currentServer);
@@ -142,8 +144,10 @@ public final class ServerCurrencyProvider implements CurrencyProvider {
         za.co.neroland.neroeconomy.direct.DirectTrades.tick(currentServer);
         // The gallery's sample tickers and Auto-Trader loop move on their labels; nothing else is touched.
         za.co.neroland.neroeconomy.command.GalleryBuilder.tick(currentServer);
-        // Economy events for other mods, queued where each operation settled, are handed out last.
+        // Economy events for other mods, queued where each operation settled, are handed out last;
+        // then the milestone gates of players who are online.
         za.co.neroland.neroeconomy.sibling.EconomyEventBus.drain();
+        za.co.neroland.neroeconomy.sibling.EconomyChannels.tick(currentServer);
         runHook(tickHook);
     }
 
@@ -169,6 +173,7 @@ public final class ServerCurrencyProvider implements CurrencyProvider {
             // And the cross-mod API's per-caller rate buckets.
             za.co.neroland.neroeconomy.sibling.SiblingPayments.clear();
             za.co.neroland.neroeconomy.sibling.EconomyEventBus.clearPending();
+            za.co.neroland.neroeconomy.sibling.EconomyChannels.clear();
             // A new session reports each failing simulation handler once again.
             Simulation.reset();
             // Nor whatever the companion-app module holds per player.

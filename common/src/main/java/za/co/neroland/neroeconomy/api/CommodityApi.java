@@ -157,6 +157,60 @@ public final class CommodityApi {
         return EconomyStore.get(server).houses().quote(definition.key()).map(CommodityApi::houseQuote);
     }
 
+    /**
+     * The commodity's reference price in whole credits, as it has drifted; empty when the item is no
+     * commodity or not quoted yet. A thin wrapper over {@link #houseQuote}.
+     */
+    public static java.util.OptionalLong referencePrice(MinecraftServer server, String itemId) {
+        Optional<HouseQuote> quote = houseQuote(server, itemId);
+        return quote.isPresent() ? java.util.OptionalLong.of(quote.get().referencePrice()) : java.util.OptionalLong.empty();
+    }
+
+    /** What a Merchant House pays for one unit now; empty when it does not buy it now. */
+    public static java.util.OptionalLong bid(MinecraftServer server, String itemId) {
+        Optional<HouseQuote> quote = houseQuote(server, itemId);
+        return quote.isPresent() && quote.get().buys() && quote.get().bid() > 0L
+                ? java.util.OptionalLong.of(quote.get().bid()) : java.util.OptionalLong.empty();
+    }
+
+    /** What a Merchant House sells one unit for now; empty when it does not sell it now. */
+    public static java.util.OptionalLong ask(MinecraftServer server, String itemId) {
+        Optional<HouseQuote> quote = houseQuote(server, itemId);
+        return quote.isPresent() && quote.get().sells() && quote.get().ask() > 0L
+                ? java.util.OptionalLong.of(quote.get().ask()) : java.util.OptionalLong.empty();
+    }
+
+    // --- registration by other mods -------------------------------------------------------------
+
+    /**
+     * A default commodity another mod registers in code: the same fields and limits as one data
+     * entry; a null field takes the class's default.
+     *
+     * @param key an item id in the caller's namespace, or a tag {@code #<caller>:...} / {@code #c:...}
+     */
+    public record CommoditySpec(String key, long referencePrice, CommodityClass commodityClass, Long npcDailySupply,
+            Long npcDailyDemand, Long perAccountDailyBuy, Long perAccountDailySell, Double elasticity, Double recovery,
+            String house, String sector) { }
+
+    /** What a registration did. */
+    public enum Registration { ACCEPTED, BAD_CALLER, BAD_KEY, FOREIGN_KEY, INVALID, TOO_LATE, TOO_MANY }
+
+    /**
+     * Adds a default commodity; call from common init. A data-pack entry for the same key always
+     * wins; the default loads only when its items resolve and passes the arbitrage guard like data.
+     */
+    public static Registration registerDefault(String callerModId, CommoditySpec spec) {
+        return za.co.neroland.neroeconomy.commodity.CommodityDefaults.GAME.register(callerModId, spec);
+    }
+
+    /**
+     * Never treats unmodified stacks of this item (in the caller's namespace) as a commodity, whatever
+     * the data says: for items whose value lives in their components. Call from common init.
+     */
+    public static Registration exclude(String callerModId, String itemId) {
+        return za.co.neroland.neroeconomy.commodity.CommodityDefaults.GAME.exclude(callerModId, itemId);
+    }
+
     private static HouseQuote houseQuote(HouseSection.Quote quote) {
         return new HouseQuote(quote.key(), quote.house(), Math.round(quote.referenceMillis() / 1_000.0D),
                 quote.referenceMillis(), quote.ask(), quote.bid(), quote.sells(), quote.buys(), quote.stock(),

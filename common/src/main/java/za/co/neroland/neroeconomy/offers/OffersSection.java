@@ -301,6 +301,9 @@ public final class OffersSection extends EconomySection implements LotHolder, Es
         for (Lot lot : offer.lots()) VaultGoods.deliver(store, env, recipient, lot);
         setDirty();
         env.alerts().raise(sender, EconomyAlerts.Kind.OFFER_ACCEPTED);
+        // The sender's milestone: an offer of theirs was accepted.
+        if (senderId != null) store.milestones().earn(senderId,
+                za.co.neroland.neroeconomy.sibling.MilestoneSection.Milestone.FIRST_OFFER_ACCEPTED);
         return new OfferOutcome(OfferResult.OK, offer, recipientGets, offer.askCredits(), senderGets,
                 taxOnGiven + taxOnAsked, false);
     }

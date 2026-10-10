@@ -631,6 +631,16 @@ public final class EconomySavedData extends EconomySection implements CurrencyPr
 
     public synchronized boolean reserveSeeded() { return reserve.seeded(); }
 
+    /** What other mods' accounts hold, summed per mod id (kind), in kind order. Aggregates only. */
+    public synchronized Map<String, Long> foreignBalances() {
+        Map<String, Long> out = new java.util.TreeMap<>();
+        balances.forEach((account, balance) -> {
+            if (account instanceof za.co.neroland.neroeconomy.api.ForeignAccountId)
+                out.merge(account.kind(), balance, EconomySavedData::saturatingAdd);
+        });
+        return out;
+    }
+
     // --- vesting -----------------------------------------------------------------------------
 
     /** Ends the lock on a starting grant: the account has reached the play time that vests it. */
@@ -925,8 +935,13 @@ public final class EconomySavedData extends EconomySection implements CurrencyPr
      */
     private static AccountId canonical(AccountId account) {
         if (account == null) return null;
-        if (account instanceof PlayerAccountId || account instanceof SystemAccountId) return account;
-        return parseAccount(account.kind(), account.value());
+        if (account instanceof PlayerAccountId || account instanceof SystemAccountId
+                || account instanceof za.co.neroland.neroeconomy.api.ForeignAccountId) return account;
+        // Another implementation is read as a player or system account only: another mod's account
+        // must be a ForeignAccountId, which only its claimed caller moves (NeroFactions' own
+        // FactionAccountId is refused here, as before).
+        AccountId parsed = parseAccount(account.kind(), account.value());
+        return parsed instanceof za.co.neroland.neroeconomy.api.ForeignAccountId ? null : parsed;
     }
 
     private static long saturatingAdd(long left, long right) {
@@ -949,7 +964,9 @@ public final class EconomySavedData extends EconomySection implements CurrencyPr
     /** A system account by its stable name; a player by salted pseudonym, or blank when opted out. */
     private String pseudonym(AccountId account) {
         if (account == null) return "";
-        if (account instanceof SystemAccountId) return account.stableKey();
+        // Another mod's account is not personal either: it is written as it is.
+        if (account instanceof SystemAccountId || account instanceof za.co.neroland.neroeconomy.api.ForeignAccountId)
+            return account.stableKey();
         return loggingOptOut.contains(account) ? "" : reference(account);
     }
 
@@ -1180,7 +1197,8 @@ public final class EconomySavedData extends EconomySection implements CurrencyPr
     private static AccountId parseAccount(String kind, String value) {
         if (kind == null || value == null) return null;
         if (SystemAccountId.KIND.equals(kind)) return SystemAccountId.parse(value);
-        if (!"player".equals(kind)) return null;
+        // Another mod's account is kept whether or not that mod is loaded now, so its credits are never lost.
+        if (!"player".equals(kind)) return za.co.neroland.neroeconomy.api.ForeignAccountId.parse(kind, value);
         try { return new PlayerAccountId(UUID.fromString(value)); }
         catch (IllegalArgumentException ignored) { return null; }
     }

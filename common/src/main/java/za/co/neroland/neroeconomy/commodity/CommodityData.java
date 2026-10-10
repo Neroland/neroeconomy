@@ -256,7 +256,8 @@ public final class CommodityData {
         }
         CommodityRegistry loaded;
         try {
-            loaded = CommodityParser.registry(files, EconomyConfig.COMMODITY_SPREAD_PERCENT.get(), GAME);
+            loaded = CommodityParser.registry(files, CommodityDefaults.GAME.files(),
+                    EconomyConfig.COMMODITY_SPREAD_PERCENT.get(), GAME);
         } catch (RuntimeException | LinkageError failure) {
             NeroEconomyCommon.LOGGER.warn("[NeroEconomy] The commodity data files could not be resolved ({}); the "
                     + "Merchant Houses keep the commodities they had.", failure.getClass().getName());
@@ -383,6 +384,8 @@ public final class CommodityData {
             Holder<Item> holder = id == null ? null : BuiltInRegistries.ITEM.get(id).orElse(null);
             if (holder == null) return null;
             if (holder.is(MarketSavedData.UNTRADEABLE)) return UNTRADEABLE;
+            // Another mod excluded it in code: its value lives in its components.
+            if (CommodityDefaults.GAME.excluded(item)) return NEVER_COMMODITY;
             return holder.is(NEVER_COMMODITY_TAG) ? NEVER_COMMODITY : null;
         }
     };
