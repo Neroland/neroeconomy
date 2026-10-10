@@ -13,9 +13,8 @@ any point and resume from the **Next** line without redoing anything. The specif
 
 ## Next
 
-**H5b — app screens and widget tests** (brief `build/briefs/H5b.md`, in `../nerolink-app`). H5a is done and staged
-(models, fixtures from the golden samples, repository, contract/privacy tests; analyze clean, 170 tests pass in the VM).
-Then H7 (offline proof), then Stage I.
+All stages A–K are done for `0.3.0-alpha.1`. What remains is the owner's runtime pass in `SMOKE-TEST.md`
+(nothing has been run in a game client) and the open items in `docs/ABUSE-REVIEW-2026-10.md`.
 
 ## Status
 

@@ -4,7 +4,7 @@
 
 ## Status and scope
 
-NeroEconomy is in alpha: the 0.1.0 feature set, hardened by an audit-remediation pass. The version
+NeroEconomy is in alpha: the 0.3 feature set, hardened by an audit-remediation pass. The version
 is `mod_version` in `gradle.properties` and the Core pin is `nerolandcore_version` in the same file;
 point at those keys instead of repeating the numbers. It provides the persistent credits provider
 for Neroland Core, privacy-aware ledger, bank and trading terminals, owned offline shops, escrowed

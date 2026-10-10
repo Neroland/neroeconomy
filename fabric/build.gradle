@@ -43,7 +43,8 @@ dependencies {
     testImplementation 'org.junit.jupiter:junit-jupiter'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
-tasks.named('test', Test) { useJUnitPlatform() }
+// Benchmarks (tagged 'benchmark') run only when asked for: gradlew <node>:test -Pbenchmarks
+tasks.named('test', Test) { useJUnitPlatform { if (!project.hasProperty('benchmarks')) excludeTags 'benchmark' } }
 
 dependencies {
     minecraft "com.mojang:minecraft:${mc}"

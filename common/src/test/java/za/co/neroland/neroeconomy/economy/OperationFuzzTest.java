@@ -173,7 +173,9 @@ class OperationFuzzTest {
     }
 
     @Test void aCrashAtAnyPointLosesNothingAndTheRunCarriesOnExactlyAsIfItHadNotHappened() {
-        for (long seed : new long[] {1L, 7L}) {
+        // Seeds 1 and 3 once diverged after a reload in a Merchant House step (the pair tally; see
+        // OperationFuzzer and HouseSectionTest#aRestartDropsTheStepsPairTallyWhetherItCrashedOrStoppedCleanly).
+        for (long seed : new long[] {1L, 3L, 7L}) {
             // Forty-odd points picked at random, the same ones for both runs.
             Random picker = new Random(seed * 31L + 5L);
             Set<Integer> points = new HashSet<>();

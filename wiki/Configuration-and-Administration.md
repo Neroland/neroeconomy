@@ -25,7 +25,7 @@ Every key the mod reads is listed below, with its default, its bounds and its me
 | `reserveCap` | 2,000,000 | 0 to 1,000,000,000,000 | The daily top-up stops when the Reserve holds this much; fees may still take it higher. |
 | `npcDailyBudget` | 20,000 | 0 to 1,000,000,000 | Most the Merchant Houses may pay out to players per economy day. |
 | `exchangeDailyBudget` | 15,000 | 0 to 1,000,000,000 | Most the exchange may pay in gains, dividends and newly reserved bond interest per economy day. |
-| `siblingDailyBudget` | 5,000 | 0 to 1,000,000,000 | Most that deposits made by other mods without a reason of their own may draw from the Reserve per economy day; a deposit past it is refused. |
+| `siblingDailyBudget` | 5,000 | 0 to 1,000,000,000 | Most that other mods together may draw from the Reserve per economy day: payouts through the cross-mod API and deposits made without a reason of their own. A payout past it is refused. |
 | `systemJobsEnabled` | true | true or false | Allow server-funded jobs, whose payouts come out of the Reserve; false refuses every new one. |
 | `systemJobDailyPayoutCap` | 5,000 | 0 to 1,000,000,000 | Total payout of the server-funded jobs that may be posted per economy day. The payout is moved from the Reserve into escrow when the job is posted. |
 | `creditChipValue` | 100 | 1 to 1,000,000,000 | Credits the Reserve pays for an account's first Credit Chip of the economy day. Each further chip that day pays less: 80, 60, 40, then 20 percent of this. |
@@ -144,6 +144,21 @@ Every key the mod reads is listed below, with its default, its bounds and its me
 | `transactionRetentionDays` | 90 | 0 to 3,650 | Audit retention in days; 0 keeps no records. |
 | `maxTransactionRecords` | 10,000 | 0 to 1,000,000 | Hard server-wide audit record bound. |
 | `historyLimitPerPlayer` | 100 | 1 to 1,000 | Maximum records returned to one player. |
+
+### Other mods (the cross-mod API)
+
+| Key | Default | Bounds | Meaning |
+| --- | ---: | --- | --- |
+| `siblingCallerDailyBudget` | 2,500 | 0 to 1,000,000,000 | Most one other mod may pay out through the cross-mod API per economy day, unless siblingCallerBudgets names it. siblingDailyBudget still caps all of them together. |
+| `siblingCallerBudgets` | "" | text | Per-mod daily payout limits that replace siblingCallerDailyBudget, as a comma-separated list of modid=amount, for example neroquests=3000,nerocolonies=1500. |
+| `siblingPerPlayerDailyCap` | 2,000 | 0 to 1,000,000,000 | Most all other mods together may pay one player through the cross-mod API per economy day; 0 turns the cap off and keeps no per-player count. |
+| `siblingMaxSinglePayout` | 1,000 | 1 to 1,000,000,000 | Largest single payout another mod may make through the cross-mod API. |
+| `siblingTransferFeePercent` | 5.0 | 0.0 to 50.0 | Fee on a player-to-player transfer another mod makes through the cross-mod API, taken from what the payee receives, rounded up and at least 1 credit; 0 charges nothing. Paid to the Reserve. |
+| `reserveAlertLow` | 25,000 | 0 to 1,000,000,000,000 | Reserve level other mods are told about through Core (neroeconomy:reserve): once when it falls below this, once when it recovers. |
+| `sectorBands` | "5,10" | text | Percent moves from a sector's day open that other mods are told about through Core (neroeconomy:sector_index), as a comma-separated list, for example 5,10. |
+| `shockSources` | "neroevents" | text | Mods whose market-shock requests through Core (`<modid>:market_shock_request`) are applied, as a comma-separated list of mod ids. Empty hears none. |
+| `shockMaxMinutes` | 1,440 | 1 to 43,200 | Longest market shock another mod may request, in economy-minutes. |
+| `maxActiveShocks` | 64 | 0 to 4,096 | Most market shocks requested by other mods that may be active at once. |
 
 ### Operators, onboarding and telemetry
 

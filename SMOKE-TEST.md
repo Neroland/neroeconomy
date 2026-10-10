@@ -1,6 +1,6 @@
 # NeroEconomy runtime smoke test
 
-Test the build whose version is `mod_version` in `gradle.properties` (`0.2.0-alpha.1` at the time of
+Test the build whose version is `mod_version` in `gradle.properties` (`0.3.0-alpha.1` at the time of
 writing, with the 0.3 work under Unreleased in the changelog) in a **disposable world**, with the
 Neroland Core version pinned by `nerolandcore_version` in the same file (`1.13.0`). Repeat the
 essential flows on Fabric, Forge and NeoForge and cover Minecraft 26.1.2, 26.2 and 26.3 across the
@@ -221,8 +221,8 @@ Then do the same after `/save-all`: the state after the action must be there.
   bid, vault contents, an uncollected claim, House trades and an app action. Run `/eco export A` and
   open `<world>/neroeconomy-exports/<uuid>.json`. Check that it holds every row inside the retention
   window and the `market`, `book`, `offers`, `rules`, `trade_escrow`, `obligations`, `shops`,
-  `auto_traders`, `vault`, `exchange`, `merchant_houses` and `remote_spend` sections plus
-  `starting_balance_vesting` and `handbook_given`, that the other party of every row reads
+  `auto_traders`, `vault`, `exchange`, `merchant_houses`, `remote_spend`, `sibling_payouts` and
+  `milestones` sections plus `starting_balance_vesting` and `handbook_given`, that the other party of every row reads
   `counterparty`, and that no other player is named and no simulation secret appears.
 - On Linux, confirm the export directory is mode `700` and the file `600`. Restart with an export older
   than seven days and confirm it is deleted at start.
@@ -255,3 +255,68 @@ Then do the same after `/save-all`: the state after the action must be there.
   with this build and verify item claims are now vault contents, listings and buy offers are orders
   with their old ids, escrow balances (`/eco admin supply` and `/eco admin health` report balanced),
   and the Reserve was filled once. Restart and confirm nothing is imported twice.
+
+## 18. Cross-mod API (I1)
+
+No test mod or data pack ships for this, so an owner checks it through what the economy shows and, where a
+sibling mod that uses the API is installed (NeroQuests, NeroColonies, NeroFactions, NeroNotes or NeroEvents),
+through that mod. Without one, do the first three bullets and the config checks, and record the rest as not
+run.
+
+- **Payouts and budgets.** With a sibling that pays credits installed, make it pay A (for example finish a
+  quest). A's balance rises by the stated amount and the history row reads as a payout from another mod.
+  `/eco admin supply` shows the Reserve falling by the same amount and the sibling budget line rising.
+  Set `siblingPerPlayerDailyCap=50`, trigger a payout above it and verify A is refused with a plain
+  message and no credit moves; set it back. Set `siblingCallerBudgets` to the mod's id with a small amount
+  (`modid=100`) and verify it stops paying at that amount while the shared `siblingDailyBudget` is untouched.
+  Repeat the same action with the same request (for example claim a reward twice) and verify it pays once.
+- **Reserve and freeze.** Lower the Reserve with `/eco admin take` (or set `reserveAlertLow` above it) and
+  verify a payout that the Reserve cannot cover is refused before anything moves. With the economy frozen
+  (move `neroeconomy:economy` aside, as in section 1) verify no sibling can pay or charge.
+- **Transfers and accounts.** If a sibling uses `transfer` (a player-to-player payment) verify the payee gets
+  the amount less `siblingTransferFeePercent`, rounded up, the fee reaches the Reserve, and a starting balance
+  that has not vested cannot be sent. If a sibling keeps accounts (a faction treasury), verify
+  `/eco admin supply` lists a line per kind, that the line is marked as no longer claimed after that mod is
+  removed, and that `/eco admin health` still says the economy is balanced.
+- **Gates.** As A, make a first sale, a first purchase, a first Savings Bond, a first investment and have an
+  offer accepted. Each opens the matching `neroeconomy:` gate (a quest pack with a gate objective, or any
+  Core gate view, shows it within a second or two). Make a hundred sales (a loop at a Merchant Stall is
+  enough) and verify `trader_100` opens once. Make A's first sale while A is offline (a resting order fills)
+  and verify the gate opens on A's next join. `/eco export A` lists the reached milestones and no one else's.
+- **Class-free channels.** With a sibling or a Core debug listener on `neroeconomy:reserve`,
+  `neroeconomy:house_stock`, `neroeconomy:market_shock` and `neroeconomy:sector_index`, verify: the Reserve
+  channel fires once going below `reserveAlertLow` and once on recovery (within about 30 seconds); a House that
+  sells out fires `house_stock` once; a shock fires `market_shock` when it starts and ends; a sector index
+  moving past the `sectorBands` level from its day open fires `sector_index` once per crossing.
+- **Shock requests.** From an allowed mod (named in `shockSources`; NeroEvents by default) request a shock on
+  an item. The price of that item moves for the requested time and no longer than `shockMaxMinutes`; a clear
+  request ends it early. Remove the mod from `shockSources` and verify its requests do nothing. Past
+  `maxActiveShocks` further requests are ignored. The log holds at most a debug line for an ignored request.
+- **Commodity defaults.** `/eco admin reload-check` lists a sibling's default commodities with the source
+  `code:<modid>`; a data pack entry for the same key replaces the default; an excluded item is not offered by
+  any House.
+- **Privacy.** The log shows no payment, amount, player name or UUID from any of the above at info level.
+  Erase A (`/eco erase A`) and verify the second export has empty `sibling_payouts` and `milestones`, and that
+  A's gates are not re-opened by the next sale.
+
+## 19. Performance at scale (MSPT)
+
+Measure on a dedicated server, not a dev client, with the same world for both runs. Use
+[spark](https://spark.lucko.me) (`/spark tps` and `/spark profiler --timeout 120`) or, without it, the
+vanilla debug screen (F3, the tick-time graph) on a client joined to that server. Record the average and the
+95th percentile of the tick time (MSPT), not only TPS.
+
+1. **Baseline.** Start the world with `autonomousEconomy=false` and no players trading; record MSPT for two
+   minutes while two players stand still.
+2. **200 accounts.** Create 200 accounts with a balance (give them credits with `/eco admin give` from a
+   console script, or join test accounts). Re-run the measurement with the economy on (`simStepMinutes=10`)
+   and note the cost of a simulation step: in spark, find the `neroeconomy` entries under the server tick.
+3. **5,000 orders.** Fill the book with 5,000 resting orders across a spread of items and prices (a console
+   script of `/eco order sell` and `/eco order buy` as test accounts, or Auto-Trader rules, kept under
+   `maxListingsPerPlayer` and `maxRulesPerPlayer` per account). Repeat the measurement while one account
+   places and cancels orders every second, and again across a simulation step.
+4. **Suggested targets** (the owner sets the real pass mark; none is measured yet). The economy adds no sustained load above 1 ms a tick on average, no single tick above 10 ms
+   outside a simulation step or save, and a simulation step stays well under the 50 ms tick budget (it may
+   take several ticks if it spreads). Record the numbers in the test notes; if a target is missed, attach
+   the spark report and the counts (accounts, orders, rules) it was taken at.
+5. Stop the server cleanly and confirm the save time did not grow beyond what the store size explains.

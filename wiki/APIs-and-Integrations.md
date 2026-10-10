@@ -50,10 +50,207 @@ the delivery-job seam. Names in this package are only ever added, never renamed 
   cannot cover the payout. An expired job returns its payout to the Reserve.
 - `DeliveryJobApi.logisticsPresent()` reports whether NeroLogistics is installed.
 
+### Cross-mod API (version 1)
+
+Since 0.3 a sibling mod can pay, charge and move credits through one handle, with a reason code, a daily
+budget and a request key. Everything below is in `za.co.neroland.neroeconomy.api` and is only ever added to.
+`SiblingEconomy.API_VERSION` is `1` for this set and goes up by one for every later addition, so a mod can
+feature-detect: read it, and use a newer call only when it is high enough. Compile against this mod's jar
+(`compileOnly`) and keep every call behind one bridge class that is loaded only when
+`isModLoaded("neroeconomy")` is true. Class-free routes through Core need no compile dependency at all and
+are listed under [Channels and gates](#channels-and-gates-through-core).
+
+#### Claiming a handle
+
+```java
+// Common init, once per mod. The reason codes are a closed set you choose.
+static final EconomyCaller CALLER = SiblingEconomy.claim("mymod", Set.of("quest_reward", "sale"));
+
+// Later, on the server thread.
+if (SiblingEconomy.API_VERSION >= 1 && SiblingEconomy.available(server)) {
+    EconomyResult result = CALLER.pay(server, playerId, 50, "quest_reward", "quest:42:stage:3");
+    if (!result.ok()) player.sendSystemMessage(Component.translatable(result.translationKey()));
+}
+```
+
+- A mod id is lower-case letters, digits, `_`, `.` and `-` (1 to 64), and must be a loaded mod. `neroeconomy`
+  and `unknown` cannot be claimed. A reason is lower-case letters, digits and `_` (1 to 32); at most 32 a
+  caller. `claim` throws `IllegalArgumentException` for a bad id or reason and `IllegalStateException` when
+  the id is already claimed, is not loaded, or a server has already started. Claims close when the first
+  server binds, so claim during mod init.
+- `SiblingEconomy.available(server)` is true only for the running server while the economy is not frozen.
+
+#### Calls
+
+| Call | What it does |
+| --- | --- |
+| `pay(server, player, amount, reason, requestKey)` | Reserve to player. 1 to `siblingMaxSinglePayout` credits. Counted against the caller's daily budget, the shared budget and the per-player cap. No partial payment: a batch caller loops and stops at the first refusal. |
+| `charge(server, player, amount, reason, requestKey)` | Player to Reserve, a sink. A starting balance that has not vested may be spent here, like any system fee. |
+| `transfer(server, payer, payee, amount, reason, requestKey)` | Payer to payee in one operation. The payee gets `amount - feeFor(amount)`; the fee goes to the Reserve as a `SIBLING_FEE` row. Never Reserve-funded; unvested starting credits cannot be used (`FUNDS_LOCKED`). Payer and payee must differ. |
+| `deposit(server, player, account, amount, reason, requestKey)` | Player to one of the caller's own accounts (see below). |
+| `withdraw(server, account, player, amount, reason, requestKey)` | One of the caller's own accounts to a player. Never Reserve-funded. |
+| `balance(server, account)` | What one of the caller's own accounts holds; 0 for an account of another kind. |
+| `canPay(server, player, amount)` | The decision `pay` would make on the Reserve and budget checks now. Nothing moves or is counted. |
+| `remainingToday(server)` | The least of the caller's remaining daily limit, the shared remaining limit and the Reserve balance. |
+| `feeFor(amount)` | The `transfer` fee: `siblingTransferFeePercent` of the amount, rounded up, at least 1 credit when the percentage is above 0, never more than the amount. |
+
+Every call runs on the server thread, checks before anything moves, and writes one ledger row whose `origin`
+is `<modid>/<reason>`. Nothing is logged at info level about a payment; debug lines carry the caller, the
+reason and the result, never an amount or a player.
+
+#### Results
+
+`EconomyResult` says what happened. Nothing moved unless it is `APPLIED`. `ok()` is true for `APPLIED` and
+`DUPLICATE`. `translationKey()` is a short plain-words lang key (`economy_result.neroeconomy.<name>`) you can
+show to a player. New constants are only ever appended.
+
+| Value | Meaning |
+| --- | --- |
+| `APPLIED` | The credits moved. |
+| `DUPLICATE` | The same request key was already applied; nothing moved this time. |
+| `INVALID` | A missing, malformed or out-of-range argument, or an account of another kind. |
+| `UNKNOWN_REASON` | The reason is not in the set the caller claimed. |
+| `UNAVAILABLE` | No server is bound, or the server passed is not the running one. |
+| `FROZEN` | The economy is frozen until an operator acts. |
+| `RESERVE_SHORT` | The Reserve cannot cover the payment. |
+| `CALLER_BUDGET_SPENT` | The caller's own daily limit is used up. |
+| `SIBLING_BUDGET_SPENT` | The limit all other mods share is used up. |
+| `PLAYER_CAP_REACHED` | Other mods have paid this player the daily cap already. |
+| `INSUFFICIENT_FUNDS` | The paying side does not hold the credits. |
+| `FUNDS_LOCKED` | The player has the credits, but part is a starting balance that has not vested. |
+| `OVERFLOW` | The receiving balance would pass the largest storable amount. |
+| `RATE_LIMITED` | The caller is calling faster than allowed, or the request-key table is full. |
+
+#### Budgets and caps
+
+All amounts are credits and all limits reset each economy day. Arithmetic is exact; there is no rounding
+except the transfer fee.
+
+| Key | Default | Limits |
+| --- | --- | --- |
+| `siblingDailyBudget` | 5,000 | All other mods together, including untyped Core deposits (counted under the label `unknown`). |
+| `siblingCallerDailyBudget` | 2,500 | One caller, unless overridden. |
+| `siblingCallerBudgets` | empty | Per-mod overrides as `modid=amount,modid=amount`, for example `neroquests=3000,nerocolonies=1500`. |
+| `siblingPerPlayerDailyCap` | 2,000 | One player, across all callers; 0 turns the cap off and keeps no per-player count. |
+| `siblingMaxSinglePayout` | 1,000 | One `pay`. |
+| `siblingTransferFeePercent` | 5.0 | The `transfer` fee, 0 to 50. |
+
+`pay` is refused, in this order, for a missing Reserve balance, a spent caller budget, a spent shared budget,
+a reached player cap, or a balance that cannot hold the amount. Each caller is also rate-limited (a burst
+of 64, then 16 a second); this is per caller, not per player.
+
+#### Request keys
+
+A request key makes a call safe to repeat. The same key from the same caller within 24 economy-hours answers
+`DUPLICATE` and moves nothing. Only an applied request is remembered, so a refused one can be retried with the
+same key. A key is 1 to 64 characters of letters, digits and `_ . : / # -`, and must never hold a player id or
+name: a key that reads as a UUID, or holds 32 hex digits in a row, is refused as `INVALID`. Build keys from your
+own record ids, such as `quest:42:stage:3`. A null key means no replay protection, for a caller that already
+guarantees once-only.
+
+#### Accounts for other mods
+
+`new ForeignAccountId("mymod", "faction/ironclad")` names an account a mod keeps, such as a faction treasury.
+The kind must be the mod id that claimed the caller; the value is `[a-z0-9_.:/-]{1,64}`, an id and never a name.
+It holds real credits, persists with the ledger and counts in the supply check. A caller can only deposit to,
+withdraw from and read accounts of its own kind. If the mod is later removed the account stays in the ledger and
+`/eco admin supply` lists it apart, marked as unclaimed.
+
+```java
+ForeignAccountId treasury = new ForeignAccountId("mymod", "faction/ironclad");
+CALLER.deposit(server, memberId, treasury, 100, "sale", "donation:8841");
+long held = CALLER.balance(server, treasury);
+```
+
+#### Events
+
+`EconomyEvents` lets a mod hear what settled, with `compileOnly` listeners:
+`onSold`, `onBought`, `onFilled`, `onDividends` and `onSiblingPaid`.
+
+```java
+EconomyEvents.onSold(sold -> {
+    if (sold.venue() == EconomyEvents.Venue.HOUSE) progress.count(sold.seller(), sold.itemId(), sold.quantity());
+});
+```
+
+- An event carries **one party only**: the seller's side, the buyer's side or the order owner. A buyer and seller
+  of the same trade are never in one event, a Merchant House is never named as anyone's counterparty, and no event
+  has a balance, a name or free text. `Dividends` is world-level (day, total, factor, stock count) and names no
+  holder. `Venue` is `BOARD`, `SHOP`, `HOUSE`, `AUTO_TRADER` or `AUCTION`.
+- Events are queued where the operation settles and handed out at the end of the economy's server tick, after
+  the ledger applied and the store was marked dirty. A listener therefore never runs inside a half-finished
+  match and may call the economy. Nothing fires for a refused or rolled-back operation, the demo gallery, practice
+  mode, or goods from a creative or spectator source.
+- A listener that throws is caught, reported once at warn without the event, and stays registered.
+- Do not keep the player id beyond your own handling: count the progress and drop the id.
+
+#### Channels and gates through Core
+
+These need no compile dependency: a mod listens to Core's `ThresholdEvents` and `GateEvents` by id. No scope is
+ever a person.
+
+| Channel | Scope | Value | Threshold | Rising |
+| --- | --- | --- | --- | --- |
+| `neroeconomy:reserve` | `world` | Reserve balance | `reserveAlertLow` (25,000) | false when it falls below, true when it recovers |
+| `neroeconomy:house_stock` | commodity key | units held | 0 | false when a House sells out, true when stock returns |
+| `neroeconomy:market_shock` | item id or `#tag` | multiplier x 1000 | 1000 | true when a shock starts, false when it ends |
+| `neroeconomy:sector_index` | sector word | index in cents | the band level from the day open (`sectorBands`, default 5 and 10 percent, above and below) | true above the level, false below it |
+
+The Reserve, House stock and sector channels are checked every 30 seconds; the first check after a start only
+records the state. Shock channels fire the moment a shock starts or ends.
+
+Six per-player milestones are Core progression gates, scope `player`: `neroeconomy:first_sale`,
+`first_purchase`, `first_investment`, `first_bond`, `first_offer_accepted` and `trader_100` (a hundred settled
+sales). A gate opens once a second for players who are online; a milestone reached while the player was offline
+opens at their next check. A quest pack can use them with no code through a gate objective.
+
+#### Asking for a market shock
+
+A mod named in `shockSources` (default `neroevents`) can request a shock without a compile dependency, by
+firing a Core threshold crossing on the channel `<modid>:market_shock_request`:
+
+| Field | Meaning |
+| --- | --- |
+| `scope` | The item id, or `#tag`, to shock. |
+| `value` | The multiplier times 1000, clamped to `minPriceMultiplier`..`maxPriceMultiplier`. |
+| `threshold` | How long, in economy-minutes, 1 to `shockMaxMinutes` (default 1440). |
+| `rising` | True applies the shock; false ends the shock on that scope early. |
+
+Requests from a mod that is not listed or not loaded, malformed ones, and requests past `maxActiveShocks`
+(default 64; replacing a shock does not count) are ignored with one debug line. The typed
+`MarketShocks.applyShock` stays for `compileOnly` callers, and `activeCount`, `active` and `clearShock` read and
+end shocks.
+
+#### Commodities and queries
+
+Data stays the main route: a mod ships `data/<modid>/neroeconomy/commodities/*.json` (see
+[Data packs](Data-Packs.md)) and adds component-keyed items to the `neroeconomy:never_commodity` tag. For a
+default without a data file:
+
+```java
+CommodityApi.Registration r = CommodityApi.registerDefault("mymod", new CommodityApi.CommoditySpec(
+        "mymod:brass_ingot", 12, CommodityClass.CRAFTED, null, null, null, null, null, null, null, null));
+CommodityApi.exclude("mymod", "mymod:charged_cell");
+```
+
+- `registerDefault` takes the same fields and limits as one data entry; a null field takes the class default.
+  The key is an item id in the caller's namespace, or a tag `#<caller>:...` or `#c:...`. Results: `ACCEPTED`,
+  `BAD_CALLER`, `BAD_KEY`, `FOREIGN_KEY`, `INVALID`, `TOO_LATE` (after the server starts) and `TOO_MANY`
+  (256 a caller).
+- **A data pack always wins.** A default only loads when its items resolve, passes the same arbitrage guard as
+  data (a looping default has its buy side switched off), and appears in `/eco admin reload-check` with the
+  source `code:<modid>`.
+- `exclude` stops unmodified stacks of an item being a commodity whatever the data says.
+- Read-only queries, all copies: `CommodityApi.referencePrice`, `bid` and `ask` return an `OptionalLong` for an
+  item id (empty when it is no commodity, not quoted yet, or the House does not buy or sell it now);
+  `ExchangeApi.sectors` and `sector` return `SectorQuote(sector, indexCents, dayOpenCents,
+  dayChangeBasisPoints, members)`, where a sector index is the equal-weighted mean of its listed companies.
+
 ### Currency from other mods
 
-Core's `CurrencyApi` is the facade other mods use. Since 0.3 every credit it moves is a transfer with
-a typed reason, never a mint:
+Core's `CurrencyApi` is the facade mods already written against Core use, and it keeps working. Since 0.3
+every credit it moves is a transfer with a typed reason, never a mint. Prefer the handle above, which adds a
+reason, a per-mod budget and idempotence:
 
 - An untyped `deposit` is a transfer from the **Reserve**, counted against `siblingDailyBudget`
   (5,000 credits a day by default). It returns `false` when that budget or the Reserve is

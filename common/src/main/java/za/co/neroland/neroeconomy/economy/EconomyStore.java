@@ -656,12 +656,20 @@ public final class EconomyStore extends SavedData {
      * to adopt.
      */
     private void setUp(SavedDataStorage storage, boolean importLegacy) {
+        if (importLegacy) setUpFrom(storage.get(EconomySavedData.TYPE), storage.get(MarketSavedData.TYPE),
+                storage.get(ObligationSavedData.TYPE), storage.get(ShopOwnershipState.TYPE));
+        else setUpFrom(null, null, null, null);
+    }
+
+    /**
+     * {@link #setUp} with the four older stores already read (each null when its file is missing):
+     * the whole of the first-load migration, without the game's storage. Package-private so that the
+     * old-world test can hand it the stores of a 0.2 save read through their codecs.
+     */
+    void setUpFrom(EconomySavedData oldLedger, MarketSavedData oldMarket, ObligationSavedData oldObligations,
+            ShopOwnershipState oldShops) {
         boolean adopted = false;
-        if (importLegacy) {
-            EconomySavedData oldLedger = storage.get(EconomySavedData.TYPE);
-            MarketSavedData oldMarket = storage.get(MarketSavedData.TYPE);
-            ObligationSavedData oldObligations = storage.get(ObligationSavedData.TYPE);
-            ShopOwnershipState oldShops = storage.get(ShopOwnershipState.TYPE);
+        if (oldLedger != null || oldMarket != null || oldObligations != null || oldShops != null) {
             if (oldLedger != null && !oldLedger.isEmpty()) { ledger = adopt(oldLedger); adopted = true; }
             if (oldMarket != null && !oldMarket.isEmpty()) { market = adopt(oldMarket); adopted = true; }
             if (oldObligations != null && !oldObligations.isEmpty()) { obligations = adopt(oldObligations); adopted = true; }

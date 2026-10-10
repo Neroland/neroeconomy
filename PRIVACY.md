@@ -47,7 +47,7 @@ field at all, and an account with nothing in a section has no row in it.
 | `ledger` | Starting-balance lock: the amount still locked and a flag that the account has not yet vested | UUID | Stop a fresh account paying out its starting credits to others | Until the account has `startingBalanceVestMinutes` of play time | Yes (`starting_balance_vesting`) | Removed |
 | `ledger` | Handbook flag: the Trader's Handbook was given on first join | UUID | Never give the book twice | Until erasure | Yes (`handbook_given`) | Removed; a returning player is treated as new |
 | `ledger` | Transaction-logging opt-out flag | UUID | Remember the player's choice | Until erasure | Yes (`transaction_logging_opt_out`) | Removed |
-| `ledger` | Transaction rows: reason code, amount, currency, time, source reference, destination reference | Salted pseudonym, not UUID | Audit trail and the player's own history | `transactionRetentionDays` and `maxTransactionRecords` | Yes, every retained row that names the player (`transactions`) | Every row that names the player's pseudonym is deleted |
+| `ledger` | Transaction rows: reason code, amount, currency, time, source reference, destination reference, and for a payment made by another mod an `origin` (`<modid>/<reason>`) | Salted pseudonym, not UUID | Audit trail and the player's own history | `transactionRetentionDays` and `maxTransactionRecords` | Yes, every retained row that names the player (`transactions`) | Every row that names the player's pseudonym is deleted |
 | `ledger` | Credit Chip counter: day number, chips redeemed that day | UUID | Enforce `creditChipDailyLimit` | Dropped by the daily sweep once the day has passed | Yes (`credit_chip_redemptions`) | Removed |
 | `ledger` | Erasure tombstone: the pseudonym of an erased account | Salted pseudonym | Stop a starting balance being paid again | Life of the world | No | Created by erasure; never removed |
 | `ledger` | System accounts (Reserve, escrow, exchange, Merchant Houses), minted and burned totals per reason and day, pseudonym salt (one random value per world), economy-clock offset and last reading | Not per player | Supply accounting, pseudonyms, stable deadlines | Life of the world | No | Unchanged |
@@ -67,6 +67,8 @@ field at all, and an account with nothing in a section has no row in it.
 | `houses` | Per account and commodity: credits paid to and received from Merchant Houses today. Per account: credits of trade with other players counted toward reference prices today | UUID | Enforce per-account daily caps and bound the reference-price drift | Dropped at the economy-day roll | Yes (`merchant_houses`) | Removed |
 | `houses` | House stock, working capital, price pressure, drifted reference prices and the House orders on the book | House id and commodity | Run the Merchant Houses | Life of the world | No (about no player) | Unchanged |
 | `remote_spend` | Economy day, credits spent and goods value sent away through the companion app that day | UUID | Bound what a stolen app token can cost a player in a day | The current economy day only; earlier rows are dropped whenever a row is written | Yes (`remote_spend`) | Removed |
+| `sibling` | Per other mod: credits it paid out today (a count per mod id, no player). Per player, only while `siblingPerPlayerDailyCap` is above 0: the credits other mods paid them today. Applied request keys: a caller-chosen key and the time it lapses | Mod id; UUID for the per-player count; request keys carry no player (a key that reads as a UUID is refused) | Hold each mod to its daily budget, hold one player to the daily cap, and make a repeated call by another mod harmless | Counts: the current economy day only, cleared at the day roll (at most 256 mods and 100,000 players). Request keys: 24 economy-hours, at most 50,000 | Yes, the player's own count and the day (`sibling_payouts`) | The player's count is removed |
+| `milestones` | Per player: the milestones earned (first sale, first purchase, first investment, first Savings Bond, first offer accepted, a hundred sales), the ones whose progression gate is still waiting to open, and the count of settled sales up to 100 | UUID | Open a progression gate once for a player, including a milestone reached while they were offline, so quest packs can use it | Until erasure; at most 100,000 players; a player with nothing earned has no row | Yes (`milestones`) | The player's row is removed |
 | `obligations` | Jobs (contracts, deliveries, bounties): id, type, issuer, claimant, target (an item, tag or entity id, or for a player bounty the target player's UUID), quantity, delivery destination, payout, expiry, state, claim time | UUID | Run the job and hold its payout | Open jobs until they settle; settled jobs for `transactionRetentionDays` after their expiry time | Yes, with the player's role (`obligations.jobs`) | See [Erasure](#erasure) |
 | `obligations` | Auctions: id, seller, the lot's item stack, minimum bid, highest bid, highest bidder, end time, interplanetary flag, state | UUID | Run the auction and hold the lot and the bid | Running auctions until they settle; settled auctions for `transactionRetentionDays` after their end time | Yes, with the player's role (`obligations.auctions`) | See [Erasure](#erasure) |
 | `obligations` | Bounty progress: job id, kill count | UUID | Pay a bounty only at its full quantity | Until the bounty settles, expires or is cancelled | Yes (`obligations.bounty_progress`) | Removed |
@@ -95,6 +97,10 @@ An empty reference means the server side of a mint or burn, or an opted-out acco
 
 The rows are pseudonymous, not anonymous. The salt is stored in the same ledger file, so anyone who
 holds that file and knows a UUID can work out that UUID's pseudonym.
+
+A row made by a call from another mod also carries an `origin`: the mod id and a reason code that mod
+chose, such as `mymod/quest_reward`. It is a fixed-shape label, never free text, and names no player.
+It appears in the row in the owner's own export, so a player can see which mod paid them.
 
 ### Free text and item data
 
@@ -150,6 +156,9 @@ These are never written to disk and never sent anywhere.
 | Practice portfolios | Dropped after 30 economy days without use | — |
 | Per-account Merchant House counts | Dropped at the economy-day roll | — |
 | Remote-spend rows | The current economy day only | — |
+| Other mods' payout counts (per mod and per player) | The current economy day only, cleared at the day roll; the per-player count is kept only while `siblingPerPlayerDailyCap` is above 0 | `siblingPerPlayerDailyCap` |
+| Other mods' applied request keys | 24 economy-hours, at most 50,000 | — |
+| Milestones | Until erasure | — |
 | Player Shop listings | Expire into the owner's vault after `shopListingMaxIdleDays` without an owner interaction or a sale (default 90; `0` never) | `shopListingMaxIdleDays` |
 | Credit claims | No time limit: kept until collected or erased | — |
 | Processed request ids | 10 minutes | — |
@@ -244,6 +253,10 @@ that holds anything about the player and is not cut at `historyLimitPerPlayer`. 
   trade with other players counted toward reference prices today;
 - `remote_spend`: what the player spent, and the value of goods they sent away, through the
   companion app in the current economy day;
+- `sibling_payouts`: the economy day and the credits other mods paid the player in it
+  (`credits_from_other_mods_today`); empty when the per-player cap is off or nothing was paid today;
+- `milestones`: the milestones the player has reached, the gates still waiting to open, and the count
+  of their settled sales (`settled_sales_counted`, up to 100);
 - `economy_time` and `wall_time`: the economy clock and the calendar clock at the moment of export.
   Every other time in the file is economy time and can be read relative to these two.
 
@@ -267,6 +280,10 @@ is called by Core's own commands (in Core 1.13.0: `/neroland data eraseme`, whic
 run for themselves, and `/neroland data erase <uuid>` at permission level 2) and by Core's
 inactivity purge (see below). A player who erases themselves loses their balance, escrow and
 claims exactly as described here, and Core 1.13.0's command asks for no confirmation.
+
+Before the steps below, two small sections are cleared first (their erasers are registered ahead of
+all others): the player's daily payout count from other mods (`sibling`) and their milestones
+(`milestones`). Nothing else about them is held there.
 
 NeroEconomy's part of an erasure runs in this order. Each step also refreshes Core's recovery
 backup of the combined store, so the erased rows do not survive in it.

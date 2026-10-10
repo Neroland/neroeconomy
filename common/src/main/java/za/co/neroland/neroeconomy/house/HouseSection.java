@@ -239,6 +239,16 @@ public final class HouseSection extends EconomySection implements LotHolder, Hou
     /** The keys of the commodities whose NPC buy side the daily guard re-check has switched off. */
     public synchronized Set<String> driftBuyOff() { return Set.copyOf(driftBuyOff); }
 
+    /**
+     * Drops the memory-only pair tally of the step in flight: exactly what a server stop does to it,
+     * because the tally is never saved (who traded with whom must not reach the disk, not even as a
+     * hash; see {@link #pendingPairs}). After a stop, clean or crashed, the step in flight therefore
+     * moves no reference. The game never calls this, since a stopped section is simply discarded;
+     * a test that compares a run that restarted with one that did not calls it at the restart point
+     * of the run that did not, so the two differ only in what a restart really changes.
+     */
+    public synchronized void forgetPairTally() { pendingPairs.clear(); }
+
     /** The current reference price of a commodity, in milli-credits; -1 when the Houses have no state for it. */
     public synchronized long referenceMillis(String key) {
         State state = key == null ? null : states.get(key);

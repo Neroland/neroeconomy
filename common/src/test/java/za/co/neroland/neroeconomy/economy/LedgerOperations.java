@@ -21,17 +21,8 @@ import za.co.neroland.neroeconomy.api.SystemAccountId;
 final class LedgerOperations {
     private LedgerOperations() { }
 
-    /*
-     * SIBLING_FEE and the two FOREIGN_ reasons (I1) are left out of the random reasons so the standard seeds keep the exact
-     * sequences they had: with it in, OperationFuzzTest's seed-1 crash run diverged in a House
-     * simulation step even with no cross-mod API call in the run, i.e. a reload sensitivity that
-     * predates I1 and that only that shifted sequence reaches. Recorded in build/I1-PROGRESS.md for
-     * a follow-up; SIBLING_FEE refuses as a mint or burn reason like every other non-minting one
-     * (LedgerFuzzTest and LedgerSupplyTest still cover it).
-     */
-    private static final TransactionType[] REASONS = java.util.Arrays.stream(TransactionType.values())
-            .filter(type -> type != TransactionType.SIBLING_FEE && type != TransactionType.FOREIGN_DEPOSIT
-                    && type != TransactionType.FOREIGN_WITHDRAWAL).toArray(TransactionType[]::new);
+    /** Every reason there is, the cross-mod ones (SIBLING_FEE, FOREIGN_DEPOSIT, FOREIGN_WITHDRAWAL) included. */
+    private static final TransactionType[] REASONS = TransactionType.values();
     private static final BudgetKind[] BUDGETS = BudgetKind.values();
 
     private static TransactionType reason(FuzzWorld world) { return REASONS[world.random.nextInt(REASONS.length)]; }

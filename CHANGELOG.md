@@ -2,14 +2,16 @@
 
 ## [Unreleased]
 
+## [0.3.0-beta.1] - 2026-10-10
+
 NeroEconomy 0.3: a living economy. This release adds trading (an order book, direct trade, offers and
 auto-trade rules), a private Vault, an exchange with Savings Bonds and practice mode, autonomous
 Merchant Houses, a Reserve that every system payout comes from, one Economy Hub screen with
 walkthroughs and a Trader's Handbook, and companion-app link schema 2 for offline trading. It changes
-how credits are created, moves all economy state into one store and adds 68 config keys, so
-operators should read **Changed** and **Migration** before upgrading. `mod_version` stays at
-`0.2.0-alpha.1` until the release is cut. The October 2026 audit remediation that shipped in the
-same release is kept below, under its own heading.
+how credits are created, moves all economy state into one store and adds 78 config keys, so
+operators should read **Changed** and **Migration** before upgrading. This is a beta: back up your
+world before the first start, because the 0.2 stores are adopted into the combined store. The October
+2026 audit remediation that shipped in the same release is kept below, under its own heading.
 
 ### Added
 
@@ -62,11 +64,35 @@ same release is kept below, under its own heading.
   - Simulation and Merchant Houses: `autonomousEconomy` (true), `simStepMinutes` (10), `simCatchUpMaxHours` (72), `commoditySpreadPercent` (10), `arbitrageGuardDepth` (3), `referenceDriftStepPercent` (1), `referenceBandMinPercent` (50), `referenceBandMaxPercent` (200), `referenceMinTradeValue` (16), `referenceAccountDailyCap` (2000), `referenceMinPairs` (3), `referenceDriftDayPercent` (10), `npcAuctionsPerDay` (4), `npcAuctionHours` (24), `houseJobPremiumPercent` (15), `houseJobsPerHouse` (2), `houseJobHours` (24), `systemBountiesPerDay` (2), `debugFastSim` (false).
   - The exchange: `exchangeEnabled` (true), `exchangeStepLimitSteadyPercent` (2), `exchangeStepLimitRiskyPercent` (6), `exchangeDayLimitSteadyPercent` (10), `exchangeDayLimitRiskyPercent` (40), `exchangeHaltSteps` (6), `exchangeReversionPercent` (0.05), `exchangeVolumeNudgeCapPercent` (0.5), `exchangeVolumeScale` (2000), `exchangeVolumePairCap` (250), `exchangeVolumeAccountCap` (1000), `exchangeShockStepPercent` (1), `exchangeFloorPercent` (5), `bondRate1DayPercent` (0.8), `bondRate3DayPercent` (3), `bondRate7DayPercent` (8), `exchangeSpreadSteadyPercent` (1), `exchangeSpreadRiskyPercent` (2), `exchangeSpreadIndexPercent` (1), `shareHoldMinutes` (60), `maxPositionPerStock` (5000), `maxPortfolio` (20000), `maxBondsPerPlayer` (8), `practiceStartingCredits` (10000), `exchangeActionsPerMinute` (20).
   - Companion app and onboarding: `remoteDailySpendLimit` (5000), `remoteDailyGoodsLimit` (5000), `remoteGoodsFloorValue` (10), `remoteModifiedGoodsValue` (500), `giveHandbookOnFirstJoin` (true).
+  - Cross-mod API: `siblingCallerDailyBudget` (2500), `siblingCallerBudgets` (empty), `siblingPerPlayerDailyCap` (2000), `siblingMaxSinglePayout` (1000), `siblingTransferFeePercent` (5.0), `sectorBands` (5,10), `reserveAlertLow` (25000), `shockSources` (neroevents), `shockMaxMinutes` (1440), `maxActiveShocks` (64).
+- **Cross-mod API (`SiblingEconomy.API_VERSION` 1).** Other mods claim an `EconomyCaller` with a closed set
+  of reason codes and then `pay` (Reserve to player), `charge` (player to Reserve), `transfer` (player to
+  player, with a fee to the Reserve, `siblingTransferFeePercent`), `canPay`, `remainingToday` and `feeFor`.
+  Each payout is held to the caller's own daily budget, the shared `siblingDailyBudget`, a per-player daily
+  cap and a per-payout maximum, and is refused before anything moves with a plain `EconomyResult`. A request
+  key makes a call idempotent for 24 economy-hours. Ledger rows carry an `origin` (`<modid>/<reason>`), shown
+  in the player's own export. Untyped Core deposits still work and count under the label `unknown`.
+- **Accounts for other mods.** `ForeignAccountId(kind, value)` names an account a mod keeps, such as a faction
+  treasury; credits move in and out with `EconomyCaller.deposit`, `withdraw` and `balance`, and `/eco admin
+  supply` lists one line per kind (marked when no mod claims it).
+- **Economy events.** `EconomyEvents` for typed listeners: `Sold`, `Bought`, `Filled`, `Dividends` and
+  `SiblingPaid`, each carrying one party only, handed out at the end of the economy's server tick.
+- **Class-free channels and gates through Core.** Threshold channels `neroeconomy:reserve`,
+  `neroeconomy:house_stock`, `neroeconomy:market_shock` and `neroeconomy:sector_index`; six per-player
+  progression gates (`first_sale`, `first_purchase`, `first_investment`, `first_bond`,
+  `first_offer_accepted`, `trader_100`); and an inbound `<modid>:market_shock_request` channel from the mods in
+  `shockSources`, bounded by `shockMaxMinutes` and `maxActiveShocks`.
+- **Commodity registration and queries.** `CommodityApi.registerDefault` and `exclude` (data packs always win;
+  defaults pass the arbitrage guard and show in `/eco admin reload-check` as `code:<modid>`), price queries
+  `referencePrice`, `bid` and `ask`, and sector quotes `ExchangeApi.sectors` and `sector`.
 - **Wiki:** pages for trading, auto-trading, the exchange, the Vault, the autonomous economy, demos
   and the Handbook, fair play and data packs.
 
 ### Changed
 
+- Version set to `0.3.0-beta.1`. An old-world test loads a 0.2.0-alpha.1 save into the combined store, and a
+  benchmark (excluded from normal test runs; `-Pbenchmarks`) records the cost of a simulation step, a 72-hour
+  catch-up, matching and store size (see `docs/PERFORMANCE-0.3.md`).
 - **Credits come from the Reserve, not from nowhere.** Starting balances, Credit Chips, system job
   and bounty payouts, Merchant House and exchange payouts and other mods' untyped deposits are
   transfers from the Reserve, within a daily budget, and a payout it cannot cover is refused.
@@ -147,7 +173,7 @@ same release is kept below, under its own heading.
 
 Audit remediation: the fixes for the October 2026 audit. This pass changes command syntax, the
 companion-app payloads and the export file, and adds config keys, so server operators should read
-**Changed** before upgrading. `mod_version` stays at `0.2.0-alpha.1` until the release is cut.
+**Changed** before upgrading.
 
 #### Added
 

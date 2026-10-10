@@ -328,6 +328,41 @@ class HouseSectionTest {
         assertTrue(world().invariants());
     }
 
+    /**
+     * Three pairs trade wheat, then the server restarts before the next step: crashed (the store
+     * read back through its codecs) or stopped cleanly. Either way the pair tally, which is memory
+     * only, is gone and the step moves no reference; without a restart the same trades do move it.
+     * The saved store carries no pair tally at all.
+     */
+    @Test void aRestartDropsTheStepsPairTallyWhetherItCrashedOrStoppedCleanly() {
+        long[] after = new long[3];
+        for (int restart = 0; restart < 3; restart++) {
+            houses = HouseWorld.standard();
+            try {
+                houses.step();
+                UUID a = houses.player(1, 1_000_000L);
+                UUID b = houses.player(2, 1_000_000L);
+                UUID c = houses.player(3, 1_000_000L);
+                trade(a, b, 10, 30L);
+                trade(b, c, 10, 30L);
+                trade(c, a, 10, 30L);
+                String saved = za.co.neroland.neroeconomy.economy.StoreTesting.encode(world().store).toString();
+                assertFalse(saved.contains("pair"), "the pair tally reached the saved store");
+                if (restart == 1) world().reload();
+                if (restart == 2) houses.section().forgetPairTally();
+                houses.step();
+                after[restart] = houses.section().referenceMillis(HouseWorld.WHEAT);
+                assertTrue(world().invariants());
+            } finally {
+                houses.world.close();
+                houses = null;
+            }
+        }
+        assertTrue(after[0] > 10_000L, "three pairs did not move the reference without a restart");
+        assertEquals(10_000L, after[1], "a crash and reload");
+        assertEquals(10_000L, after[2], "a clean stop");
+    }
+
     @Test void aReferenceThatMovesIsCheckedByTheGuardTheSameStepNotTomorrow() {
         houses = HouseWorld.standard();
         CommodityDefinition wheat = houses.commodities.commodities().stream()

@@ -99,7 +99,14 @@ final class OperationFuzzer {
                 // No trade window survives a restart, crashed or clean: either way what its sides
                 // had put in is back in their vaults afterwards.
                 if (crash) world.crash();
-                else world.stopTrades();
+                else {
+                    world.stopTrades();
+                    // The one thing a restart changes by design: the Merchant Houses' pair tally of
+                    // the step in flight is memory only (never saved, see HouseSection#forgetPairTally),
+                    // so after any stop that step moves no reference. The run that does not crash
+                    // stops cleanly here, and a clean stop loses that tally too.
+                    world.store.houses().forgetPairTally();
+                }
                 // What was read back satisfies every invariant before anything else happens to it.
                 world.check(crash ? "crash" : "stop", step);
             }
