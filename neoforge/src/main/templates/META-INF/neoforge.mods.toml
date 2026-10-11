@@ -33,37 +33,40 @@ versionRange = "${nerolandcore_version_range}"
 ordering = "AFTER"
 side = "BOTH"
 
+# Optional siblings use ordering = "NONE": NeroEconomy is the API provider and only checks
+# isModLoaded() at runtime, while siblings (NeroSpace, NeroLogistics, ...) declare ordering = "AFTER"
+# on neroeconomy. Ordering AFTER them here creates a load-order cycle that stops the game starting.
 [[dependencies.${mod_id}]]
 modId = "nerologistics"
 type = "optional"
 versionRange = "[0,)"
-ordering = "AFTER"
+ordering = "NONE"
 side = "BOTH"
 
 [[dependencies.${mod_id}]]
 modId = "nerofactions"
 type = "optional"
 versionRange = "[0,)"
-ordering = "AFTER"
+ordering = "NONE"
 side = "BOTH"
 
 [[dependencies.${mod_id}]]
 modId = "neroevents"
 type = "optional"
 versionRange = "[0,)"
-ordering = "AFTER"
+ordering = "NONE"
 side = "BOTH"
 
 [[dependencies.${mod_id}]]
 modId = "neroquests"
 type = "optional"
 versionRange = "[0,)"
-ordering = "AFTER"
+ordering = "NONE"
 side = "BOTH"
 
 [[dependencies.${mod_id}]]
 modId = "nerocreatures"
 type = "optional"
 versionRange = "[0,)"
-ordering = "AFTER"
+ordering = "NONE"
 side = "BOTH"

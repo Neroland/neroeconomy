@@ -2,6 +2,19 @@
 
 ## [Unreleased]
 
+## [0.3.2-beta.1] - 2026-10-11
+
+A hotfix release with no gameplay, config or save-format changes. Worlds and configs from 0.3.x load
+unchanged, and the cross-mod API is unchanged (`SiblingEconomy.API_VERSION` is still 1).
+
+### Fixed
+
+- **Game no longer fails to start with NeroSpace and NeroLogistics installed.** NeroEconomy declared
+  `ordering = "AFTER"` on its optional siblings, which together with NeroSpace and NeroLogistics ordering
+  after NeroEconomy formed a load-order cycle (`Detected a mod dependency cycle: neroeconomy,
+  nerologistics, nerospace`). Optional sibling dependencies now use `ordering = "NONE"` on NeoForge
+  and Forge; siblings still load after NeroEconomy.
+
 ## [0.3.1-beta.1] - 2026-10-11
 
 A build and CI release with no gameplay, config or save-format changes. Worlds and configs from
