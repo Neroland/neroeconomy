@@ -2,6 +2,21 @@
 
 ## [Unreleased]
 
+## [0.3.1-beta.1] - 2026-10-11
+
+A build and CI release with no gameplay, config or save-format changes. Worlds and configs from
+0.3.0-beta.1 load unchanged, and the cross-mod API is unchanged (`SiblingEconomy.API_VERSION` is still 1).
+
+### Build and CI
+
+- **Maven artifacts for sibling mods.** Every loader × Minecraft cell is now published as
+  `za.co.neroland.neroeconomy:neroeconomy-<loader>-<mc>:<version>` (for example
+  `neroeconomy-neoforge-26.2`) to GitHub Packages at `https://maven.pkg.github.com/Neroland/neroeconomy`
+  by the release workflow, and to Maven Local with `./gradlew publishToMavenLocal`. The POM carries
+  no dependencies: other mods consume NeroEconomy only as an optional `compileOnly` dependency behind
+  an `isModLoaded("neroeconomy")` check. [USING-NEROECONOMY.md](USING-NEROECONOMY.md) explains how.
+- The release workflow's build job now has `packages: write` so it can publish those artifacts.
+
 ## [0.3.0-beta.1] - 2026-10-10
 
 NeroEconomy 0.3: a living economy. This release adds trading (an order book, direct trade, offers and

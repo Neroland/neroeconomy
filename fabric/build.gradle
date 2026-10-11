@@ -4,6 +4,7 @@
 plugins {
     id 'net.fabricmc.fabric-loom'
     id 'eclipse'   // for eclipse.synchronizationTasks (VS Code / Buildship import hook)
+    id 'maven-publish'
 }
 
 // MC version comes from the Stonecutter node (e.g. :fabric:26.1.2), not a global property.
@@ -29,6 +30,29 @@ def nextMinecraft = { String version ->
 // Distinct, descriptive jar name per cell (the node project is named after the MC version, so the
 // default jar would be "<mc>-<version>.jar" and COLLIDE with the neoforge cell of the same version).
 base { archivesName = "neroeconomy-fabric-${mc}" }
+
+// Maven publishing for optional sibling-mod consumption (compileOnly) — mirrors Core's and Nerospace's
+// publishing; see the neoforge module's block and USING-NEROECONOMY.md for the full rationale.
+publishing {
+    publications {
+        register('mod', MavenPublication) {
+            groupId = rootProject.mod_group_id
+            artifactId = "neroeconomy-fabric-${mc}"
+            version = rootProject.mod_version
+            artifact tasks.named('jar')
+        }
+    }
+    repositories {
+        maven {
+            name = 'GitHubPackages'
+            url = 'https://maven.pkg.github.com/Neroland/neroeconomy'
+            credentials {
+                username = providers.gradleProperty('gpr.user').orElse(providers.environmentVariable('GITHUB_ACTOR')).getOrNull()
+                password = providers.gradleProperty('gpr.key').orElse(providers.environmentVariable('GITHUB_TOKEN')).getOrNull()
+            }
+        }
+    }
+}
 
 // Pull in the shared common source + resources.
 sourceSets.main.java.srcDir rootProject.ext.commonJava

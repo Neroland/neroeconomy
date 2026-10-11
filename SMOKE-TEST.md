@@ -1,7 +1,6 @@
 # NeroEconomy runtime smoke test
 
-Test the build whose version is `mod_version` in `gradle.properties` (`0.3.0-beta.1` at the time of
-writing) in a **disposable world**, with the
+Test the build whose version is `mod_version` in `gradle.properties` in a **disposable world**, with the
 Neroland Core version pinned by `nerolandcore_version` in the same file (`1.13.0`). Repeat the
 essential flows on Fabric, Forge and NeoForge and cover Minecraft 26.1.2, 26.2 and 26.3 across the
 nine-cell matrix. Use **two players** (call them A and B) for sync and settlement, and an operator
