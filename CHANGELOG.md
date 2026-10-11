@@ -94,7 +94,7 @@ world before the first start, because the 0.2 stores are adopted into the combin
   a session) are sent unless `telemetryEnabled=false`. See PRIVACY.md.
 - Version set to `0.3.0-beta.1`. An old-world test loads a 0.2.0-alpha.1 save into the combined store, and a
   benchmark (excluded from normal test runs; `-Pbenchmarks`) records the cost of a simulation step, a 72-hour
-  catch-up, matching and store size (see `docs/PERFORMANCE-0.3.md`).
+  catch-up, matching and store size.
 - **Credits come from the Reserve, not from nowhere.** Starting balances, Credit Chips, system job
   and bounty payouts, Merchant House and exchange payouts and other mods' untyped deposits are
   transfers from the Reserve, within a daily budget, and a payout it cannot cover is refused.

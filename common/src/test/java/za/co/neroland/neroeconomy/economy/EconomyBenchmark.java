@@ -73,7 +73,6 @@ import za.co.neroland.neroeconomy.trade.TradingSteps;
  * <p>Tagged {@code benchmark}, so the ordinary test run leaves it out; run it with
  * {@code gradlew :neoforge:26.2:test -Pbenchmarks --tests *EconomyBenchmark}. It prints its numbers
  * ({@code [bench]} lines) and asserts only that the world it measured is the one described.
- * The results are recorded in {@code docs/PERFORMANCE-0.3.md}.
  */
 @Tag("benchmark")
 class EconomyBenchmark {
