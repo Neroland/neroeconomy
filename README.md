@@ -81,7 +81,8 @@ lists every key, and its [data packs page](wiki/Data-Packs.md) documents the fil
 The stable `za.co.neroland.neroeconomy.api` package exposes abstract accounts, deterministic pricing,
 modifier registration, market views, a read-only commodity view and capped expiring shocks.
 NeroLogistics can use the string-keyed delivery seam; NeroEvents can apply shocks; NeroFactions can
-later register modifiers. Core Link exposes the player's own data, trading and exchange actions,
+later register modifiers. Other mods compile against the API as an optional `compileOnly`
+Maven dependency (see [USING-NEROECONOMY.md](USING-NEROECONOMY.md)). Core Link exposes the player's own data, trading and exchange actions,
 live topics, and alerts with fixed text.
 
 ## For server operators
@@ -129,5 +130,6 @@ Core-wide erasure. No log line carries a player, an amount or a transaction. Sen
 (`telemetryEnabled=false` in `config/neroeconomy.properties`).
 
 See [the wiki](wiki/Home.md), [the privacy notice](PRIVACY.md), [building against Core](USING-CORE.md),
+[building another mod against NeroEconomy](USING-NEROECONOMY.md),
 [the changelog](CHANGELOG.md), [the completion audit](AUDIT.md), and
 [the runtime smoke test](SMOKE-TEST.md).
