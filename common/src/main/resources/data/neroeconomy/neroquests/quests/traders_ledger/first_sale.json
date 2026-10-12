@@ -1,0 +1,25 @@
+{
+  "title": "quest.neroeconomy.traders_ledger.first_sale.title",
+  "description": "quest.neroeconomy.traders_ledger.first_sale.desc",
+  "icon": "minecraft:gold_nugget",
+  "prerequisites": [
+    "neroeconomy:traders_ledger/first_stall"
+  ],
+  "objectives": [
+    {
+      "type": "neroquests:gate_open",
+      "gate": "neroeconomy:first_sale"
+    }
+  ],
+  "rewards": [
+    {
+      "type": "neroquests:xp",
+      "amount": 100
+    },
+    {
+      "type": "neroquests:mod_hook",
+      "gate": "neroeconomy:hook/fee_waiver"
+    }
+  ],
+  "scope": "player"
+}

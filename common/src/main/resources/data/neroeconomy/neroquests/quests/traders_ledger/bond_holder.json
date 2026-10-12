@@ -1,0 +1,25 @@
+{
+  "title": "quest.neroeconomy.traders_ledger.bond_holder.title",
+  "description": "quest.neroeconomy.traders_ledger.bond_holder.desc",
+  "icon": "minecraft:book",
+  "prerequisites": [
+    "neroeconomy:traders_ledger/shareholder"
+  ],
+  "objectives": [
+    {
+      "type": "neroquests:gate_open",
+      "gate": "neroeconomy:first_bond"
+    }
+  ],
+  "rewards": [
+    {
+      "type": "neroquests:xp",
+      "amount": 150
+    },
+    {
+      "type": "neroquests:currency",
+      "amount": 100
+    }
+  ],
+  "scope": "player"
+}

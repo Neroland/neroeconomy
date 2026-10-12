@@ -59,6 +59,8 @@ public final class NeroEconomyCommon {
         PlayerDataErasure.register(za.co.neroland.neroeconomy.sibling.SiblingSection::eraseFor);
         //    And the player's economy milestones and the gates waiting to open for them.
         PlayerDataErasure.register(za.co.neroland.neroeconomy.sibling.MilestoneSection::eraseFor);
+        //    And the perks quest hooks granted them (a pending listing-fee waiver).
+        PlayerDataErasure.register(za.co.neroland.neroeconomy.sibling.PerkSection::eraseFor);
         PlayerDataErasure.register(EconomySavedData::eraseFor);
         PlayerDataErasure.register(ShopOwnershipState::eraseFor);
         PlayerDataErasure.register(ObligationSavedData::eraseFor);
@@ -89,6 +91,8 @@ public final class NeroEconomyCommon {
         NeroEconomyNetwork.init();
         // The class-free channels to other mods: shock requests in, milestone counting out.
         za.co.neroland.neroeconomy.sibling.EconomyChannels.init();
+        // What a quest pack's mod_hook rewards do here, through Core's gate events alone.
+        za.co.neroland.neroeconomy.sibling.QuestHooks.init();
         // The trading rules' simulation handlers, after the housekeeping ones the pipeline starts with.
         TradingSteps.register(Simulation.PIPELINE, context -> Trading.env(context.store()));
         // The exchange's price step. Not housekeeping: autonomousEconomy=false switches it off.

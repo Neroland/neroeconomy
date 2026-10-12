@@ -20,17 +20,18 @@ import org.junit.jupiter.api.Test;
  */
 class StoreBoundsAuditTest {
     /** Sections with their own store-wide bound (a {@code MAX_} constant, each tested by its section's test). */
-    private static final Map<String, String> HARD = Map.of(
-            "AutoTraderSection", "MAX_ROWS, MAX_PER_OWNER; purge: block removal + stale-location sweep",
-            "SimulationSection", "MAX_STATE_ENTRIES; purge: handlers replace their state",
-            "HouseSection", "MAX_COMMODITIES, MAX_ACCOUNT_ROWS, MAX_REFERENCE_ACCOUNTS, MAX_PENDING_ITEMS; purge: day roll",
-            "RemoteSpendSection", "MAX_ACCOUNTS; purge: rows of earlier days",
-            "SiblingSection", "MAX_CALLERS, MAX_PLAYERS, MAX_REQUEST_KEYS; purge: day roll, lapsed keys",
-            "MilestoneSection", "MAX_PLAYERS; purge: erasure",
-            "ExchangeSection", "MAX_STATES; purge: delisting",
-            "GallerySandbox", "MAX_BLOCKS, MAX_LABELS; purge: gallery clear",
-            "TradeEscrowSection", "MAX_STACKS per side, at most one open trade per online player; purge: swap/cancel/load",
-            "ObligationSavedData", "MAX_SYSTEM_JOBS, MAX_HOUSE_AUCTIONS, per-player job/auction caps; purge: expiry");
+    private static final Map<String, String> HARD = Map.ofEntries(
+            Map.entry("AutoTraderSection", "MAX_ROWS, MAX_PER_OWNER; purge: block removal + stale-location sweep"),
+            Map.entry("SimulationSection", "MAX_STATE_ENTRIES; purge: handlers replace their state"),
+            Map.entry("HouseSection", "MAX_COMMODITIES, MAX_ACCOUNT_ROWS, MAX_REFERENCE_ACCOUNTS, MAX_PENDING_ITEMS; purge: day roll"),
+            Map.entry("RemoteSpendSection", "MAX_ACCOUNTS; purge: rows of earlier days"),
+            Map.entry("SiblingSection", "MAX_CALLERS, MAX_PLAYERS, MAX_REQUEST_KEYS; purge: day roll, lapsed keys"),
+            Map.entry("MilestoneSection", "MAX_PLAYERS; purge: erasure"),
+            Map.entry("PerkSection", "MAX_PLAYERS; purge: waiver spent, erasure"),
+            Map.entry("ExchangeSection", "MAX_STATES; purge: delisting"),
+            Map.entry("GallerySandbox", "MAX_BLOCKS, MAX_LABELS; purge: gallery clear"),
+            Map.entry("TradeEscrowSection", "MAX_STACKS per side, at most one open trade per online player; purge: swap/cancel/load"),
+            Map.entry("ObligationSavedData", "MAX_SYSTEM_JOBS, MAX_HOUSE_AUCTIONS, per-player job/auction caps; purge: expiry"));
     /** Sections bounded by per-account caps times accounts, with their purge. */
     private static final Map<String, String> PER_ACCOUNT = Map.of(
             "VaultSection", "vaultHardBound per account; purge: erasure",

@@ -50,6 +50,12 @@ has an **Open demo** button that runs the matching tab's walkthrough.
 - **Crafting.** It is craftable on any server as a shapeless recipe: one book and one gold nugget.
 - **Reading.** The book is read on the client only; it has no menu and sends and reads nothing from
   the server.
+- **Trader's Notes.** Four chapters (the market, shops, Merchant Houses, jobs) end in an extra page
+  that is hidden until a quest opens it: the quest book's `handbook_page` reward (see
+  [APIs and integrations](APIs-and-Integrations.md)) opens the notes one at a time, in that order.
+  Each note is a player-scope Core progression gate, `neroeconomy:handbook/<id>`, so the client learns
+  which notes to show from Core's ordinary gate sync and the book still reads nothing of its own from
+  the server. Without a quest mod the notes simply stay hidden.
 
 ## The gallery
 

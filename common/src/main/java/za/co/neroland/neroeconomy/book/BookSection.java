@@ -287,8 +287,11 @@ public final class BookSection extends EconomySection implements LotHolder, Escr
         // The most the order could earn at once has to fit the seller's claim before anything moves.
         if (player && !canBook(store, owner, unitPrice * lot.count())) return Placed.refused(BookResult.PAYOUT_BLOCKED);
         if (!origin.take(lot)) return Placed.refused(BookResult.NOT_HOLDING);
-        // The listing fee is charged after every other check and is not refunded.
+        // The listing fee is charged after every other check and is not refunded; a waiver a quest hook
+        // granted the player covers one order they place themselves, spent only once the order stands.
         long fee = player ? Fees.flat(env.settings().listingFee()) : 0L;
+        boolean waived = waives(store, owner, source, fee);
+        if (waived) fee = 0L;
         if (fee > 0L) {
             LedgerResult charged = store.execute(LedgerPlan.of(owner, SystemAccountId.RESERVE, fee,
                     TransactionType.FEE_LISTING));
@@ -305,7 +308,17 @@ public final class BookSection extends EconomySection implements LotHolder, Escr
         if (left > 0) putSell(new SellOrder(id, owner, lot.withCount(left), unitPrice, nextSequence++,
                 expiry(env, now), source));
         touch(lot.item());
+        if (waived) store.perks().useFeeWaiver(((PlayerAccountId) owner).playerId());
         return new Placed(BookResult.OK, id, left, List.copyOf(fills), fee, 0L, false);
+    }
+
+    /**
+     * Whether a listing fee of {@code fee} on this order is waived: the owner is a player placing the
+     * order themselves (not a rule or a House) who holds a waiver from a quest hook (see {@code QuestHooks}).
+     */
+    private static boolean waives(EconomyStore store, AccountId owner, OrderSource source, long fee) {
+        return fee > 0L && (source == OrderSource.HAND || source == OrderSource.VAULT)
+                && owner instanceof PlayerAccountId player && store.perks().hasFeeWaiver(player.playerId());
     }
 
     /** Fills {@code left} units of an incoming sell order against the bids, best first. @return what is left */
@@ -381,6 +394,8 @@ public final class BookSection extends EconomySection implements LotHolder, Escr
         if (atOnce > 0 && !receiver.canTake(Lot.of(item, atOnce))) return Placed.refused(BookResult.STORAGE_FULL);
         long total = unitPrice * quantity;
         long fee = player ? Fees.flat(env.settings().listingFee()) : 0L;
+        boolean waived = !preEscrowed && waives(store, owner, source, fee);
+        if (waived) fee = 0L;
         LedgerPlan.Builder funding = LedgerPlan.builder();
         // The escrow is promised to another player, so it cannot come out of an unvested starting
         // balance; the fee can. A rule's order is paid for out of its budget, already in escrow.
@@ -394,6 +409,7 @@ public final class BookSection extends EconomySection implements LotHolder, Escr
             case INSUFFICIENT_FUNDS -> preEscrowed ? BookResult.FEE_UNPAID : BookResult.INSUFFICIENT_FUNDS;
             default -> BookResult.INVALID;
         });
+        if (waived) store.perks().useFeeWaiver(((PlayerAccountId) owner).playerId());
         List<Fill> fills = new ArrayList<>();
         long escrow = total;
         int left = quantity;

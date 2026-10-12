@@ -1,0 +1,25 @@
+{
+  "title": "quest.neroeconomy.traders_ledger.hundred_sales.title",
+  "description": "quest.neroeconomy.traders_ledger.hundred_sales.desc",
+  "icon": "minecraft:gold_ingot",
+  "prerequisites": [
+    "neroeconomy:traders_ledger/handshake"
+  ],
+  "objectives": [
+    {
+      "type": "neroquests:gate_open",
+      "gate": "neroeconomy:trader_100"
+    }
+  ],
+  "rewards": [
+    {
+      "type": "neroquests:xp",
+      "amount": 400
+    },
+    {
+      "type": "neroquests:currency",
+      "amount": 250
+    }
+  ],
+  "scope": "player"
+}

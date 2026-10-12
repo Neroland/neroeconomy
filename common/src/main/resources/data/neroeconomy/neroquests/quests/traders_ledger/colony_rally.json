@@ -1,0 +1,22 @@
+{
+  "title": "quest.neroeconomy.traders_ledger.colony_rally.title",
+  "description": "quest.neroeconomy.traders_ledger.colony_rally.desc",
+  "icon": "minecraft:bell",
+  "prerequisites": [],
+  "objectives": [
+    {
+      "type": "neroquests:custom_event",
+      "channel": "neroeconomy:sector_index",
+      "event_scope": "colonies",
+      "direction": "rising",
+      "audience": "world"
+    }
+  ],
+  "rewards": [
+    {
+      "type": "neroquests:xp",
+      "amount": 150
+    }
+  ],
+  "scope": "server"
+}

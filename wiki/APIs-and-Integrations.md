@@ -199,10 +199,36 @@ ever a person.
 The Reserve, House stock and sector channels are checked every 30 seconds; the first check after a start only
 records the state. Shock channels fire the moment a shock starts or ends.
 
-Six per-player milestones are Core progression gates, scope `player`: `neroeconomy:first_sale`,
-`first_purchase`, `first_investment`, `first_bond`, `first_offer_accepted` and `trader_100` (a hundred settled
-sales). A gate opens once a second for players who are online; a milestone reached while the player was offline
-opens at their next check. A quest pack can use them with no code through a gate objective.
+Every crossing is published with `neroeconomy` as its source mod, so a listener on Core 1.15.0's sourced bus
+(`ThresholdEvents.onSourcedCrossing`) can tell NeroEconomy's channels from another mod's.
+
+Nine per-player milestones are Core progression gates, scope `player`: `neroeconomy:first_sale`,
+`first_purchase`, `first_investment`, `first_bond`, `first_offer_accepted`, `trader_100` (a hundred settled
+sales), `first_auction_win` (an auction settled in the player's favour), `first_delivery` (a contract or
+delivery job fulfilled, a Merchant House's included) and `first_dividend` (a dividend paid on a holding). A
+gate opens within a second of the milestone, whether the player is online or not. A quest pack can use them
+with no code through a gate objective. They are records: nothing in NeroEconomy checks them for access.
+
+#### The quest chapter and its hooks
+
+NeroEconomy ships a quest pack for the NeroQuests quest book: the chapter **Trader's Ledger**
+(`neroeconomy:traders_ledger`), fifteen quests that follow the milestones above, the `economy` objectives
+(goods sold, credits earned) and the Merchant Stall craft, plus three server-wide world-log entries on the
+`reserve`, `market_shock` and `sector_index` channels. It is data inside the NeroEconomy jar: with NeroQuests
+installed the chapter appears in the book, without it nothing happens, and neither mod depends on the other.
+
+Two of its rewards reach back into NeroEconomy through Core gate hooks. A quest's `mod_hook` reward opens
+one of these player-scope record gates for the player who completed it, and NeroEconomy, listening on Core's
+gate events, applies the effect and closes the gate again:
+
+| Hook gate | Effect |
+| --- | --- |
+| `neroeconomy:hook/fee_waiver` | The player's next listing fee on an order they place themselves (from hand or vault, not a rule's) is waived once. It is a flag, held at most once at a time, so a quest can never mint credits. |
+| `neroeconomy:hook/handbook_page` | The next **Trader's Note** opens in the player's Handbook (see [Demos and the Trader's Handbook](Demos-and-Handbook.md)). A player who has all four gets nothing more. |
+
+A hook that opens while the player is away, or while the economy is frozen, is delivered at their next
+join. A server's own data pack may use the same two hooks from quests in the `neroeconomy` namespace only, as
+the quest mod's pack rules require. Hook gates gate nothing and are never checked for access.
 
 #### Asking for a market shock
 

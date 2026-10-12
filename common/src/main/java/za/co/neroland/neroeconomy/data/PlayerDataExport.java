@@ -63,6 +63,8 @@ public final class PlayerDataExport {
         json.add("sibling_payouts", EconomyStore.get(server).sibling().exportFor(player));
         // The subject's economy milestones, and the gates still waiting to open for them.
         json.add("milestones", EconomyStore.get(server).milestones().exportFor(player));
+        // Whether a listing-fee waiver from a quest hook waits for the subject.
+        json.add("perks", EconomyStore.get(server).perks().exportFor(player));
         return json;
     }
 

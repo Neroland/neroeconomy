@@ -1,0 +1,25 @@
+{
+  "title": "quest.neroeconomy.traders_ledger.handshake.title",
+  "description": "quest.neroeconomy.traders_ledger.handshake.desc",
+  "icon": "minecraft:writable_book",
+  "prerequisites": [
+    "neroeconomy:traders_ledger/first_sale"
+  ],
+  "objectives": [
+    {
+      "type": "neroquests:gate_open",
+      "gate": "neroeconomy:first_offer_accepted"
+    }
+  ],
+  "rewards": [
+    {
+      "type": "neroquests:xp",
+      "amount": 150
+    },
+    {
+      "type": "neroquests:mod_hook",
+      "gate": "neroeconomy:hook/handbook_page"
+    }
+  ],
+  "scope": "player"
+}

@@ -6,7 +6,6 @@ import java.util.UUID;
 
 import net.minecraft.resources.Identifier;
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.server.level.ServerPlayer;
 
 import za.co.neroland.nerolandcore.event.ThresholdEvents;
 import za.co.neroland.nerolandcore.progression.ProgressionGates;
@@ -28,7 +27,7 @@ import za.co.neroland.neroeconomy.platform.Services;
  *       {@code neroeconomy:house_stock}, {@code neroeconomy:market_shock} and
  *       {@code neroeconomy:sector_index}.</li>
  *   <li><b>Out, as Core progression gates</b>: the per-player milestones of {@link MilestoneSection},
- *       opened when the player is online, or at the next check after they join.</li>
+ *       opened within a second of being earned whether the player is online or not (Core 1.15.0).</li>
  *   <li><b>In</b>: {@code <modid>:market_shock_request} crossings from the mods in
  *       {@code shockSources} ({@link ShockRequests}).</li>
  * </ul>
@@ -39,7 +38,7 @@ public final class EconomyChannels {
     public static final Identifier HOUSE_STOCK = id("house_stock");
     public static final Identifier MARKET_SHOCK = id("market_shock");
     public static final Identifier SECTOR_INDEX = id("sector_index");
-    /** How often, in ticks, waiting gates are opened for online players. */
+    /** How often, in ticks, waiting gates are opened. */
     private static final int GATE_TICKS = 20;
 
     private static final ThresholdWatch RESERVE_WATCH = new ThresholdWatch();
@@ -83,23 +82,23 @@ public final class EconomyChannels {
 
     // --- per tick ----------------------------------------------------------------------------
 
-    /** Every tick: once a second, opens the waiting gates of players who are online. */
+    /** Every tick: once a second, opens the waiting gates, for offline players too (Core 1.15.0). */
     public static void tick(MinecraftServer server) {
         if (server == null || --gateCountdown > 0) return;
         gateCountdown = GATE_TICKS;
         if (EconomyHealth.frozen()) return;
         MilestoneSection milestones = EconomyStore.get(server).milestones();
         if (!milestones.hasPending()) return;
-        for (ServerPlayer player : server.getPlayerList().getPlayers()) {
-            for (MilestoneSection.Milestone milestone : milestones.pending(player.getUUID())) {
+        for (UUID player : milestones.pendingPlayers()) {
+            for (MilestoneSection.Milestone milestone : milestones.pending(player)) {
                 try {
-                    ProgressionGates.open(player, id(milestone.id()));
+                    ProgressionGates.open(server, player, id(milestone.id()));
                 } catch (RuntimeException | LinkageError failure) {
                     NeroEconomyCommon.LOGGER.debug("[NeroEconomy] A milestone gate could not be opened ({}).",
                             failure.getClass().getName());
                 }
                 // Opened or not, it is not retried every second: an operator can open the gate by hand.
-                milestones.opened(player.getUUID(), milestone);
+                milestones.opened(player, milestone);
             }
         }
     }
@@ -190,7 +189,8 @@ public final class EconomyChannels {
 
     static void publish(Identifier channel, String scope, long value, long threshold, boolean rising) {
         try {
-            ThresholdEvents.fire(new ThresholdEvents.ThresholdCrossing(channel, scope, value, threshold, rising));
+            ThresholdEvents.fire(NeroEconomyCommon.MOD_ID,
+                    new ThresholdEvents.ThresholdCrossing(channel, scope, value, threshold, rising));
         } catch (RuntimeException | LinkageError failure) {
             NeroEconomyCommon.LOGGER.debug("[NeroEconomy] A threshold listener threw ({}).", failure.getClass().getName());
         }

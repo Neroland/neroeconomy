@@ -56,8 +56,12 @@ public final class FabricPlatformInfo implements PlatformInfo {
             DirectTrades.useEntity(player, entity, hand);
             return net.minecraft.world.InteractionResult.PASS;
         });
-        // First join: the Trader's Handbook, once per account (see HandbookGift for the rule).
-        ServerPlayConnectionEvents.JOIN.register((handler, sender, server) -> HandbookGift.joined(handler.player));
+        // First join: the Trader's Handbook, once per account (see HandbookGift for the rule), then any
+        // quest hook that opened while the player was away (see QuestHooks).
+        ServerPlayConnectionEvents.JOIN.register((handler, sender, server) -> {
+            HandbookGift.joined(handler.player);
+            za.co.neroland.neroeconomy.sibling.QuestHooks.onJoin(handler.player);
+        });
         // The packet limiter keys on the player id in memory; the entry leaves with the player,
         // and so do their trade requests and a trade they had open.
         ServerPlayConnectionEvents.DISCONNECT.register((handler, server) -> {

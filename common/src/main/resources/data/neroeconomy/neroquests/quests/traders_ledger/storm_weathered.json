@@ -1,0 +1,23 @@
+{
+  "title": "quest.neroeconomy.traders_ledger.storm_weathered.title",
+  "description": "quest.neroeconomy.traders_ledger.storm_weathered.desc",
+  "icon": "minecraft:lightning_rod",
+  "prerequisites": [
+    "neroeconomy:traders_ledger/reserve_restored"
+  ],
+  "objectives": [
+    {
+      "type": "neroquests:custom_event",
+      "channel": "neroeconomy:market_shock",
+      "direction": "falling",
+      "audience": "world"
+    }
+  ],
+  "rewards": [
+    {
+      "type": "neroquests:xp",
+      "amount": 150
+    }
+  ],
+  "scope": "server"
+}

@@ -1,0 +1,82 @@
+{
+  "title": "chapter.neroeconomy.traders_ledger.title",
+  "icon": "neroeconomy:credit_chip",
+  "allow_server_scope": true,
+  "quests": [
+    {
+      "quest": "neroeconomy:traders_ledger/first_stall",
+      "x": 0,
+      "y": 0
+    },
+    {
+      "quest": "neroeconomy:traders_ledger/first_sale",
+      "x": 2,
+      "y": -1
+    },
+    {
+      "quest": "neroeconomy:traders_ledger/first_purchase",
+      "x": 2,
+      "y": 1
+    },
+    {
+      "quest": "neroeconomy:traders_ledger/handshake",
+      "x": 4,
+      "y": -1
+    },
+    {
+      "quest": "neroeconomy:traders_ledger/shareholder",
+      "x": 4,
+      "y": 1
+    },
+    {
+      "quest": "neroeconomy:traders_ledger/bond_holder",
+      "x": 6,
+      "y": 1
+    },
+    {
+      "quest": "neroeconomy:traders_ledger/hundred_sales",
+      "x": 6,
+      "y": -1
+    },
+    {
+      "quest": "neroeconomy:traders_ledger/bulk_shipper",
+      "x": 8,
+      "y": -1
+    },
+    {
+      "quest": "neroeconomy:traders_ledger/healthy_ledger",
+      "x": 8,
+      "y": 1
+    },
+    {
+      "quest": "neroeconomy:traders_ledger/on_contract",
+      "x": 4,
+      "y": -3
+    },
+    {
+      "quest": "neroeconomy:traders_ledger/going_once",
+      "x": 4,
+      "y": 3
+    },
+    {
+      "quest": "neroeconomy:traders_ledger/dividend_day",
+      "x": 6,
+      "y": 3
+    },
+    {
+      "quest": "neroeconomy:traders_ledger/reserve_restored",
+      "x": 0,
+      "y": 5
+    },
+    {
+      "quest": "neroeconomy:traders_ledger/storm_weathered",
+      "x": 2,
+      "y": 5
+    },
+    {
+      "quest": "neroeconomy:traders_ledger/colony_rally",
+      "x": 6,
+      "y": 5
+    }
+  ]
+}

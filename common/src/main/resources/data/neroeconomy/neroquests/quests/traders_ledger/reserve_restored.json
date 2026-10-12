@@ -1,0 +1,22 @@
+{
+  "title": "quest.neroeconomy.traders_ledger.reserve_restored.title",
+  "description": "quest.neroeconomy.traders_ledger.reserve_restored.desc",
+  "icon": "minecraft:gold_block",
+  "prerequisites": [],
+  "objectives": [
+    {
+      "type": "neroquests:custom_event",
+      "channel": "neroeconomy:reserve",
+      "event_scope": "world",
+      "direction": "rising",
+      "audience": "world"
+    }
+  ],
+  "rewards": [
+    {
+      "type": "neroquests:xp",
+      "amount": 200
+    }
+  ],
+  "scope": "server"
+}

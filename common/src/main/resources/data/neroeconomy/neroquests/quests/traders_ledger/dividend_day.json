@@ -1,0 +1,25 @@
+{
+  "title": "quest.neroeconomy.traders_ledger.dividend_day.title",
+  "description": "quest.neroeconomy.traders_ledger.dividend_day.desc",
+  "icon": "minecraft:sunflower",
+  "prerequisites": [
+    "neroeconomy:traders_ledger/shareholder"
+  ],
+  "objectives": [
+    {
+      "type": "neroquests:gate_open",
+      "gate": "neroeconomy:first_dividend"
+    }
+  ],
+  "rewards": [
+    {
+      "type": "neroquests:xp",
+      "amount": 200
+    },
+    {
+      "type": "neroquests:mod_hook",
+      "gate": "neroeconomy:hook/handbook_page"
+    }
+  ],
+  "scope": "player"
+}

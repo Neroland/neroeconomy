@@ -85,6 +85,13 @@ later register modifiers. Other mods compile against the API as an optional `com
 Maven dependency (see [USING-NEROECONOMY.md](USING-NEROECONOMY.md)). Core Link exposes the player's own data, trading and exchange actions,
 live topics, and alerts with fixed text.
 
+NeroEconomy also ships a **NeroQuests quest pack**: the chapter "Trader's Ledger" (15 quests, three of
+them server-wide world-log entries) appears in the quest book when NeroQuests is installed and is inert
+data otherwise. NeroQuests is optional and neither mod depends on the other; the quests read the nine
+per-player milestone gates and the threshold channels described on the wiki's
+[APIs and integrations](wiki/APIs-and-Integrations.md) page, and two of its rewards reach back through
+Core gate hooks (a one-off listing-fee waiver and the Handbook's Trader's Notes).
+
 ## For server operators
 
 NeroEconomy keeps one combined world store, `neroeconomy:economy`, with a recovery backup through

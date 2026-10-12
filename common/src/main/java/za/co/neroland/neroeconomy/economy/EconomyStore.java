@@ -42,6 +42,7 @@ import za.co.neroland.neroeconomy.goods.LotHolder;
 import za.co.neroland.neroeconomy.house.HouseSection;
 import za.co.neroland.neroeconomy.link.RemoteSpendSection;
 import za.co.neroland.neroeconomy.sibling.MilestoneSection;
+import za.co.neroland.neroeconomy.sibling.PerkSection;
 import za.co.neroland.neroeconomy.sibling.SiblingSection;
 import za.co.neroland.neroeconomy.market.ListingSource;
 import za.co.neroland.neroeconomy.market.MarketBuyOffer;
@@ -133,16 +134,16 @@ public final class EconomyStore extends SavedData {
 
     /**
      * The trading sections, added from the order book on; every one optional, so an older store loads
-     * them empty. Ten fields: room for six more sections before a third group is needed.
+     * them empty. Thirteen fields: room for three more sections before a third group is needed.
      */
     private record Markets(Optional<BookSection> book, Optional<OffersSection> offers, Optional<RulesSection> rules,
             Optional<TradeEscrowSection> tradeEscrow, Optional<AutoTraderSection> autoTraders,
             Optional<ExchangeSection> exchange, Optional<HouseSection> houses, Optional<AdminSection> admin,
             Optional<GallerySandbox> gallery, Optional<RemoteSpendSection> remoteSpend,
-            Optional<SiblingSection> sibling, Optional<MilestoneSection> milestones) {
+            Optional<SiblingSection> sibling, Optional<MilestoneSection> milestones, Optional<PerkSection> perks) {
         static final Markets EMPTY = new Markets(Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
                 Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
-                Optional.empty(), Optional.empty(), Optional.empty());
+                Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty());
 
         static final MapCodec<Markets> CODEC = RecordCodecBuilder.mapCodec(instance -> instance.group(
                 // An older store loads the book empty and its Market Board rows, still in the market
@@ -168,14 +169,16 @@ public final class EconomyStore extends SavedData {
                 // What other mods paid out through the cross-mod API today: an older store loads with none.
                 SiblingSection.CODEC.optionalFieldOf("sibling").forGetter(Markets::sibling),
                 // Each player's economy milestones and the gates waiting to open: an older store loads with none.
-                MilestoneSection.CODEC.optionalFieldOf("milestones").forGetter(Markets::milestones))
+                MilestoneSection.CODEC.optionalFieldOf("milestones").forGetter(Markets::milestones),
+                // The perks quest hooks granted (a pending listing-fee waiver): an older store loads with none.
+                PerkSection.CODEC.optionalFieldOf("perks").forGetter(Markets::perks))
                 .apply(instance, Markets::new));
 
         static Markets of(EconomyStore store) {
             return new Markets(present(store.book), present(store.offers), present(store.rules),
                     present(store.tradeEscrow), present(store.autoTraders), present(store.exchange),
                     present(store.houses), present(store.admin), present(store.gallery), present(store.remoteSpend),
-                    present(store.sibling), present(store.milestones));
+                    present(store.sibling), present(store.milestones), present(store.perks));
         }
     }
 
@@ -213,6 +216,7 @@ public final class EconomyStore extends SavedData {
     private final RemoteSpendSection remoteSpend;
     private final SiblingSection sibling;
     private final MilestoneSection milestones;
+    private final PerkSection perks;
 
     public EconomyStore() {
         this(Core.EMPTY, Markets.EMPTY, false);
@@ -244,6 +248,7 @@ public final class EconomyStore extends SavedData {
         this.remoteSpend = adopt(trading.remoteSpend().orElseGet(RemoteSpendSection::new));
         this.sibling = adopt(trading.sibling().orElseGet(SiblingSection::new));
         this.milestones = adopt(trading.milestones().orElseGet(MilestoneSection::new));
+        this.perks = adopt(trading.perks().orElseGet(PerkSection::new));
         // A store written before the vault existed still holds item claims in its market section.
         adoptItemClaims(false);
         // And one written before the order book existed still holds its Market Board rows there.
@@ -309,6 +314,9 @@ public final class EconomyStore extends SavedData {
     /** Each player's economy milestones, which open Core progression gates. */
     public MilestoneSection milestones() { return milestones; }
 
+    /** The perks quest hooks granted each player: a pending listing-fee waiver. */
+    public PerkSection perks() { return perks; }
+
     /**
      * Whether an operator has closed the market: player trading, the Merchant Houses' orders and the
      * exchange refuse, while reads, collecting and refunds carry on. Not the corruption freeze.
@@ -342,7 +350,7 @@ public final class EconomyStore extends SavedData {
      */
     private List<EconomySection> sections() {
         return List.of(ledger, market, obligations, shopOwners, goods, vault, simulation, book, offers, rules,
-                tradeEscrow, autoTraders, exchange, houses, admin, gallery, remoteSpend, sibling, milestones);
+                tradeEscrow, autoTraders, exchange, houses, admin, gallery, remoteSpend, sibling, milestones, perks);
     }
 
     /** The names of the sections that hold anything, for the health report. */
@@ -367,6 +375,7 @@ public final class EconomyStore extends SavedData {
         if (!remoteSpend.isEmpty()) names.add("remote_spend");
         if (!sibling.isEmpty()) names.add("sibling");
         if (!milestones.isEmpty()) names.add("milestones");
+        if (!perks.isEmpty()) names.add("perks");
         return names;
     }
 

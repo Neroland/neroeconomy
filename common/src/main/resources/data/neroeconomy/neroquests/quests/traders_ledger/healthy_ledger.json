@@ -1,0 +1,27 @@
+{
+  "title": "quest.neroeconomy.traders_ledger.healthy_ledger.title",
+  "description": "quest.neroeconomy.traders_ledger.healthy_ledger.desc",
+  "icon": "neroeconomy:credit_chip",
+  "prerequisites": [
+    "neroeconomy:traders_ledger/bond_holder"
+  ],
+  "objectives": [
+    {
+      "type": "neroquests:economy",
+      "event": "earned",
+      "count": 5000
+    }
+  ],
+  "rewards": [
+    {
+      "type": "neroquests:xp",
+      "amount": 300
+    },
+    {
+      "type": "neroquests:item",
+      "item": "neroeconomy:credit_chip",
+      "count": 1
+    }
+  ],
+  "scope": "player"
+}

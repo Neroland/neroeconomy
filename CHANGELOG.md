@@ -2,6 +2,44 @@
 
 ## [Unreleased]
 
+## [0.4.0-beta.1] - 2026-10-11
+
+A content release that **requires Neroland Core 1.15.0** (was 1.13.0): NeroEconomy now opens progression
+gates for offline players and publishes its threshold crossings with a source, both Core 1.15.0 APIs.
+Worlds and configs from 0.3.x load unchanged; one optional section (`perks`) is added to the combined
+store, and the cross-mod API is unchanged (`SiblingEconomy.API_VERSION` is still 1).
+
+### Added
+
+- **A quest chapter.** Ships a NeroQuests quest pack — chapter `neroeconomy:traders_ledger` "Trader's
+  Ledger", 15 quests (3 server-wide world-log entries) — that appears in the quest book when
+  NeroQuests is installed; inert otherwise, no dependency in either direction. The quests follow the
+  milestone gates below, two `economy` objectives (256 goods sold, 5000 credits earned), the Merchant
+  Stall craft, and the `reserve`, `market_shock` and `sector_index` channels for the world log.
+- **Three more milestone gates**, scope `player`: `neroeconomy:first_auction_win` (an auction settles in
+  your favour), `neroeconomy:first_delivery` (you fulfil a contract or delivery job, a House's included)
+  and `neroeconomy:first_dividend` (a company you hold pays you a dividend). Nine milestones in all.
+- **Quest hooks.** Two record gates a quest pack's `mod_hook` reward can open, `neroeconomy:hook/fee_waiver`
+  and `neroeconomy:hook/handbook_page`, listened for on Core's gate events. The first waives the player's
+  next listing fee on an order they place themselves (a single flag, never a credit, held at most once at a
+  time, kept in the new `perks` section); the second opens the next **Trader's Note** for them. A hook that
+  opens while the player is away, or while the economy is frozen, is delivered at their next join.
+- **Trader's Notes.** Four extra Handbook pages, one each at the end of the market, shops, Merchant
+  Houses and jobs chapters, revealed one at a time by the `handbook_page` hook through player-scope
+  gates `neroeconomy:handbook/<id>`. The book still reads nothing from the server: the client learns
+  which notes are open from Core's own gate sync.
+
+### Changed
+
+- **Milestone gates open for offline players.** A milestone reached while its player is away now opens
+  its gate within a second, instead of waiting for them to join (Core 1.15.0's offline gate API).
+- **Threshold crossings carry their source.** The `reserve`, `house_stock`, `market_shock` and
+  `sector_index` channels are published with `neroeconomy` as the source mod, so a listener using Core
+  1.15.0's sourced bus can tell them apart from another mod's; the crossings themselves are unchanged.
+- **Privacy.** The `perks` section holds one flag per player (a pending fee waiver) under their UUID; it
+  is exported (`perks`) and erased with the player. The Trader's Note gates live in Core's gate store
+  like every other progression gate. See [PRIVACY.md](PRIVACY.md).
+
 ## [0.3.2-beta.1] - 2026-10-11
 
 A hotfix release with no gameplay, config or save-format changes. Worlds and configs from 0.3.x load

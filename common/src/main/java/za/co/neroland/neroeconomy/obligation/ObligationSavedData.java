@@ -49,6 +49,8 @@ import za.co.neroland.neroeconomy.goods.LotHolder;
 import za.co.neroland.neroeconomy.market.MarketSavedData;
 import za.co.neroland.neroeconomy.market.Settlement;
 import za.co.neroland.neroeconomy.market.StoredStacks;
+import za.co.neroland.neroeconomy.sibling.EconomyChannels;
+import za.co.neroland.neroeconomy.sibling.MilestoneSection;
 import za.co.neroland.neroeconomy.link.EconomyAlerts;
 import za.co.neroland.neroeconomy.trade.TradeEnv;
 import za.co.neroland.neroeconomy.trade.Trading;
@@ -328,6 +330,7 @@ public final class ObligationSavedData extends EconomySection implements EscrowH
         EconomyAlerts.raise(player.level().getServer(), job.issuer(), EconomyAlerts.Kind.CONTRACT_FULFILLED,
                 LinkAlert.Severity.INFO);
         jobs.put(id, job.withState(JobState.FULFILLED)); invalidateSchedule(); setDirty();
+        store.milestones().earn(player.getUUID(), MilestoneSection.Milestone.FIRST_DELIVERY);
         return FulfillResult.SUCCESS;
     }
 
@@ -533,6 +536,7 @@ public final class ObligationSavedData extends EconomySection implements EscrowH
                 if (proceeds > 0L) market.addCreditClaim(auction.seller(), proceeds, TransactionType.AUCTION_PAYOUT);
                 VaultStacks.deliver(EconomyStore.get(server), winner, auction.lot());
                 EconomyAlerts.raise(server, winner, EconomyAlerts.Kind.AUCTION_WON, LinkAlert.Severity.INFO);
+                EconomyChannels.earn(server, winner, MilestoneSection.Milestone.FIRST_AUCTION_WIN);
                 announceAuction(auction.seller(), winner, net.minecraft.core.registries.BuiltInRegistries.ITEM
                         .getKey(auction.lot().getItem()).toString(), auction.lot().getCount(), auction.highestBid(), now);
             }
@@ -820,6 +824,7 @@ public final class ObligationSavedData extends EconomySection implements EscrowH
         for (Lot lot : goods) store.houses().returnStock(house, lot);
         jobs.put(id, job.withState(JobState.FULFILLED));
         invalidateSchedule(); setDirty();
+        store.milestones().earn(worker, MilestoneSection.Milestone.FIRST_DELIVERY);
         return FulfillResult.SUCCESS;
     }
 

@@ -1,0 +1,21 @@
+{
+  "title": "quest.neroeconomy.traders_ledger.shareholder.title",
+  "description": "quest.neroeconomy.traders_ledger.shareholder.desc",
+  "icon": "minecraft:paper",
+  "prerequisites": [
+    "neroeconomy:traders_ledger/first_purchase"
+  ],
+  "objectives": [
+    {
+      "type": "neroquests:gate_open",
+      "gate": "neroeconomy:first_investment"
+    }
+  ],
+  "rewards": [
+    {
+      "type": "neroquests:xp",
+      "amount": 150
+    }
+  ],
+  "scope": "player"
+}

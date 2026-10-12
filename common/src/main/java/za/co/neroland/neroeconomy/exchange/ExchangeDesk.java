@@ -24,6 +24,7 @@ import za.co.neroland.neroeconomy.economy.LedgerResult;
 import za.co.neroland.neroeconomy.economy.Reserve;
 import za.co.neroland.neroeconomy.economy.TransactionType;
 import za.co.neroland.neroeconomy.link.EconomyAlerts;
+import za.co.neroland.neroeconomy.sibling.MilestoneSection;
 import za.co.neroland.neroeconomy.trade.Accounts;
 
 /**
@@ -435,6 +436,8 @@ public final class ExchangeDesk {
                 Portfolio portfolio = portfolios.get(share.getKey());
                 if (portfolio != null) portfolio.paidDividend(day, share.getValue());
                 env.alerts().raise(share.getKey(), EconomyAlerts.Kind.DIVIDEND_PAID);
+                if (share.getKey() instanceof PlayerAccountId holder)
+                    store().milestones().earn(holder.playerId(), MilestoneSection.Milestone.FIRST_DIVIDEND);
                 accounts++;
             }
             section.setDirty();

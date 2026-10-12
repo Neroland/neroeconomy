@@ -1,0 +1,26 @@
+{
+  "title": "quest.neroeconomy.traders_ledger.bulk_shipper.title",
+  "description": "quest.neroeconomy.traders_ledger.bulk_shipper.desc",
+  "icon": "minecraft:barrel",
+  "prerequisites": [
+    "neroeconomy:traders_ledger/hundred_sales"
+  ],
+  "objectives": [
+    {
+      "type": "neroquests:economy",
+      "event": "sold",
+      "count": 256
+    }
+  ],
+  "rewards": [
+    {
+      "type": "neroquests:xp",
+      "amount": 300
+    },
+    {
+      "type": "neroquests:mod_hook",
+      "gate": "neroeconomy:hook/fee_waiver"
+    }
+  ],
+  "scope": "player"
+}

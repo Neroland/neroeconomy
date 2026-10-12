@@ -12,7 +12,7 @@
 
 NeroEconomy is the **economy** mod of the Neroland ecosystem. It adds credits, a private Vault, bank terminals, offline player shops, direct trade, a matching market, auto-trading, a fictional stock exchange, Merchant Houses, supply contracts, delivery jobs, bounties and server-wide auctions — a whole retail-and-work layer that gives players a reason to specialise and trade instead of every player building every machine. A miner can sell ore to a fabricator, a logistics player can run delivery jobs, and a trader can corner the auction house — or buy a share in a fictional company and watch the market move while the server sleeps.
 
-> ⚠️ **Beta.** NeroEconomy is in beta (`0.3.0-beta.1`, the "living economy" release described below). Back up your world before upgrading from 0.2 — the four older stores are adopted into one combined store on first start — and expect rough edges. Bug reports are very welcome.
+> ⚠️ **Beta.** NeroEconomy is in beta (`0.4.0-beta.1`, the 0.3 "living economy" release described below plus a NeroQuests quest chapter). Back up your world before upgrading from 0.2 — the four older stores are adopted into one combined store on first start — and expect rough edges. Bug reports are very welcome.
 
 Built on **Neroland Core**, so its currency API, progression gates, config framework, `c:` tags and data-erasure hook are shared with the rest of the lineup — NeroEconomy is the persistent provider behind Core's credits and never re-implements a competing currency.
 

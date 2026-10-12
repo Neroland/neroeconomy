@@ -20,7 +20,7 @@ import za.co.neroland.neroeconomy.economy.EconomyStore;
  * ({@code neroeconomy:first_sale} and so on) so quest packs can react without code.
  *
  * <p>Per player: which milestones were reached ({@code earned}), which of those still wait for
- * their gate to be opened because the player was offline ({@code pending}), and the count of
+ * their gate to be opened because the economy was frozen or no check has run yet ({@code pending}), and the count of
  * settled sales toward {@code trader_100} (it stops counting at 100). Personal: erased with the
  * player ({@link #forgetPlayer}), exported ({@link #exportFor}), at most {@link #MAX_PLAYERS}
  * rows; when full, a new player's milestone is not recorded (the gate can still be opened by an
@@ -34,7 +34,8 @@ public final class MilestoneSection extends EconomySection {
 
     /** The milestones; the ordinal is the saved bit, so constants are only ever appended. */
     public enum Milestone {
-        FIRST_SALE, FIRST_PURCHASE, FIRST_INVESTMENT, FIRST_BOND, TRADER_100, FIRST_OFFER_ACCEPTED;
+        FIRST_SALE, FIRST_PURCHASE, FIRST_INVESTMENT, FIRST_BOND, TRADER_100, FIRST_OFFER_ACCEPTED, FIRST_AUCTION_WIN,
+        FIRST_DELIVERY, FIRST_DIVIDEND;
 
         /** The gate path and data-file name, such as {@code first_sale}. */
         public String id() { return name().toLowerCase(Locale.ROOT); }
@@ -92,6 +93,13 @@ public final class MilestoneSection extends EconomySection {
         List<Milestone> out = new ArrayList<>();
         if (row != null) for (Milestone milestone : Milestone.values())
             if ((row.pending() & milestone.bit()) != 0L) out.add(milestone);
+        return out;
+    }
+
+    /** The players with a gate waiting to be opened, online or not. */
+    public synchronized List<UUID> pendingPlayers() {
+        List<UUID> out = new ArrayList<>();
+        rows.forEach((player, row) -> { if (row.pending() != 0L) out.add(player); });
         return out;
     }
 

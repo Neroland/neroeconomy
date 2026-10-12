@@ -1,0 +1,25 @@
+{
+  "title": "quest.neroeconomy.traders_ledger.going_once.title",
+  "description": "quest.neroeconomy.traders_ledger.going_once.desc",
+  "icon": "minecraft:goat_horn",
+  "prerequisites": [
+    "neroeconomy:traders_ledger/first_purchase"
+  ],
+  "objectives": [
+    {
+      "type": "neroquests:gate_open",
+      "gate": "neroeconomy:first_auction_win"
+    }
+  ],
+  "rewards": [
+    {
+      "type": "neroquests:xp",
+      "amount": 150
+    },
+    {
+      "type": "neroquests:mod_hook",
+      "gate": "neroeconomy:hook/handbook_page"
+    }
+  ],
+  "scope": "player"
+}

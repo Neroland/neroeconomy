@@ -112,9 +112,13 @@ public final class ForgePlatformInfo implements PlatformInfo {
         PlayerInteractEvent.EntityInteractSpecific.BUS.addListener(event -> {
             DirectTrades.useEntity(event.getEntity(), event.getTarget(), event.getHand());
         });
-        // First join: the Trader's Handbook, once per account (see HandbookGift for the rule).
+        // First join: the Trader's Handbook, once per account (see HandbookGift for the rule), then any
+        // quest hook that opened while the player was away (see QuestHooks).
         PlayerEvent.PlayerLoggedInEvent.BUS.addListener(event -> {
-            if (event.getEntity() instanceof net.minecraft.server.level.ServerPlayer joined) HandbookGift.joined(joined);
+            if (event.getEntity() instanceof net.minecraft.server.level.ServerPlayer joined) {
+                HandbookGift.joined(joined);
+                za.co.neroland.neroeconomy.sibling.QuestHooks.onJoin(joined);
+            }
         });
         // The packet limiter keys on the player id in memory; the entry leaves with the player,
         // and so do their trade requests and a trade they had open.

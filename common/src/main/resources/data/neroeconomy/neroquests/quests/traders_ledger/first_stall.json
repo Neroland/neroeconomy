@@ -1,0 +1,19 @@
+{
+  "title": "quest.neroeconomy.traders_ledger.first_stall.title",
+  "description": "quest.neroeconomy.traders_ledger.first_stall.desc",
+  "icon": "neroeconomy:merchant_stall",
+  "prerequisites": [],
+  "objectives": [
+    {
+      "type": "neroquests:craft_item",
+      "item": "neroeconomy:merchant_stall"
+    }
+  ],
+  "rewards": [
+    {
+      "type": "neroquests:xp",
+      "amount": 50
+    }
+  ],
+  "scope": "player"
+}
