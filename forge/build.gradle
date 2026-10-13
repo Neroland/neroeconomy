@@ -71,7 +71,7 @@ sourceSets.test.java.srcDir "${rootProject.projectDir}/common/src/test/java"
 configurations.testCompileClasspath.extendsFrom configurations.compileClasspath
 configurations.testRuntimeClasspath.extendsFrom configurations.runtimeClasspath
 dependencies {
-    testImplementation platform('org.junit:junit-bom:5.12.2')
+    testImplementation platform('org.junit:junit-bom:6.1.3')
     testImplementation 'org.junit.jupiter:junit-jupiter'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
@@ -120,9 +120,9 @@ repositories {
 dependencies {
     implementation minecraft.dependency("net.minecraftforge:forge:${forgeVersion}")
     implementation "za.co.neroland.nerolandcore:nerolandcore-forge-${mc}:${nerolandcoreVersion}"
-    annotationProcessor 'net.minecraftforge:eventbus-validator:7.0.5'
+    annotationProcessor 'net.minecraftforge:eventbus-validator:7.0.6'
 
-    implementation 'io.sentry:sentry:8.45.0'
+    implementation 'io.sentry:sentry:8.60.0'
     jarJar(group: 'io.sentry', name: 'sentry', version: '8.45.0')
 
     // JEI common API only; Forge 26.x loader artifacts are not yet published on the pinned JEI lines.

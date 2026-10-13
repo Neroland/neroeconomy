@@ -63,7 +63,7 @@ configurations.testCompileClasspath.extendsFrom configurations.compileClasspath
 configurations.testRuntimeClasspath.extendsFrom configurations.runtimeClasspath
 
 dependencies {
-    testImplementation platform('org.junit:junit-bom:5.12.2')
+    testImplementation platform('org.junit:junit-bom:6.1.3')
     testImplementation 'org.junit.jupiter:junit-jupiter'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
@@ -81,8 +81,8 @@ dependencies {
 
     // Sentry SDK (telemetry/NeroEconomyTelemetry): compile against it + embed it as a jar-in-jar so the
     // shipped Fabric jar carries it. Counterpart to the NeoForge JarJar bundling.
-    implementation 'io.sentry:sentry:8.45.0'
-    include 'io.sentry:sentry:8.45.0'
+    implementation 'io.sentry:sentry:8.60.0'
+    include 'io.sentry:sentry:8.60.0'
 
     // JEI (optional recipe-viewer compat). The shared compat/jei plugin lives in `common` and uses ONLY
     // the loader-agnostic JEI common API; on Fabric it compiles against the common + fabric APIs and loads
