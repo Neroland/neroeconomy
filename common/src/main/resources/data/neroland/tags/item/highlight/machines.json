@@ -1,0 +1,15 @@
+{
+  "replace": false,
+  "values": [
+    {
+      "id": "neroeconomy:auto_trader",
+      "required": false
+    },
+    "neroeconomy:bank_terminal",
+    "neroeconomy:exchange_terminal",
+    "neroeconomy:market_board",
+    "neroeconomy:merchant_stall",
+    "neroeconomy:player_shop",
+    "neroeconomy:trading_terminal"
+  ]
+}

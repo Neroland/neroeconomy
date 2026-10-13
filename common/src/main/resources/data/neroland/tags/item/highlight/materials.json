@@ -1,0 +1,9 @@
+{
+  "replace": false,
+  "values": [
+    {
+      "id": "neroeconomy:credit_chip",
+      "required": false
+    }
+  ]
+}
