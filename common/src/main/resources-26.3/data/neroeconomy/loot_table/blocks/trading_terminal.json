@@ -1,0 +1,18 @@
+{
+  "type": "minecraft:block",
+  "pools": [
+    {
+      "condition": {
+        "type": "minecraft:survives_explosion"
+      },
+      "entries": [
+        {
+          "type": "minecraft:item",
+          "name": "neroeconomy:trading_terminal"
+        }
+      ],
+      "rolls": 1
+    }
+  ],
+  "random_sequence": "neroeconomy:blocks/trading_terminal"
+}

@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **Block and loot drops work as intended on Minecraft 26.3** (NeoForge, Fabric and Forge). Minecraft
+  26.3 changed the loot-table file format and silently ignores the old one, so conditions and drop
+  modifiers (explosion survival, door/slab block-state checks, drop counts, random chances) were skipped.
+  The 26.3 builds now ship every loot table in the new format. 26.1.2 and 26.2 were not affected.
+
 ## [0.4.0-beta.1] - 2026-10-11
 
 A content release that **requires Neroland Core 1.15.0** (was 1.13.0): NeroEconomy now opens progression
