@@ -2,9 +2,11 @@ package za.co.neroland.neroeconomy.registry;
 
 import net.minecraft.core.registries.Registries;
 import net.minecraft.world.item.BlockItem;
-import net.minecraft.world.item.Item;
+import java.util.List;
 
-import za.co.neroland.nerolandcore.registry.CoreCreativeTab;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.level.ItemLike;
+
 import za.co.neroland.nerolandcore.registry.RegistrationProvider;
 import za.co.neroland.nerolandcore.registry.RegistrationProvider.RegistryEntry;
 import za.co.neroland.neroeconomy.NeroEconomyCommon;
@@ -36,15 +38,14 @@ public final class ModItems {
     private ModItems() {
     }
 
+    /** Classload-forcing no-op: touching this class runs the static registrations above. */
     public static void init() {
-        CoreCreativeTab.add(BANK_TERMINAL);
-        CoreCreativeTab.add(PLAYER_SHOP);
-        CoreCreativeTab.add(TRADING_TERMINAL);
-        CoreCreativeTab.add(MARKET_BOARD);
-        CoreCreativeTab.add(AUTO_TRADER);
-        CoreCreativeTab.add(EXCHANGE_TERMINAL);
-        CoreCreativeTab.add(MERCHANT_STALL);
-        CoreCreativeTab.add(CREDIT_CHIP);
-        CoreCreativeTab.add(TRADERS_HANDBOOK);
+    }
+
+    /** Every NeroEconomy item, in display order, for {@link ModCreativeTab}. Resolved when the tab is built. */
+    public static List<ItemLike> creativeContents() {
+        return List.of(BANK_TERMINAL.get(), PLAYER_SHOP.get(), TRADING_TERMINAL.get(), MARKET_BOARD.get(),
+                AUTO_TRADER.get(), EXCHANGE_TERMINAL.get(), MERCHANT_STALL.get(), CREDIT_CHIP.get(),
+                TRADERS_HANDBOOK.get());
     }
 }

@@ -13,6 +13,7 @@ import za.co.neroland.neroeconomy.economy.EconomySavedData;
 import za.co.neroland.neroeconomy.economy.ServerCurrencyProvider;
 import za.co.neroland.neroeconomy.registry.ModBlockEntities;
 import za.co.neroland.neroeconomy.registry.ModBlocks;
+import za.co.neroland.neroeconomy.registry.ModCreativeTab;
 import za.co.neroland.neroeconomy.registry.ModItems;
 import za.co.neroland.neroeconomy.registry.ModMenuTypes;
 import za.co.neroland.neroeconomy.network.NeroEconomyNetwork;
@@ -114,6 +115,7 @@ public final class NeroEconomyCommon {
         // 3. Content registrations.
         ModBlocks.init();
         ModItems.init();
+        ModCreativeTab.init();
         ModBlockEntities.init();
         ModMenuTypes.init();
         // 4. Link is always last and can never prevent the mod from loading.
