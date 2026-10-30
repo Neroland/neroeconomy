@@ -18,6 +18,10 @@ public final class NeroEconomyNeoForge {
         NeroEconomyCommon.init();
         Services.PLATFORM.register(modEventBus);
         Services.NETWORK.register(modEventBus);
+        //? if >=1.21.9 {
         if (FMLEnvironment.getDist() == Dist.CLIENT) NeoForgeClientSetup.init(modEventBus);
+        //?} else {
+        /*if (FMLEnvironment.dist == Dist.CLIENT) NeoForgeClientSetup.init(modEventBus);
+        *///?}
     }
 }

@@ -44,7 +44,7 @@ public final class NeroEconomyTelemetry {
             options.setEnvironment(Services.PLATFORM.isDevelopmentEnvironment() ? "development" : "production");
             options.setSendDefaultPii(false);
             options.setAttachServerName(false);
-            options.setBeforeSend((event, hint) -> filter(event));
+            options.setBeforeSend((event, hint) -> ForeignMixinFailure.matches(event) ? null : filter(event));
         });
         active = true;
     }

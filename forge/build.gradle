@@ -33,6 +33,10 @@ def nextMinecraft = { String version ->
     def parts = version.tokenize('.')
     "${parts[0]}.${(parts[1] as int) + 1}"
 }
+// 1.21.x lines are not "next minor", so their bounds come from gradle.properties (mc_floor_/mc_ceiling_);
+// the floor only goes below the compiled version for a protocol-identical hotfix sibling.
+def mcFloor = project.findProperty("mc_floor_${mc}") ?: mc
+def mcCeiling = project.findProperty("mc_ceiling_${mc}") ?: nextMinecraft(mc)
 
 // Distinct, descriptive jar name per cell.
 base { archivesName = "neroeconomy-forge-${mc}" }
@@ -120,7 +124,10 @@ repositories {
 dependencies {
     implementation minecraft.dependency("net.minecraftforge:forge:${forgeVersion}")
     implementation "za.co.neroland.nerolandcore:nerolandcore-forge-${mc}:${nerolandcoreVersion}"
-    annotationProcessor 'net.minecraftforge:eventbus-validator:7.0.6'
+    // EventBus 7's compile-time validator; Forge before 1.21.6 ships EventBus 6, which it cannot validate.
+    if (stonecutter.eval(mc, '>=1.21.6')) {
+        annotationProcessor 'net.minecraftforge:eventbus-validator:7.0.6'
+    }
 
     implementation 'io.sentry:sentry:8.60.0'
     jarJar(group: 'io.sentry', name: 'sentry', version: '8.45.0')
@@ -147,7 +154,7 @@ def generateModMetadata = tasks.register('generateModMetadata', ProcessResources
         mod_authors               : rootProject.mod_authors,
         mod_license               : rootProject.mod_license,
         forge_loader_version_range: "[${forgeMajor},)",
-        minecraft_version_range   : "[${mc},${nextMinecraft(mc)})",
+        minecraft_version_range   : "[${mcFloor},${mcCeiling})",
         nerolandcore_version_range: "[${nerolandcoreVersion},2.0)",
     ]
     inputs.properties(props)
@@ -187,7 +194,7 @@ tasks.register('ecjCheck', JavaExec) {
                 .join(File.pathSeparator)
         def srcDirs = sourceSets.main.java.srcDirs.findAll { it.exists() }.collect { it.absolutePath }
         args = [
-                '--release', '25',
+                '--release', "${project.javaRelease}",
                 '-proc:none',
                 '-d', 'none',
                 '-properties', rootProject.file('tools/ecj.prefs').absolutePath,

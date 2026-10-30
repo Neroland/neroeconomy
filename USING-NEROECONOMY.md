@@ -13,7 +13,8 @@ za.co.neroland.neroeconomy:neroeconomy-<loader>-<mc>:<version>
 ```
 
 - `<loader>` is `fabric`, `forge` or `neoforge`.
-- `<mc>` is `26.1.2`, `26.2` or `26.3` — pick the cell that matches the Minecraft version of the
+- `<mc>` is `1.21.1`, `1.21.4`, `1.21.5`, `1.21.8`, `1.21.10`, `1.21.11`, `26.1.2`, `26.2` or `26.3`
+  (the 1.21.x cells exist from `0.5.0-beta.1`) — pick the cell that matches the Minecraft version of the
   node you are compiling.
 - `<version>` is NeroEconomy's `mod_version` (`0.3.1-beta.1` is the first version published to Maven).
 

@@ -58,6 +58,8 @@ public final class GuardTesting {
     private static final String TEST = "common/src/test/resources/";
     private static final String RECIPES = "data/minecraft/recipe/";
     private static final String ITEM_TAGS = "data/minecraft/tags/item/";
+    /** Vanilla item tags the mod ships additions to (data/minecraft/tags/item/<name>.json). */
+    private static final List<String> SHIPPED_VANILLA_TAGS = List.of("eggs");
     private static final String ITEM_MODELS = "assets/minecraft/items/";
     private static final String PROBE = ITEM_TAGS + "planks.json";
 
@@ -133,6 +135,23 @@ public final class GuardTesting {
                 String name = path.substring(ITEM_MODELS.length(), path.length() - 5);
                 if (name.indexOf('/') < 0) items.add("minecraft:" + name);
             }
+        }
+        // The mod's own additions to vanilla item tags merge in as the game merges data packs (replace: false).
+        for (String extra : SHIPPED_VANILLA_TAGS) {
+            List<String> values = new ArrayList<>(rawTags.getOrDefault("minecraft:" + extra, List.of()));
+            // Read from the source tree: on the classpath the game's own file of the same name would win.
+            JsonElement shipped;
+            try {
+                shipped = JsonParser.parseString(Files.readString(sourceFile(MAIN + ITEM_TAGS + extra + ".json"),
+                        StandardCharsets.UTF_8));
+            } catch (IOException failure) {
+                throw new IllegalStateException("Cannot read the shipped " + extra + " tag", failure);
+            }
+            for (JsonElement value : shipped.getAsJsonObject().getAsJsonArray("values")) {
+                String id = value.isJsonObject() ? value.getAsJsonObject().get("id").getAsString() : value.getAsString();
+                if (!values.contains(id)) values.add(id);
+            }
+            rawTags.put("minecraft:" + extra, values);
         }
         if (recipes.size() < 1000 || rawTags.size() < 100)
             throw new IllegalStateException("The Minecraft data on the test classpath is incomplete: " + recipes.size()

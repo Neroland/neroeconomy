@@ -7,15 +7,17 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+import com.mojang.blaze3d.platform.InputConstants;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.components.Tooltip;
+//? if >=1.21.9 {
 import net.minecraft.client.input.KeyEvent;
 import net.minecraft.client.input.MouseButtonEvent;
-import net.minecraft.client.renderer.RenderPipelines;
+//?}
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
@@ -217,7 +219,7 @@ public final class EconomyHubScreen extends TexturedContainerScreen<EconomyHubMe
 
     /** Text wrapped to {@code width}, at a body-relative position. */
     void wrapped(GuiGraphicsExtractor g, Component text, int x, int y, int width, int color) {
-        g.textWithWordWrap(this.font, text, bodyLeft() + x, bodyTop() + y, width, color, false);
+        GuiCompat.wrapped(g, this.font, text, bodyLeft() + x, bodyTop() + y, width, color);
     }
 
     void textRight(GuiGraphicsExtractor g, Component text, int xRight, int y, int color) {
@@ -235,7 +237,7 @@ public final class EconomyHubScreen extends TexturedContainerScreen<EconomyHubMe
     /** The icon of an item id, at a body-relative position. Unknown ids draw nothing. */
     void icon(GuiGraphicsExtractor g, String itemId, int x, int y) {
         ItemStack stack = stack(itemId);
-        if (!stack.isEmpty()) g.item(stack, bodyLeft() + x, bodyTop() + y);
+        if (!stack.isEmpty()) GuiCompat.item(g, stack, bodyLeft() + x, bodyTop() + y);
     }
 
     private ItemStack stack(String itemId) {
@@ -393,9 +395,9 @@ public final class EconomyHubScreen extends TexturedContainerScreen<EconomyHubMe
 
     @Override
     protected void drawPanel(GuiGraphicsExtractor extractor) {
-        extractor.blit(RenderPipelines.GUI_TEXTURED, TABS_TEXTURE, this.leftPos, this.topPos, 0.0F, 0.0F, TAB_W,
+        GuiCompat.blit(extractor, TABS_TEXTURE, this.leftPos, this.topPos, 0.0F, 0.0F, TAB_W,
                 this.imageHeight, 256, 256);
-        extractor.blit(RenderPipelines.GUI_TEXTURED, BODY_TEXTURE, this.leftPos + TAB_W, this.topPos, 0.0F, 0.0F,
+        GuiCompat.blit(extractor, BODY_TEXTURE, this.leftPos + TAB_W, this.topPos, 0.0F, 0.0F,
                 BODY_W, this.imageHeight, 256, 256);
     }
 
@@ -411,7 +413,7 @@ public final class EconomyHubScreen extends TexturedContainerScreen<EconomyHubMe
             int y = this.topPos + TAB_Y + index * TAB_STEP;
             if (tab == this.page.tab()) band(g, 0, TAB_Y + index * TAB_STEP, 2, TAB_SIZE, CREDIT);
             ItemStack stack = stack(tab.icon());
-            if (!stack.isEmpty()) g.item(stack, this.leftPos + TAB_X + 2, y + 2);
+            if (!stack.isEmpty()) GuiCompat.item(g, stack, this.leftPos + TAB_X + 2, y + 2);
         }
         if (this.waiting) {
             text(g, Component.translatable("gui.neroeconomy.hub.loading"), 8, 24, SUBTLE);
@@ -434,14 +436,15 @@ public final class EconomyHubScreen extends TexturedContainerScreen<EconomyHubMe
         HubTabView view = shown();
         if (view == null || this.demo != null && this.demo.onCaption(mouseX - bodyLeft(), mouseY - bodyTop())) return;
         Component tip = view.tooltipAt(mouseX - bodyLeft(), mouseY - bodyTop());
-        if (tip != null) extractor.setTooltipForNextFrame(this.font, Tooltip.splitTooltip(this.minecraft, tip),
+        if (tip != null) GuiCompat.tooltip(extractor, this.font, Tooltip.splitTooltip(this.minecraft, tip),
                 mouseX, mouseY);
     }
 
+    //? if >=1.21.9 {
     @Override
     public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
         if (this.demo != null) return demoClicked(event, doubleClick);
-        if (!this.waiting && event.button() == 0
+        if (!this.waiting && event.button() == InputConstants.MOUSE_BUTTON_LEFT
                 && current().click((int) Math.floor(event.x()) - bodyLeft(), (int) Math.floor(event.y()) - bodyTop()))
             return true;
         return super.mouseClicked(event, doubleClick);
@@ -467,18 +470,18 @@ public final class EconomyHubScreen extends TexturedContainerScreen<EconomyHubMe
             if (running.controls().contains(child) || !child.isMouseOver(event.x(), event.y())) continue;
             if (child.mouseClicked(event, doubleClick)) {
                 setFocused(child);
-                if (event.button() == 0) setDragging(true);
+                if (event.button() == InputConstants.MOUSE_BUTTON_LEFT) setDragging(true);
             }
             return true;
         }
-        if (event.button() == 0 && running.view() != null) running.view().click(x, y);
+        if (event.button() == InputConstants.MOUSE_BUTTON_LEFT && running.view() != null) running.view().click(x, y);
         return true;
     }
 
     @Override
     public boolean mouseReleased(MouseButtonEvent event) {
         if (this.demo == null) return super.mouseReleased(event);
-        if (event.button() == 0 && isDragging()) {
+        if (event.button() == InputConstants.MOUSE_BUTTON_LEFT && isDragging()) {
             setDragging(false);
             if (getFocused() != null) getFocused().mouseReleased(event);
         }
@@ -488,7 +491,7 @@ public final class EconomyHubScreen extends TexturedContainerScreen<EconomyHubMe
     @Override
     public boolean mouseDragged(MouseButtonEvent event, double dx, double dy) {
         if (this.demo == null) return super.mouseDragged(event, dx, dy);
-        if (getFocused() != null && isDragging() && event.button() == 0) getFocused().mouseDragged(event, dx, dy);
+        if (getFocused() != null && isDragging() && event.button() == InputConstants.MOUSE_BUTTON_LEFT) getFocused().mouseDragged(event, dx, dy);
         return true;
     }
 
@@ -502,4 +505,73 @@ public final class EconomyHubScreen extends TexturedContainerScreen<EconomyHubMe
         }
         return super.keyPressed(event);
     }
+    //?} else {
+    /*// Before 1.21.9 the input callbacks take raw coordinates and codes; they are wrapped into the same
+    // event shape the 26.x code above reads, and handed back to vanilla in its own form.
+    private record MouseButtonEvent(double x, double y, int button) {
+    }
+
+    @Override
+    public boolean mouseClicked(double mouseX, double mouseY, int button) {
+        MouseButtonEvent event = new MouseButtonEvent(mouseX, mouseY, button);
+        if (this.demo != null) return demoClicked(event);
+        if (!this.waiting && event.button() == InputConstants.MOUSE_BUTTON_LEFT
+                && current().click((int) Math.floor(event.x()) - bodyLeft(), (int) Math.floor(event.y()) - bodyTop()))
+            return true;
+        return super.mouseClicked(mouseX, mouseY, button);
+    }
+
+    private boolean demoClicked(MouseButtonEvent event) {
+        HubDemo running = this.demo;
+        int x = (int) Math.floor(event.x()) - bodyLeft();
+        int y = (int) Math.floor(event.y()) - bodyTop();
+        Button control = null;
+        for (Button button : running.controls())
+            if (button.visible && button.isMouseOver(event.x(), event.y())) control = button;
+        if (control != null) {
+            control.mouseClicked(event.x(), event.y(), event.button());
+            return true;
+        }
+        if (running.onCaption(x, y)) return true;
+        for (var child : List.copyOf(this.children())) {
+            if (running.controls().contains(child) || !child.isMouseOver(event.x(), event.y())) continue;
+            if (child.mouseClicked(event.x(), event.y(), event.button())) {
+                setFocused(child);
+                if (event.button() == InputConstants.MOUSE_BUTTON_LEFT) setDragging(true);
+            }
+            return true;
+        }
+        if (event.button() == InputConstants.MOUSE_BUTTON_LEFT && running.view() != null) running.view().click(x, y);
+        return true;
+    }
+
+    @Override
+    public boolean mouseReleased(double mouseX, double mouseY, int button) {
+        if (this.demo == null) return super.mouseReleased(mouseX, mouseY, button);
+        if (button == InputConstants.MOUSE_BUTTON_LEFT && isDragging()) {
+            setDragging(false);
+            if (getFocused() != null) getFocused().mouseReleased(mouseX, mouseY, button);
+        }
+        return true;
+    }
+
+    @Override
+    public boolean mouseDragged(double mouseX, double mouseY, int button, double dx, double dy) {
+        if (this.demo == null) return super.mouseDragged(mouseX, mouseY, button, dx, dy);
+        if (getFocused() != null && isDragging() && button == InputConstants.MOUSE_BUTTON_LEFT)
+            getFocused().mouseDragged(mouseX, mouseY, button, dx, dy);
+        return true;
+    }
+
+    @Override
+    public boolean keyPressed(int key, int scanCode, int modifiers) {
+        boolean typing = getFocused() instanceof EditBox box && box.canConsumeInput();
+        if (this.demo != null && (key == InputConstants.KEY_ESCAPE
+                || !typing && this.minecraft != null && this.minecraft.options.keyInventory.matches(key, scanCode))) {
+            closeDemo();
+            return true;
+        }
+        return super.keyPressed(key, scanCode, modifiers);
+    }
+    *///?}
 }

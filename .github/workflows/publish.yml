@@ -1,13 +1,13 @@
 name: Publish
 
-# Builds and publishes the MULTILOADER mod (all 9 cells: fabric/neoforge/forge x 26.1.2/26.2/26.3)
+# Builds and publishes the MULTILOADER mod (all 27 cells: fabric/neoforge/forge x 1.21.1/1.21.4/1.21.5/1.21.8/1.21.10/1.21.11/26.1.2/26.2/26.3)
 # whenever the mod_version in gradle.properties has no published release yet.
 #
 # Pipeline (4 jobs):
 #   detect  -> is there a v<mod_version> release tag yet? (read-only ledger check)
 #   build   -> build all 6 cells once; extract release notes; upload the 6 distributable
 #              jars + notes as the `dist` artifact.
-#   publish -> matrix over the 9 cells: download `dist`, upload each jar to CurseForge +
+#   publish -> matrix over the 27 cells: download `dist`, upload each jar to CurseForge +
 #              Modrinth as its own version tagged with the EXACT loader + game-version (each
 #              version self-contained, carrying its own copy of the changelog).
 #   release -> runs LAST (needs: publish): download `dist`, register the Sentry release, then
@@ -45,7 +45,7 @@ jobs:
       version: ${{ steps.check.outputs.version }}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
         with:
           # Tags are the release ledger - fetch them for the existence check.
           fetch-depth: 1
@@ -86,7 +86,7 @@ jobs:
       version_type: ${{ steps.channel.outputs.version_type }}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
         with:
           fetch-depth: 1
 
@@ -112,7 +112,7 @@ jobs:
       # See USING-CORE.md.
       # --- end Neroland Core dependency ---
 
-      # Build all nine cells (loader x MC version). Each produces a distinctly named jar under
+      # Build all 27 cells (loader x MC version). Each produces a distinctly named jar under
       # <loader>/versions/<mc>/build/libs. Forge's distributable is the jarJar output
       # ("*-all.jar", with embedded Sentry); the plain Forge jar is not shipped.
       - name: Build all cells
@@ -121,12 +121,12 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: >-
           ./gradlew
-          :fabric:26.1.2:build :fabric:26.2:build :fabric:26.3:build
-          :neoforge:26.1.2:build :neoforge:26.2:build :neoforge:26.3:build
-          :forge:26.1.2:build :forge:26.2:build :forge:26.3:build
+          :fabric:1.21.1:build :fabric:1.21.4:build :fabric:1.21.5:build :fabric:1.21.8:build :fabric:1.21.10:build :fabric:1.21.11:build :fabric:26.1.2:build :fabric:26.2:build :fabric:26.3:build
+          :neoforge:1.21.1:build :neoforge:1.21.4:build :neoforge:1.21.5:build :neoforge:1.21.8:build :neoforge:1.21.10:build :neoforge:1.21.11:build :neoforge:26.1.2:build :neoforge:26.2:build :neoforge:26.3:build
+          :forge:1.21.1:build :forge:1.21.4:build :forge:1.21.5:build :forge:1.21.8:build :forge:1.21.10:build :forge:1.21.11:build :forge:26.1.2:build :forge:26.2:build :forge:26.3:build
           --stacktrace
 
-      # Publish the nine per-loader Maven artifacts to GitHub Packages so sibling Nero mods can resolve
+      # Publish the 27 per-loader Maven artifacts to GitHub Packages so sibling Nero mods can resolve
       # NeroEconomy from a remote repo (CI runners + fresh clones have an empty ~/.m2) and compile
       # against za.co.neroland.neroeconomy.api as an OPTIONAL (compileOnly) dependency. This is the
       # ONLY consumable Maven for NeroEconomy; CurseForge/Modrinth/GitHub Releases carry player-facing
@@ -140,9 +140,9 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: >-
           ./gradlew
-          :fabric:26.1.2:publish :fabric:26.2:publish :fabric:26.3:publish
-          :neoforge:26.1.2:publish :neoforge:26.2:publish :neoforge:26.3:publish
-          :forge:26.1.2:publish :forge:26.2:publish :forge:26.3:publish
+          :fabric:1.21.1:publish :fabric:1.21.4:publish :fabric:1.21.5:publish :fabric:1.21.8:publish :fabric:1.21.10:publish :fabric:1.21.11:publish :fabric:26.1.2:publish :fabric:26.2:publish :fabric:26.3:publish
+          :neoforge:1.21.1:publish :neoforge:1.21.4:publish :neoforge:1.21.5:publish :neoforge:1.21.8:publish :neoforge:1.21.10:publish :neoforge:1.21.11:publish :neoforge:26.1.2:publish :neoforge:26.2:publish :neoforge:26.3:publish
+          :forge:1.21.1:publish :forge:1.21.4:publish :forge:1.21.5:publish :forge:1.21.8:publish :forge:1.21.10:publish :forge:1.21.11:publish :forge:26.1.2:publish :forge:26.2:publish :forge:26.3:publish
           --stacktrace
 
       # Release channel from the version suffix: -alpha -> alpha, -beta -> beta, else release.
@@ -195,15 +195,33 @@ jobs:
           VERSION: ${{ needs.detect.outputs.version }}
         run: |
           mkdir -p dist
-          cp "fabric/versions/26.1.2/build/libs/neroeconomy-fabric-26.1.2-$VERSION.jar"     dist/
-          cp "fabric/versions/26.2/build/libs/neroeconomy-fabric-26.2-$VERSION.jar"         dist/
-          cp "fabric/versions/26.3/build/libs/neroeconomy-fabric-26.3-$VERSION.jar"         dist/
+          cp "fabric/versions/1.21.1/build/libs/neroeconomy-fabric-1.21.1-$VERSION.jar" dist/
+          cp "fabric/versions/1.21.4/build/libs/neroeconomy-fabric-1.21.4-$VERSION.jar" dist/
+          cp "fabric/versions/1.21.5/build/libs/neroeconomy-fabric-1.21.5-$VERSION.jar" dist/
+          cp "fabric/versions/1.21.8/build/libs/neroeconomy-fabric-1.21.8-$VERSION.jar" dist/
+          cp "fabric/versions/1.21.10/build/libs/neroeconomy-fabric-1.21.10-$VERSION.jar" dist/
+          cp "fabric/versions/1.21.11/build/libs/neroeconomy-fabric-1.21.11-$VERSION.jar" dist/
+          cp "fabric/versions/26.1.2/build/libs/neroeconomy-fabric-26.1.2-$VERSION.jar" dist/
+          cp "fabric/versions/26.2/build/libs/neroeconomy-fabric-26.2-$VERSION.jar" dist/
+          cp "fabric/versions/26.3/build/libs/neroeconomy-fabric-26.3-$VERSION.jar" dist/
+          cp "neoforge/versions/1.21.1/build/libs/neroeconomy-neoforge-1.21.1-$VERSION.jar" dist/
+          cp "neoforge/versions/1.21.4/build/libs/neroeconomy-neoforge-1.21.4-$VERSION.jar" dist/
+          cp "neoforge/versions/1.21.5/build/libs/neroeconomy-neoforge-1.21.5-$VERSION.jar" dist/
+          cp "neoforge/versions/1.21.8/build/libs/neroeconomy-neoforge-1.21.8-$VERSION.jar" dist/
+          cp "neoforge/versions/1.21.10/build/libs/neroeconomy-neoforge-1.21.10-$VERSION.jar" dist/
+          cp "neoforge/versions/1.21.11/build/libs/neroeconomy-neoforge-1.21.11-$VERSION.jar" dist/
           cp "neoforge/versions/26.1.2/build/libs/neroeconomy-neoforge-26.1.2-$VERSION.jar" dist/
-          cp "neoforge/versions/26.2/build/libs/neroeconomy-neoforge-26.2-$VERSION.jar"     dist/
-          cp "neoforge/versions/26.3/build/libs/neroeconomy-neoforge-26.3-$VERSION.jar"     dist/
-          cp "forge/versions/26.1.2/build/libs/neroeconomy-forge-26.1.2-$VERSION-all.jar"   dist/
-          cp "forge/versions/26.2/build/libs/neroeconomy-forge-26.2-$VERSION-all.jar"       dist/
-          cp "forge/versions/26.3/build/libs/neroeconomy-forge-26.3-$VERSION-all.jar"       dist/
+          cp "neoforge/versions/26.2/build/libs/neroeconomy-neoforge-26.2-$VERSION.jar" dist/
+          cp "neoforge/versions/26.3/build/libs/neroeconomy-neoforge-26.3-$VERSION.jar" dist/
+          cp "forge/versions/1.21.1/build/libs/neroeconomy-forge-1.21.1-$VERSION-all.jar" dist/
+          cp "forge/versions/1.21.4/build/libs/neroeconomy-forge-1.21.4-$VERSION-all.jar" dist/
+          cp "forge/versions/1.21.5/build/libs/neroeconomy-forge-1.21.5-$VERSION-all.jar" dist/
+          cp "forge/versions/1.21.8/build/libs/neroeconomy-forge-1.21.8-$VERSION-all.jar" dist/
+          cp "forge/versions/1.21.10/build/libs/neroeconomy-forge-1.21.10-$VERSION-all.jar" dist/
+          cp "forge/versions/1.21.11/build/libs/neroeconomy-forge-1.21.11-$VERSION-all.jar" dist/
+          cp "forge/versions/26.1.2/build/libs/neroeconomy-forge-26.1.2-$VERSION-all.jar" dist/
+          cp "forge/versions/26.2/build/libs/neroeconomy-forge-26.2-$VERSION-all.jar" dist/
+          cp "forge/versions/26.3/build/libs/neroeconomy-forge-26.3-$VERSION-all.jar" dist/
           cp RELEASE_NOTES.md dist/
           ls -l dist/
 
@@ -231,18 +249,36 @@ jobs:
       max-parallel: 1
       matrix:
         include:
-          - { loader: fabric,   mc: "26.1.2", label: "Fabric",   suffix: "" }
-          - { loader: fabric,   mc: "26.2",   label: "Fabric",   suffix: "" }
-          - { loader: fabric,   mc: "26.3",   label: "Fabric",   suffix: "" }
-          - { loader: neoforge, mc: "26.1.2", label: "NeoForge", suffix: "" }
-          - { loader: neoforge, mc: "26.2",   label: "NeoForge", suffix: "" }
-          - { loader: neoforge, mc: "26.3",   label: "NeoForge", suffix: "" }
-          - { loader: forge,    mc: "26.1.2", label: "Forge",    suffix: "-all" }
-          - { loader: forge,    mc: "26.2",   label: "Forge",    suffix: "-all" }
-          - { loader: forge,    mc: "26.3",   label: "Forge",    suffix: "-all" }
+          - { loader: fabric, mc: "1.21.1", games: "1.21.1", label: "Fabric", suffix: "" }
+          - { loader: fabric, mc: "1.21.4", games: "1.21.4", label: "Fabric", suffix: "" }
+          - { loader: fabric, mc: "1.21.5", games: "1.21.5", label: "Fabric", suffix: "" }
+          - { loader: fabric, mc: "1.21.8", games: "1.21.7,1.21.8", label: "Fabric", suffix: "" }
+          - { loader: fabric, mc: "1.21.10", games: "1.21.9,1.21.10", label: "Fabric", suffix: "" }
+          - { loader: fabric, mc: "1.21.11", games: "1.21.11", label: "Fabric", suffix: "" }
+          - { loader: fabric, mc: "26.1.2", games: "26.1.2", label: "Fabric", suffix: "" }
+          - { loader: fabric, mc: "26.2", games: "26.2", label: "Fabric", suffix: "" }
+          - { loader: fabric, mc: "26.3", games: "26.3", label: "Fabric", suffix: "" }
+          - { loader: neoforge, mc: "1.21.1", games: "1.21.1", label: "NeoForge", suffix: "" }
+          - { loader: neoforge, mc: "1.21.4", games: "1.21.4", label: "NeoForge", suffix: "" }
+          - { loader: neoforge, mc: "1.21.5", games: "1.21.5", label: "NeoForge", suffix: "" }
+          - { loader: neoforge, mc: "1.21.8", games: "1.21.7,1.21.8", label: "NeoForge", suffix: "" }
+          - { loader: neoforge, mc: "1.21.10", games: "1.21.9,1.21.10", label: "NeoForge", suffix: "" }
+          - { loader: neoforge, mc: "1.21.11", games: "1.21.11", label: "NeoForge", suffix: "" }
+          - { loader: neoforge, mc: "26.1.2", games: "26.1.2", label: "NeoForge", suffix: "" }
+          - { loader: neoforge, mc: "26.2", games: "26.2", label: "NeoForge", suffix: "" }
+          - { loader: neoforge, mc: "26.3", games: "26.3", label: "NeoForge", suffix: "" }
+          - { loader: forge, mc: "1.21.1", games: "1.21.1", label: "Forge", suffix: "-all" }
+          - { loader: forge, mc: "1.21.4", games: "1.21.4", label: "Forge", suffix: "-all" }
+          - { loader: forge, mc: "1.21.5", games: "1.21.5", label: "Forge", suffix: "-all" }
+          - { loader: forge, mc: "1.21.8", games: "1.21.7,1.21.8", label: "Forge", suffix: "-all" }
+          - { loader: forge, mc: "1.21.10", games: "1.21.9,1.21.10", label: "Forge", suffix: "-all" }
+          - { loader: forge, mc: "1.21.11", games: "1.21.11", label: "Forge", suffix: "-all" }
+          - { loader: forge, mc: "26.1.2", games: "26.1.2", label: "Forge", suffix: "-all" }
+          - { loader: forge, mc: "26.2", games: "26.2", label: "Forge", suffix: "-all" }
+          - { loader: forge, mc: "26.3", games: "26.3", label: "Forge", suffix: "-all" }
     steps:
       - name: Download distributables
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: dist
           path: dist
@@ -250,9 +286,22 @@ jobs:
       # One CurseForge/Modrinth version per cell, each tagged with its EXACT loader +
       # game-version (so no jar is mislabelled). Each version carries its own copy of the
       # changelog (self-contained per the chosen layout).
+      # matrix.games is a comma list (a 1.21.x cell can cover a hotfix sibling: 1.21.7+1.21.8,
+      # 1.21.9+1.21.10); mc-publish wants one version per line.
+      - name: Game versions for this cell
+        id: games
+        env:
+          GAMES: ${{ matrix.games }}
+        run: |
+          {
+            echo "list<<EOF"
+            echo "$GAMES" | tr ',' '\n'
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
       - name: Publish to Modrinth
         id: upload
-        uses: Kir-Antipov/mc-publish@995edadc13559a8b28d0b7e6571229f067ec7659 # v3.3
+        uses: Kir-Antipov/mc-publish@52307b03863581dec6b652b83e597aec02ebb075 # v3.3
         with:
           modrinth-id: ${{ secrets.MODRINTH_PROJECT_ID }}
           modrinth-token: ${{ secrets.MODRINTH_API_TOKEN }}
@@ -262,8 +311,8 @@ jobs:
           changelog-file: dist/RELEASE_NOTES.md
           files: dist/neroeconomy-${{ matrix.loader }}-${{ matrix.mc }}-${{ needs.detect.outputs.version }}${{ matrix.suffix }}.jar
           loaders: ${{ matrix.loader }}
-          game-versions: ${{ matrix.mc }}
-          java: 25
+          game-versions: ${{ steps.games.outputs.list }}
+          java: ${{ startsWith(matrix.mc, '1.') && '21' || '25' }}
 
       # Tag the freshly-created Modrinth version with the per-version environment
       # metadata from Modrinth's environments overhaul (Content Rules §5.1). mc-publish
@@ -312,7 +361,7 @@ jobs:
           CF_PROJECT_ID: ${{ secrets.CURSEFORGE_PROJECT_ID }}
           DISPLAY_NAME: NeroEconomy ${{ needs.detect.outputs.version }} - ${{ matrix.label }} ${{ matrix.mc }}
           RELEASE_TYPE: ${{ needs.build.outputs.version_type }}
-          MC_VERSION: ${{ matrix.mc }}
+          MC_VERSION: ${{ matrix.games }}
           CF_LOADER: ${{ matrix.label }}
           JAR: dist/neroeconomy-${{ matrix.loader }}-${{ matrix.mc }}-${{ needs.detect.outputs.version }}${{ matrix.suffix }}.jar
         run: |
@@ -335,7 +384,7 @@ jobs:
               changelogType: "markdown",
               displayName: $name,
               releaseType: $rt,
-              gameVersionNames: [$mc, $loader, "Client", "Server"]
+              gameVersionNames: (($mc | split(",")) + [$loader, "Client", "Server"])
             }' > cf_metadata.json
 
           # CurseForge's upload endpoint intermittently answers a generic HTTP 500
@@ -378,13 +427,13 @@ jobs:
       contents: write # create the GitHub Release + v<version> tag
     steps:
       - name: Checkout repository
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
         with:
           fetch-depth: 0
           fetch-tags: true
 
       - name: Download distributables
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: dist
           path: dist
@@ -406,7 +455,7 @@ jobs:
       # `detect` reads as the release ledger - intentionally the LAST step, so a failed CF/MR
       # upload above leaves no tag and a re-run retries cleanly instead of being skipped.
       - name: Publish GitHub Release
-        uses: Kir-Antipov/mc-publish@995edadc13559a8b28d0b7e6571229f067ec7659 # v3.3
+        uses: Kir-Antipov/mc-publish@52307b03863581dec6b652b83e597aec02ebb075 # v3.3
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           github-tag: v${{ needs.detect.outputs.version }}

@@ -292,20 +292,41 @@ public final class PlayerShopBlockEntity extends BlockEntity implements WorldlyC
      * effects. The escrow is released before the default handler runs, so that handler finds an
      * empty container and drops nothing, and the owner row goes with the block.
      */
+    //? if >=1.21.5 {
     @Override public void preRemoveSideEffects(BlockPos pos, BlockState state) {
+    //?} else {
+    /*// Called by PlayerShopBlock.onRemove before 1.21.5, which has no block-entity removal hook.
+    public void preRemoveSideEffects(BlockPos pos, BlockState state) {
+    *///?}
         cancel();
         if (level instanceof ServerLevel serverLevel)
             ShopOwnershipState.get(serverLevel.getServer()).remove(serverLevel, pos);
+        //? if >=1.21.5 {
         super.preRemoveSideEffects(pos, state);
+        //?} else {
+        /*if (level != null) net.minecraft.world.Containers.dropContents(level, pos, this);
+        *///?}
     }
+    //? if >=1.21.6 {
     @Override protected void saveAdditional(ValueOutput output) {
         super.saveAdditional(output);
+    //?} else {
+    /*@Override protected void saveAdditional(net.minecraft.nbt.CompoundTag tag, net.minecraft.core.HolderLookup.Provider registries) {
+        super.saveAdditional(tag, registries);
+        ValueOutput output = ValueOutput.of(tag, registries);
+    *///?}
         output.putString("ListingId", listingId.toString());
         output.putLong("Price", price);
         if (demo) output.putBoolean("Demo", true);
     }
+    //? if >=1.21.6 {
     @Override protected void loadAdditional(ValueInput input) {
         super.loadAdditional(input);
+    //?} else {
+    /*@Override protected void loadAdditional(net.minecraft.nbt.CompoundTag tag, net.minecraft.core.HolderLookup.Provider registries) {
+        super.loadAdditional(tag, registries);
+        ValueInput input = ValueInput.of(tag, registries);
+    *///?}
         try { listingId = UUID.fromString(input.getStringOr("ListingId", listingId.toString())); }
         catch (IllegalArgumentException ignored) { listingId = UUID.randomUUID(); }
         price = Math.max(1L, input.getLongOr("Price", 1L));

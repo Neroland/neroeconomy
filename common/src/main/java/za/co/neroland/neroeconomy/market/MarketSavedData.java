@@ -33,6 +33,7 @@ import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.saveddata.SavedDataType;
 
+import za.co.neroland.nerolandcore.data.SavedDataCompat;
 import za.co.neroland.neroeconomy.NeroEconomyCommon;
 import za.co.neroland.neroeconomy.api.AccountId;
 import za.co.neroland.neroeconomy.api.PlayerAccountId;
@@ -92,7 +93,7 @@ public final class MarketSavedData extends EconomySection implements EscrowHolde
     public static final Codec<MarketSavedData> CODEC = Codec.lazyInitialized(MarketSavedData::codec);
     /** The pre-combined-store type. Only {@link EconomyStore} uses it, to migrate and then empty the old file. */
     public static final SavedDataType<MarketSavedData> TYPE =
-            new SavedDataType<>(ID, MarketSavedData::new, CODEC, null);
+            SavedDataCompat.type(ID, MarketSavedData::new, CODEC);
     /** Items in this tag (empty by default) can never be listed, auctioned, escrowed or requested. */
     public static final TagKey<Item> UNTRADEABLE = TagKey.create(Registries.ITEM,
             Identifier.fromNamespaceAndPath(NeroEconomyCommon.MOD_ID, "untradeable"));

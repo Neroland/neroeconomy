@@ -2,13 +2,20 @@
 // module's source directly (single copy -> no drift).
 
 plugins {
-    id 'net.fabricmc.fabric-loom'
+    // Two Loom flavours from the same plugin jar: `fabric-loom` for de-obfuscated 26.x (no mappings, no
+    // remap) and `fabric-loom-remap` for obfuscated 1.21.x (Mojang mappings + remapJar to intermediary).
+    // Neither is applied here; the node picks one below from its Minecraft version.
+    id 'net.fabricmc.fabric-loom' apply false
+    id 'net.fabricmc.fabric-loom-remap' apply false
     id 'eclipse'   // for eclipse.synchronizationTasks (VS Code / Buildship import hook)
     id 'maven-publish'
 }
 
 // MC version comes from the Stonecutter node (e.g. :fabric:26.1.2), not a global property.
 def mc = stonecutter.current.version
+// Minecraft before 26.1 ships obfuscated, so those cells need mappings and a remapped jar.
+def obfuscated = mc.startsWith('1.')
+apply plugin: obfuscated ? 'net.fabricmc.fabric-loom-remap' : 'net.fabricmc.fabric-loom'
 def fabricApi = project.findProperty("fabric_api_version_${mc}")
 def jeiVersion = project.findProperty("jei_version_${mc}")
 def emiFile = project.findProperty("emi_file_fabric_${mc}")
@@ -26,6 +33,10 @@ def nextMinecraft = { String version ->
     def parts = version.tokenize('.')
     "${parts[0]}.${(parts[1] as int) + 1}"
 }
+// 1.21.x lines are not "next minor", so their bounds come from gradle.properties (mc_floor_/mc_ceiling_);
+// the floor only goes below the compiled version for a protocol-identical hotfix sibling.
+def mcFloor = project.findProperty("mc_floor_${mc}") ?: mc
+def mcCeiling = project.findProperty("mc_ceiling_${mc}") ?: nextMinecraft(mc)
 
 // Distinct, descriptive jar name per cell (the node project is named after the MC version, so the
 // default jar would be "<mc>-<version>.jar" and COLLIDE with the neoforge cell of the same version).
@@ -39,7 +50,8 @@ publishing {
             groupId = rootProject.mod_group_id
             artifactId = "neroeconomy-fabric-${mc}"
             version = rootProject.mod_version
-            artifact tasks.named('jar')
+            // 1.21.x consumers remap NeroEconomy with modImplementation, so they need the intermediary jar.
+            artifact tasks.named(obfuscated ? 'remapJar' : 'jar')
         }
     }
     repositories {
@@ -72,12 +84,23 @@ tasks.named('test', Test) { useJUnitPlatform { if (!project.hasProperty('benchma
 
 dependencies {
     minecraft "com.mojang:minecraft:${mc}"
-    // NOTE: no `mappings` — de-obfuscated 26.x needs none (Fabric Loom 1.17+).
-    implementation "net.fabricmc:fabric-loader:${rootProject.fabric_loader_version}"
-    if (fabricApi != null) {
-        implementation "net.fabricmc.fabric-api:fabric-api:${fabricApi}"
+    if (obfuscated) {
+        // Obfuscated 1.21.x: Mojang's official names, remapped to intermediary on jar. Mod dependencies
+        // (loader, Fabric API, Core) go through modImplementation so Loom remaps them.
+        mappings loom.officialMojangMappings()
+        modImplementation "net.fabricmc:fabric-loader:${rootProject.fabric_loader_version}"
+        if (fabricApi != null) {
+            modImplementation "net.fabricmc.fabric-api:fabric-api:${fabricApi}"
+        }
+        modImplementation "za.co.neroland.nerolandcore:nerolandcore-fabric-${mc}:${nerolandcoreVersion}"
+    } else {
+        // NOTE: no `mappings` — de-obfuscated 26.x needs none (Fabric Loom 1.17+).
+        implementation "net.fabricmc:fabric-loader:${rootProject.fabric_loader_version}"
+        if (fabricApi != null) {
+            implementation "net.fabricmc.fabric-api:fabric-api:${fabricApi}"
+        }
+        implementation "za.co.neroland.nerolandcore:nerolandcore-fabric-${mc}:${nerolandcoreVersion}"
     }
-    implementation "za.co.neroland.nerolandcore:nerolandcore-fabric-${mc}:${nerolandcoreVersion}"
 
     // Sentry SDK (telemetry/NeroEconomyTelemetry): compile against it + embed it as a jar-in-jar so the
     // shipped Fabric jar carries it. Counterpart to the NeoForge JarJar bundling.
@@ -119,8 +142,10 @@ def generateModMetadata = tasks.register('generateModMetadata', ProcessResources
         mod_license          : rootProject.mod_license,
         fabric_loader_version: rootProject.fabric_loader_version,
         minecraft_version    : mc,
-        // Fabric version predicate: ">=<this mc> <<next minor>" (see nextMinecraft above).
-        minecraft_version_range: ">=${mc} <${nextMinecraft(mc)}",
+        // Fabric version predicate: ">=<floor> <<ceiling>" (see mcFloor/mcCeiling above).
+        minecraft_version_range: ">=${mcFloor} <${mcCeiling}",
+        // Java the cell's classes are compiled for: 21 on 1.21.x, 25 on 26.x.
+        java_version         : project.javaRelease,
         nerolandcore_version : nerolandcoreVersion,
         access_widener       : mc == '26.1.2' ? '"accessWidener": "neroeconomy.accesswidener",' : '',
     ]
@@ -203,7 +228,7 @@ tasks.register('ecjCheck', JavaExec) {
                 .join(File.pathSeparator)
         def srcDirs = sourceSets.main.java.srcDirs.findAll { it.exists() }.collect { it.absolutePath }
         args = [
-                '--release', '25',
+                '--release', "${project.javaRelease}",
                 '-proc:none',
                 '-d', 'none',
                 '-properties', rootProject.file('tools/ecj.prefs').absolutePath,

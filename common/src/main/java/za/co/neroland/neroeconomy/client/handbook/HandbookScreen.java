@@ -7,13 +7,13 @@ import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.client.gui.screens.Screen;
-import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
 
 import za.co.neroland.nerolandcore.progression.ClientGates;
 import za.co.neroland.neroeconomy.NeroEconomyCommon;
 import za.co.neroland.neroeconomy.client.EconomyHubScreen;
+import za.co.neroland.neroeconomy.client.GuiCompat;
 import za.co.neroland.neroeconomy.handbook.Handbook;
 import za.co.neroland.neroeconomy.handbook.HandbookOpener;
 import za.co.neroland.neroeconomy.hub.HubTab;
@@ -146,17 +146,33 @@ public final class HandbookScreen extends Screen {
 
     @Override
     public void extractRenderState(GuiGraphicsExtractor g, int mouseX, int mouseY, float partialTick) {
-        g.blit(RenderPipelines.GUI_TEXTURED, SHEET, this.left, this.top, 0.0F, 0.0F, PANEL_W, PANEL_H, 512, 256);
+        //? if >=1.21.6 {
+        drawPage(g);
+        //?}
+        super.extractRenderState(g, mouseX, mouseY, partialTick);
+    }
+
+    //? if <1.21.6 {
+    /*// Before 1.21.6 Screen.render paints the (blurred) background over whatever was drawn before it, so the
+    // page goes on top of the background here instead, still under the buttons.
+    @Override
+    public void renderBackground(GuiGraphicsExtractor g, int mouseX, int mouseY, float partialTick) {
+        super.renderBackground(g, mouseX, mouseY, partialTick);
+        drawPage(g);
+    }
+    *///?}
+
+    private void drawPage(GuiGraphicsExtractor g) {
+        GuiCompat.blit(g, SHEET, this.left, this.top, 0.0F, 0.0F, PANEL_W, PANEL_H, 512, 256);
         g.text(this.font, this.title, this.left + 8, this.top + 5, TITLE, false);
         Handbook.Chapter open = shown();
         g.text(this.font, cut(Component.translatable(open.titleKey()), PAGE_W), this.left + PAGE_X,
                 this.top + HEADING_Y, HEADING, false);
-        g.textWithWordWrap(this.font, Component.translatable(open.pageKey(page)), this.left + PAGE_X,
-                this.top + TEXT_Y, PAGE_W, BODY, false);
+        GuiCompat.wrapped(g, this.font, Component.translatable(open.pageKey(page)), this.left + PAGE_X,
+                this.top + TEXT_Y, PAGE_W, BODY);
         Component counter = Component.translatable(Handbook.PAGE, page + 1, open.pages());
         int counterX = this.left + PAGE_X + PAGING_W + 4 + (COUNTER_W - this.font.width(counter)) / 2;
         g.text(this.font, counter, counterX, this.top + PAGING_Y + 3, SUBTLE, false);
-        super.extractRenderState(g, mouseX, mouseY, partialTick);
     }
 
     /** {@code text} shortened to {@code width} pixels with an ellipsis; text that fits is kept as it is. */

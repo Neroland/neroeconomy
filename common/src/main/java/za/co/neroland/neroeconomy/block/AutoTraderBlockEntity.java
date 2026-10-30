@@ -172,10 +172,19 @@ public final class AutoTraderBlockEntity extends BlockEntity implements WorldlyC
      * be emptied; then the default handler drops what the slots hold, inputs and outputs alike,
      * as it drops a chest's contents.
      */
+    //? if >=1.21.5 {
     @Override public void preRemoveSideEffects(BlockPos pos, BlockState state) {
+    //?} else {
+    /*// Called by AutoTraderBlock.onRemove before 1.21.5, which has no block-entity removal hook.
+    public void preRemoveSideEffects(BlockPos pos, BlockState state) {
+    *///?}
         removing = true;
         if (level instanceof ServerLevel serverLevel) AutoTraders.removed(serverLevel, pos);
+        //? if >=1.21.5 {
         super.preRemoveSideEffects(pos, state);
+        //?} else {
+        /*if (level != null) net.minecraft.world.Containers.dropContents(level, pos, this);
+        *///?}
     }
 
     // --- MenuProvider ------------------------------------------------------------------------
@@ -255,15 +264,35 @@ public final class AutoTraderBlockEntity extends BlockEntity implements WorldlyC
 
     // --- persistence -------------------------------------------------------------------------
 
+    //? if >=1.21.6 {
     @Override protected void saveAdditional(ValueOutput output) {
         super.saveAdditional(output);
+    //?} else {
+    /*@Override protected void saveAdditional(net.minecraft.nbt.CompoundTag tag, net.minecraft.core.HolderLookup.Provider registries) {
+        super.saveAdditional(tag, registries);
+        ValueOutput output = ValueOutput.of(tag, registries);
+    *///?}
+        //? if >=1.21.6 {
         ContainerHelper.saveAllItems(output, items);
+        //?} else {
+        /*ContainerHelper.saveAllItems(output.tag(), items, output.registries());
+        *///?}
     }
 
+    //? if >=1.21.6 {
     @Override protected void loadAdditional(ValueInput input) {
         super.loadAdditional(input);
+    //?} else {
+    /*@Override protected void loadAdditional(net.minecraft.nbt.CompoundTag tag, net.minecraft.core.HolderLookup.Provider registries) {
+        super.loadAdditional(tag, registries);
+        ValueInput input = ValueInput.of(tag, registries);
+    *///?}
         items.clear();
+        //? if >=1.21.6 {
         ContainerHelper.loadAllItems(input, items);
+        //?} else {
+        /*ContainerHelper.loadAllItems(input.tag(), items, input.registries());
+        *///?}
         stirred = true;
     }
 }

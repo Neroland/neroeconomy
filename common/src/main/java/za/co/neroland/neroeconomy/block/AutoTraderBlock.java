@@ -145,10 +145,23 @@ public final class AutoTraderBlock extends BaseEntityBlock {
      * entity is already gone here and has returned what it held; this settles the records by
      * position, which is safe to do twice. Removals that suppress this hook are caught by the sweep.
      */
+    //? if >=1.21.5 {
     @Override
     protected void affectNeighborsAfterRemoval(BlockState state, ServerLevel level, BlockPos pos,
             boolean movedByPiston) {
         AutoTraders.removed(level, pos);
         super.affectNeighborsAfterRemoval(state, level, pos, movedByPiston);
     }
+    //?} else {
+    /*// Before 1.21.5 one hook covers both steps: the block entity's side effects (it is still there),
+    // then the records by position.
+    @Override
+    protected void onRemove(BlockState state, Level level, BlockPos pos, BlockState newState, boolean movedByPiston) {
+        if (!state.is(newState.getBlock())) {
+            if (level.getBlockEntity(pos) instanceof AutoTraderBlockEntity trader) trader.preRemoveSideEffects(pos, state);
+            if (level instanceof ServerLevel serverLevel) AutoTraders.removed(serverLevel, pos);
+        }
+        super.onRemove(state, level, pos, newState, movedByPiston);
+    }
+    *///?}
 }

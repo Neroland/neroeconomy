@@ -53,11 +53,15 @@ class EconomyStoreCodecTest {
         assertEquals(List.of("schema", "ledger", "market", "obligations", "shop_owners", "vault", "simulation",
                 "book", "offers", "rules", "trade_escrow", "auto_traders", "exchange", "houses", "admin"),
                 new ArrayList<>(golden.keySet()));
+        // (The field-order checks below need the codec library of 1.21.11 and later, which writes fields in
+        // declaration order; earlier lines write the same fields in another order, which a save does not mind.)
         EconomyStore store = StoreTesting.decode(golden);
         JsonElement again = StoreTesting.encode(store);
         assertEquals(golden, again);
         // Field for field and in the same order: the groups add no nesting and do not reorder.
+        //? if >=1.21.11 {
         assertEquals(new ArrayList<>(golden.keySet()), new ArrayList<>(again.getAsJsonObject().keySet()));
+        //?}
         assertEquals(EconomyStore.SCHEMA, store.schema());
         // The fuzzed economy was saved mid-run, with direct trades open whose escrow lives outside the
         // store, so its invariants are not checked here; what matters is that nothing changed.
@@ -88,8 +92,10 @@ class EconomyStoreCodecTest {
             // The ledger is always written; a store without one writes the empty ledger's fields.
             if (!shape.contains("ledger")) expected.add("ledger", again.getAsJsonObject().get("ledger"));
             assertEquals(order(expected), again, "shape " + shape);
+            //? if >=1.21.11 {
             assertEquals(new ArrayList<>(order(expected).keySet()), new ArrayList<>(again.getAsJsonObject().keySet()),
                     "order " + shape);
+            //?}
         }
     }
 
@@ -114,7 +120,9 @@ class EconomyStoreCodecTest {
         assertEquals(FIELDS.subList(1, FIELDS.size()), store.sectionsPresent());
         JsonElement again = StoreTesting.encode(store);
         assertEquals(ordered, again);
+        //? if >=1.21.11 {
         assertEquals(FIELDS, new ArrayList<>(again.getAsJsonObject().keySet()));
+        //?}
         // And a second pass changes nothing.
         assertEquals(again, StoreTesting.encode(StoreTesting.decode(again)));
     }

@@ -320,7 +320,11 @@ class EconomyBenchmark {
     private static void sizes(EconomyStore target) throws IOException {
         CompoundTag whole = (CompoundTag) EconomyStore.CODEC.encodeStart(NbtOps.INSTANCE, target).getOrThrow();
         JsonObject json = StoreTesting.encode(target).getAsJsonObject();
+        //? if >=1.21.5 {
         List<String> keys = new ArrayList<>(whole.keySet());
+        //?} else {
+        /*List<String> keys = new ArrayList<>(whole.getAllKeys());
+        *///?}
         keys.sort(null);
         for (String key : keys) {
             CompoundTag one = new CompoundTag();

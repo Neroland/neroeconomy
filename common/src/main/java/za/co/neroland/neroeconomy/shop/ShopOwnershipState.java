@@ -17,6 +17,7 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.saveddata.SavedDataType;
 
+import za.co.neroland.nerolandcore.data.SavedDataCompat;
 import za.co.neroland.neroeconomy.NeroEconomyCommon;
 import za.co.neroland.neroeconomy.economy.EconomySection;
 import za.co.neroland.neroeconomy.economy.EconomyStore;
@@ -31,7 +32,7 @@ public final class ShopOwnershipState extends EconomySection {
     public static final Codec<ShopOwnershipState> CODEC = codec();
     /** The pre-combined-store type. Only {@link EconomyStore} uses it, to migrate and then empty the old file. */
     public static final SavedDataType<ShopOwnershipState> TYPE =
-            new SavedDataType<>(ID, ShopOwnershipState::new, CODEC, null);
+            SavedDataCompat.type(ID, ShopOwnershipState::new, CODEC);
 
     private final Map<String, UUID> owners = new LinkedHashMap<>();
 

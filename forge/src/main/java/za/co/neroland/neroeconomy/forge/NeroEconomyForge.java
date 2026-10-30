@@ -15,8 +15,13 @@ public final class NeroEconomyForge {
     public NeroEconomyForge(FMLJavaModLoadingContext context) {
         NeroEconomyCommon.LOGGER.info("[NeroEconomy] Forge bootstrap");
         NeroEconomyCommon.init();
-        Services.PLATFORM.register(context.getModBusGroup());
-        Services.NETWORK.register(context.getModBusGroup());
-        if (FMLEnvironment.dist == Dist.CLIENT) ForgeClientSetup.init(context.getModBusGroup());
+        //? if >=1.21.6 {
+        var modBus = context.getModBusGroup();
+        //?} else {
+        /*var modBus = context.getModEventBus();
+        *///?}
+        Services.PLATFORM.register(modBus);
+        Services.NETWORK.register(modBus);
+        if (FMLEnvironment.dist == Dist.CLIENT) ForgeClientSetup.init(modBus);
     }
 }

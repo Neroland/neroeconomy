@@ -11,7 +11,9 @@ import net.minecraftforge.common.capabilities.Capability;
 import net.minecraftforge.common.capabilities.ForgeCapabilities;
 import net.minecraftforge.common.capabilities.ICapabilityProvider;
 import net.minecraftforge.common.util.LazyOptional;
+//? if >=1.21.6 {
 import net.minecraftforge.common.util.Result;
+//?}
 import net.minecraftforge.event.AttachCapabilitiesEvent;
 import net.minecraftforge.items.IItemHandler;
 import net.minecraftforge.items.wrapper.SidedInvWrapper;
@@ -28,7 +30,6 @@ import za.co.neroland.neroeconomy.block.AutoTraderBlock;
 import za.co.neroland.neroeconomy.block.AutoTraderBlockEntity;
 import za.co.neroland.neroeconomy.block.PlayerShopBlock;
 import za.co.neroland.neroeconomy.obligation.BountyHooks;
-import net.minecraftforge.eventbus.api.bus.BusGroup;
 import net.minecraftforge.fml.ModList;
 import net.minecraftforge.fml.loading.FMLEnvironment;
 
@@ -74,11 +75,16 @@ public final class ForgePlatformInfo implements PlatformInfo {
     }
 
     @Override public void register(Object bus) {
-        RegistrationProvider.attach((BusGroup) bus);
+        RegistrationProvider.attach(bus);
+        //? if >=1.21.6 {
         ServerStartedEvent.BUS.addListener(event -> NeroEconomyCommon.CURRENCY_PROVIDER.bind(event.getServer()));
         ServerStoppedEvent.BUS.addListener(event -> NeroEconomyCommon.CURRENCY_PROVIDER.unbind(event.getServer()));
         RegisterCommandsEvent.BUS.addListener(event -> EconomyCommands.register(event.getDispatcher()));
+        //? if >=1.21.9 {
         TickEvent.ServerTickEvent.Post.BUS.addListener(event -> NeroEconomyCommon.CURRENCY_PROVIDER.tick(event.server()));
+        //?} else {
+        /*TickEvent.ServerTickEvent.Post.BUS.addListener(event -> NeroEconomyCommon.CURRENCY_PROVIDER.tick(event.getServer()));
+        *///?}
         // Data packs were reloaded (the event names no player then): the listed companies and the
         // commodities are read again from the new packs. The same event fires per player on login,
         // which is not a reload.
@@ -126,6 +132,48 @@ public final class ForgePlatformInfo implements PlatformInfo {
             if (event.getEntity() instanceof net.minecraft.server.level.ServerPlayer leaving) DirectTrades.playerLeft(leaving);
             IntentGuard.forget(event.getEntity().getUUID());
         });
+        //?} else {
+        /*// Forge before 1.21.6 runs EventBus 6: one game bus, listeners typed by their parameter.
+        net.minecraftforge.eventbus.api.IEventBus game = net.minecraftforge.common.MinecraftForge.EVENT_BUS;
+        game.addListener((ServerStartedEvent event) -> NeroEconomyCommon.CURRENCY_PROVIDER.bind(event.getServer()));
+        game.addListener((ServerStoppedEvent event) -> NeroEconomyCommon.CURRENCY_PROVIDER.unbind(event.getServer()));
+        game.addListener((RegisterCommandsEvent event) -> EconomyCommands.register(event.getDispatcher()));
+        game.addListener((TickEvent.ServerTickEvent.Post event) -> NeroEconomyCommon.CURRENCY_PROVIDER.tick(event.getServer()));
+        game.addListener((OnDatapackSyncEvent event) -> {
+            if (event.getPlayer() == null) {
+                StockData.reload(event.getPlayerList().getServer());
+                CommodityData.reload(event.getPlayerList().getServer());
+                za.co.neroland.neroeconomy.house.HouseData.reload(event.getPlayerList().getServer());
+            }
+        });
+        game.addListener((LivingDeathEvent event) -> BountyHooks.entityKilled(event.getEntity(), event.getSource()));
+        game.addListener((BlockEvent.BreakEvent event) -> {
+            if (event.getLevel() instanceof Level level && event.getPlayer() != null
+                    && (!PlayerShopBlock.canBreak(level, event.getPos(), event.getPlayer())
+                            || !AutoTraderBlock.canBreak(level, event.getPos(), event.getPlayer())))
+                event.setCanceled(true);
+        });
+        game.addGenericListener(net.minecraft.world.level.block.entity.BlockEntity.class,
+                (AttachCapabilitiesEvent<net.minecraft.world.level.block.entity.BlockEntity> event) -> {
+            if (event.getObject() instanceof AutoTraderBlockEntity trader) {
+                TraderItems items = new TraderItems(trader);
+                event.addCapability(TRADER_ITEMS, items);
+                event.addListener(items::invalidate);
+            }
+        });
+        game.addListener((PlayerInteractEvent.EntityInteractSpecific event) ->
+                DirectTrades.useEntity(event.getEntity(), event.getTarget(), event.getHand()));
+        game.addListener((PlayerEvent.PlayerLoggedInEvent event) -> {
+            if (event.getEntity() instanceof net.minecraft.server.level.ServerPlayer joined) {
+                HandbookGift.joined(joined);
+                za.co.neroland.neroeconomy.sibling.QuestHooks.onJoin(joined);
+            }
+        });
+        game.addListener((PlayerEvent.PlayerLoggedOutEvent event) -> {
+            if (event.getEntity() instanceof net.minecraft.server.level.ServerPlayer leaving) DirectTrades.playerLeft(leaving);
+            IntentGuard.forget(event.getEntity().getUUID());
+        });
+        *///?}
     }
     @Override public String getPlatformName() { return "Forge"; }
     @Override public boolean isDevelopmentEnvironment() { return !FMLEnvironment.production; }

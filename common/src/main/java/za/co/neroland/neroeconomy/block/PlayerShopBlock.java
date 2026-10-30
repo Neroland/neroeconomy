@@ -135,10 +135,23 @@ public final class PlayerShopBlock extends BaseEntityBlock {
      * whoever or whatever caused it. The block entity is already gone here, so the records are
      * settled by position. Removals that suppress this hook are caught by {@code ShopSweep}.
      */
+    //? if >=1.21.5 {
     @Override
     protected void affectNeighborsAfterRemoval(BlockState state, ServerLevel level, BlockPos pos,
             boolean movedByPiston) {
         forgetShop(level, pos);
         super.affectNeighborsAfterRemoval(state, level, pos, movedByPiston);
     }
+    //?} else {
+    /*// Before 1.21.5 one hook covers both steps: the block entity's side effects (it is still there),
+    // then the records by position.
+    @Override
+    protected void onRemove(BlockState state, Level level, BlockPos pos, BlockState newState, boolean movedByPiston) {
+        if (!state.is(newState.getBlock())) {
+            if (level.getBlockEntity(pos) instanceof PlayerShopBlockEntity shop) shop.preRemoveSideEffects(pos, state);
+            if (level instanceof ServerLevel serverLevel) forgetShop(serverLevel, pos);
+        }
+        super.onRemove(state, level, pos, newState, movedByPiston);
+    }
+    *///?}
 }

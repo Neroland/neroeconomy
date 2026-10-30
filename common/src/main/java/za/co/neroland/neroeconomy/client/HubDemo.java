@@ -162,22 +162,22 @@ final class HubDemo {
     /** Draws the frame over the sample view: highlight, caption with its buttons, then the banner. */
     void draw(GuiGraphicsExtractor g, int mouseX, int mouseY, float partialTick) {
         EconomyHubScreen s = this.screen;
-        g.nextStratum();
+        GuiCompat.nextStratum(g);
         DemoTarget target = this.script.steps().get(this.step).target();
         if (target != null) {
             s.fill(g, target.x() - 2, target.y() - 2, target.w() + 4, target.h() + 4, HIGHLIGHT_FILL);
-            g.outline(s.bodyLeft() + target.x() - 2, s.bodyTop() + target.y() - 2, target.w() + 4, target.h() + 4,
+            GuiCompat.outline(g, s.bodyLeft() + target.x() - 2, s.bodyTop() + target.y() - 2, target.w() + 4, target.h() + 4,
                     HIGHLIGHT);
-            g.outline(s.bodyLeft() + target.x() - 3, s.bodyTop() + target.y() - 3, target.w() + 6, target.h() + 6,
+            GuiCompat.outline(g, s.bodyLeft() + target.x() - 3, s.bodyTop() + target.y() - 3, target.w() + 6, target.h() + 6,
                     HIGHLIGHT);
         }
         s.fill(g, CAPTION_X, this.captionTop, CAPTION_W, CAPTION_H, PANEL);
-        g.outline(s.bodyLeft() + CAPTION_X, s.bodyTop() + this.captionTop, CAPTION_W, CAPTION_H, FRAME);
+        GuiCompat.outline(g, s.bodyLeft() + CAPTION_X, s.bodyTop() + this.captionTop, CAPTION_W, CAPTION_H, FRAME);
         s.wrapped(g, Component.translatable(this.script.stepKey(this.step)), CAPTION_X + 4, this.captionTop + 4,
                 TEXT_W, TexturedContainerScreen.TITLE);
         s.text(g, Component.translatable(DemoScript.COUNTER, this.step + 1, this.script.steps().size()),
                 CAPTION_X + 98, this.captionTop + 39, 96, TexturedContainerScreen.SUBTLE);
-        for (Button control : this.controls) control.extractRenderState(g, mouseX, mouseY, partialTick);
+        for (Button control : this.controls) GuiCompat.widget(control, g, mouseX, mouseY, partialTick);
         drawBanner(g);
     }
 

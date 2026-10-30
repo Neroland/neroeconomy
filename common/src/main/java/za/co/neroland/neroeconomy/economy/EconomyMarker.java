@@ -7,6 +7,7 @@ import net.minecraft.resources.Identifier;
 import net.minecraft.world.level.saveddata.SavedData;
 import net.minecraft.world.level.saveddata.SavedDataType;
 
+import za.co.neroland.nerolandcore.data.SavedDataCompat;
 import za.co.neroland.neroeconomy.NeroEconomyCommon;
 
 /**
@@ -20,7 +21,7 @@ public final class EconomyMarker extends SavedData {
             Codec.BOOL.optionalFieldOf("exists", false).forGetter(marker -> marker.exists),
             Codec.INT.optionalFieldOf("schema", 0).forGetter(marker -> marker.schema))
             .apply(instance, EconomyMarker::new));
-    public static final SavedDataType<EconomyMarker> TYPE = new SavedDataType<>(ID, EconomyMarker::new, CODEC, null);
+    public static final SavedDataType<EconomyMarker> TYPE = SavedDataCompat.type(ID, EconomyMarker::new, CODEC);
 
     private boolean exists;
     private int schema;

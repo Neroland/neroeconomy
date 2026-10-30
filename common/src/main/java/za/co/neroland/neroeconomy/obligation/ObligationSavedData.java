@@ -26,6 +26,7 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.saveddata.SavedDataType;
 
+import za.co.neroland.nerolandcore.data.SavedDataCompat;
 import za.co.neroland.nerolandcore.progression.CoreGates;
 import za.co.neroland.neroeconomy.api.PlayerAccountId;
 import za.co.neroland.neroeconomy.api.SystemAccountId;
@@ -84,7 +85,7 @@ public final class ObligationSavedData extends EconomySection implements EscrowH
     public static final Codec<ObligationSavedData> CODEC = Codec.lazyInitialized(ObligationSavedData::codec);
     /** The pre-combined-store type. Only {@link EconomyStore} uses it, to migrate and then empty the old file. */
     public static final SavedDataType<ObligationSavedData> TYPE =
-            new SavedDataType<>(ID, ObligationSavedData::new, CODEC, null);
+            SavedDataCompat.type(ID, ObligationSavedData::new, CODEC);
     private static final Identifier ORBIT_GATE = CoreGates.REACHED_ORBIT;
     /** Issuer of server-funded jobs. It has no wallet: their payout is escrowed from the Reserve. */
     public static final UUID SYSTEM_ACCOUNT = new UUID(0L, 0L);

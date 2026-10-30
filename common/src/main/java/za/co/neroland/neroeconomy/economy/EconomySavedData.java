@@ -24,6 +24,7 @@ import net.minecraft.resources.Identifier;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.world.level.saveddata.SavedDataType;
 
+import za.co.neroland.nerolandcore.data.SavedDataCompat;
 import za.co.neroland.nerolandcore.economy.Currency;
 import za.co.neroland.nerolandcore.economy.CurrencyProvider;
 import za.co.neroland.neroeconomy.NeroEconomyCommon;
@@ -61,7 +62,7 @@ public final class EconomySavedData extends EconomySection implements CurrencyPr
     static final Codec<EconomySavedData> CODEC = codec();
     /** The pre-combined-store type. Only {@link EconomyStore} uses it, to migrate and then empty the old file. */
     public static final SavedDataType<EconomySavedData> TYPE =
-            new SavedDataType<>(ID, EconomySavedData::new, CODEC, null);
+            SavedDataCompat.type(ID, EconomySavedData::new, CODEC);
     private static final long MILLIS_PER_DAY = 86_400_000L;
     /** How far the audit list may run past its bound before an append pays for a purge. */
     private static final int PURGE_SLACK = 256;

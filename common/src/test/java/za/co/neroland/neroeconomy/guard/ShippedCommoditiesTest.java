@@ -174,8 +174,11 @@ class ShippedCommoditiesTest {
                 "minecraft:written_book", "minecraft:filled_map", "minecraft:potion", "minecraft:enchanted_book"))
             assertTrue(never.contains(id), id);
         // Every vanilla id in the tag is a real item, so the tag loads in a world with no other mod.
+        // (Before 1.21.4 the game jar has no item list to check against, only what recipes and tags name.)
+        //? if >=1.21.4 {
         for (String id : never)
             if (id.startsWith("minecraft:")) assertTrue(GuardTesting.vanillaItemKnown(id), id);
+        //?}
         CommodityRegistry registry = GuardTesting.shipped(GuardTesting.fullWorld());
         for (String id : never) assertNull(registry.forItem(id), id);
         assertNull(registry.forItem(GuardTesting.CREDIT_CHIP));
@@ -249,7 +252,11 @@ class ShippedCommoditiesTest {
         assertTrue(report.buyOff().isEmpty());
         assertTrue(report.sellOff().isEmpty());
         // The check really ran: the vanilla recipes were read and chains were compared.
+        //? if >=1.21.6 {
         assertTrue(report.recipesRead() > 1300, () -> "only " + report.recipesRead() + " recipes were read");
+        //?} else {
+        /*assertTrue(report.recipesRead() > 1200, () -> "only " + report.recipesRead() + " recipes were read");
+        *///?}
         assertTrue(report.chainsChecked() >= 10, () -> "only " + report.chainsChecked() + " chains were checked");
         assertEquals(registry.commodities().size(), report.commodities());
         System.out.println("[guard] shipped data, every sibling installed: " + report.commodities() + " commodities, "

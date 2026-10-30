@@ -29,6 +29,10 @@ def nextMinecraft = { String version ->
     def parts = version.tokenize('.')
     "${parts[0]}.${(parts[1] as int) + 1}"
 }
+// 1.21.x lines are not "next minor", so their bounds come from gradle.properties (mc_floor_/mc_ceiling_);
+// the floor only goes below the compiled version for a protocol-identical hotfix sibling.
+def mcFloor = project.findProperty("mc_floor_${mc}") ?: mc
+def mcCeiling = project.findProperty("mc_ceiling_${mc}") ?: nextMinecraft(mc)
 
 // Distinct, descriptive jar name per cell (the node project is named after the MC version, so the
 // default jar would be "<mc>-<version>.jar" and COLLIDE with the fabric cell of the same version).
@@ -127,7 +131,7 @@ def generateModMetadata = tasks.register('generateModMetadata', ProcessResources
         mod_authors            : rootProject.mod_authors,
         mod_license            : rootProject.mod_license,
         mod_logo_entry         : modLogoEntry,
-        minecraft_version_range: "[${mc},${nextMinecraft(mc)})",
+        minecraft_version_range: "[${mcFloor},${mcCeiling})",
         // Floor the NeoForge loader range at the version this cell was compiled against; an older
         // NeoForge cannot supply the APIs this jar links to.
         neoforge_version_range : "[${neoVersion},)",
@@ -210,7 +214,7 @@ tasks.register('ecjCheck', JavaExec) {
                 .join(File.pathSeparator)
         def srcDirs = sourceSets.main.java.srcDirs.findAll { it.exists() }.collect { it.absolutePath }
         args = [
-                '--release', '25',
+                '--release', "${project.javaRelease}",
                 '-proc:none',
                 '-d', 'none',
                 '-properties', rootProject.file('tools/ecj.prefs').absolutePath,

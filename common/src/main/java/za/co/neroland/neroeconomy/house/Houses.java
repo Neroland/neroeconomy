@@ -40,9 +40,16 @@ public final class Houses {
     public static HouseDealsEnv dealsEnv(MinecraftServer server, EconomyStore store) {
         String destination = "";
         try {
+            //? if >=1.21.9 {
             var spawn = server.getRespawnData().globalPos();
             destination = spawn.dimension().identifier() + "|" + spawn.pos().getX() + "|" + spawn.pos().getY() + "|"
                     + spawn.pos().getZ();
+            //?} else {
+            /*// Before 1.21.9 the world spawn is always in the overworld.
+            var spawn = server.overworld().getSharedSpawnPos();
+            destination = net.minecraft.world.level.Level.OVERWORLD.identifier() + "|" + spawn.getX() + "|"
+                    + spawn.getY() + "|" + spawn.getZ();
+            *///?}
         } catch (RuntimeException unknown) {
             // No spawn point to deliver to: the Houses post contracts only.
         }

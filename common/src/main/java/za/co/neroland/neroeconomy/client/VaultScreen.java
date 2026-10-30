@@ -91,7 +91,7 @@ public final class VaultScreen extends TexturedContainerScreen<VaultMenu> {
         super.extractContents(extractor, mouseX, mouseY, partialTick);
         Component tip = tooltipAt(mouseX - this.leftPos, mouseY - this.topPos);
         if (tip != null && this.minecraft != null) {
-            extractor.setTooltipForNextFrame(this.font, Tooltip.splitTooltip(this.minecraft, tip), mouseX, mouseY);
+            GuiCompat.tooltip(extractor, this.font, Tooltip.splitTooltip(this.minecraft, tip), mouseX, mouseY);
         }
     }
 

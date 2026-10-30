@@ -171,8 +171,13 @@ public final class DirectTrades {
 
     private static Component clickable(String label, String tooltip, String command, ChatFormatting colour) {
         return Component.translatable(label).withStyle(style -> style.withColor(colour).withUnderlined(true)
+                //? if >=1.21.5 {
                 .withClickEvent(new ClickEvent.RunCommand(command))
                 .withHoverEvent(new HoverEvent.ShowText(Component.translatable(tooltip))));
+                //?} else {
+                /*.withClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, command))
+                .withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, Component.translatable(tooltip))));
+                *///?}
     }
 
     /**

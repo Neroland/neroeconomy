@@ -11,8 +11,10 @@ for Neroland Core, privacy-aware ledger, bank and trading terminals, owned offli
 market offers, contracts, deliveries, bounties, auctions, credit chips, public pricing APIs, and a
 Core Link module. Faction wallets remain deferred.
 
-Mod id: `neroeconomy`. Package: `za.co.neroland.neroeconomy`. Java 25, Mojang mappings, Minecraft
-26.1.2, 26.2 and 26.3 on Fabric, Forge, and NeoForge.
+Mod id: `neroeconomy`. Package: `za.co.neroland.neroeconomy`. Mojang mappings, Minecraft
+1.21.1, 1.21.4, 1.21.5, 1.21.8, 1.21.10, 1.21.11 (Java 21) and 26.1.2, 26.2, 26.3 (Java 25) on Fabric,
+Forge, and NeoForge. Source is written for 26.x; older lines are handled by `//?` blocks and the
+`legacyRenames` list in `stonecutter.gradle`.
 
 ## Non-negotiable rules
 
@@ -59,6 +61,9 @@ loader nodes are `:<loader>:<mc>`. Resources are hand-authored; there is no data
 Before handoff run:
 
 `./gradlew :neoforge:26.1.2:build :neoforge:26.2:build :neoforge:26.3:build :forge:26.1.2:build :forge:26.2:build :forge:26.3:build :fabric:26.1.2:build :fabric:26.2:build :fabric:26.3:build :neoforge:26.2:ecjCheck :neoforge:26.3:ecjCheck test`
+
+and, for the 1.21.x lines, `:<loader>:<mc>:compileJava` for every loader and `<mc>` in 1.21.1, 1.21.4,
+1.21.5, 1.21.8, 1.21.10 and 1.21.11 (plus `:neoforge:1.21.1:build :fabric:1.21.1:build`).
 
 Update the player/contributor documentation in `wiki/` with every feature change; `wiki/` is public
 and must not reference planning, audit or test documents. Runtime smoke testing is owned by the

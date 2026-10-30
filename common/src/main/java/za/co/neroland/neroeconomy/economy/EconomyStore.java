@@ -21,6 +21,7 @@ import net.minecraft.world.level.saveddata.SavedData;
 import net.minecraft.world.level.saveddata.SavedDataType;
 import net.minecraft.world.level.storage.SavedDataStorage;
 
+import za.co.neroland.nerolandcore.data.SavedDataCompat;
 import za.co.neroland.nerolandcore.data.SavedDataRecovery;
 import za.co.neroland.neroeconomy.NeroEconomyCommon;
 import za.co.neroland.neroeconomy.admin.AdminSection;
@@ -182,7 +183,7 @@ public final class EconomyStore extends SavedData {
         }
     }
 
-    public static final SavedDataType<EconomyStore> TYPE = new SavedDataType<>(ID, EconomyStore::new, CODEC, null);
+    public static final SavedDataType<EconomyStore> TYPE = SavedDataCompat.type(ID, EconomyStore::new, CODEC);
 
     /** What one running server has resolved; never outlives it. */
     private static final class Session {
@@ -541,7 +542,7 @@ public final class EconomyStore extends SavedData {
         EconomyMarker marker = SavedDataRecovery.get(level, EconomyMarker.TYPE, EconomyMarker::new,
                 EconomyMarker.ID.toString());
         // A plain read: null when there is no file, and also when the file could not be read.
-        EconomyStore onDisk = storage.get(TYPE);
+        EconomyStore onDisk = peek(storage, TYPE);
         boolean missing = onDisk == null && marker.exists();
         // A store written by a later version holds sections this one would drop on its next save.
         boolean newer = onDisk != null && onDisk.schema > SCHEMA;
@@ -620,7 +621,7 @@ public final class EconomyStore extends SavedData {
 
     private static <T extends EconomySection> void eraseLegacy(ServerLevel level, SavedDataStorage storage,
             SavedDataType<T> type, Consumer<T> purge) {
-        T old = storage.get(type);
+        T old = peek(storage, type);
         if (old == null) return;
         if (old.owner() != null) old.rewriteStandaloneFile();
         else if (old.isEmpty()) return;
@@ -645,7 +646,7 @@ public final class EconomyStore extends SavedData {
         ServerLevel level = server.overworld();
         SavedDataStorage storage = level.getDataStorage();
         EconomyStore store = current.frozen;
-        storage.set(TYPE, store);
+        put(storage, TYPE, store);
         current.frozen = null;
         EconomyHealth.clear();
         clearLegacy(level, storage);
@@ -665,8 +666,8 @@ public final class EconomyStore extends SavedData {
      * to adopt.
      */
     private void setUp(SavedDataStorage storage, boolean importLegacy) {
-        if (importLegacy) setUpFrom(storage.get(EconomySavedData.TYPE), storage.get(MarketSavedData.TYPE),
-                storage.get(ObligationSavedData.TYPE), storage.get(ShopOwnershipState.TYPE));
+        if (importLegacy) setUpFrom(peek(storage, EconomySavedData.TYPE), peek(storage, MarketSavedData.TYPE),
+                peek(storage, ObligationSavedData.TYPE), peek(storage, ShopOwnershipState.TYPE));
         else setUpFrom(null, null, null, null);
     }
 
@@ -716,10 +717,29 @@ public final class EconomyStore extends SavedData {
 
     private static <T extends EconomySection> void clearLegacy(ServerLevel level, SavedDataStorage storage,
             SavedDataType<T> type, T empty) {
-        T old = storage.get(type);
+        T old = peek(storage, type);
         if (old == null || old.isEmpty() || old.owner() != null) return;
         // set() marks the empty instance dirty, so the old file is rewritten empty at the next save.
-        storage.set(type, empty);
+        put(storage, type, empty);
         SavedDataRecovery.backupNow(level, type, empty, type.id().toString());
+    }
+
+    /** A plain read of one store: null when it has no file (or the file could not be read); never creates it. */
+    private static <T extends SavedData> T peek(SavedDataStorage storage, SavedDataType<T> type) {
+        //? if >=1.21.5 {
+        return storage.get(type);
+        //?} else {
+        /*// Core's legacy factory never reads the level it is handed, so a storage-only read needs none.
+        return storage.get(type.factory(null), type.id());
+        *///?}
+    }
+
+    /** Installs {@code instance} as the store for {@code type} (written at the next save). */
+    private static <T extends SavedData> void put(SavedDataStorage storage, SavedDataType<T> type, T instance) {
+        //? if >=1.21.5 {
+        storage.set(type, instance);
+        //?} else {
+        /*storage.set(type.id(), type.attach(instance));
+        *///?}
     }
 }

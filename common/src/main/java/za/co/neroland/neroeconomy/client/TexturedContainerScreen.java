@@ -7,8 +7,9 @@ import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.navigation.FocusNavigationEvent;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
+//? if >=1.21.9 {
 import net.minecraft.client.input.KeyEvent;
-import net.minecraft.client.renderer.RenderPipelines;
+//?}
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
 import net.minecraft.world.entity.player.Inventory;
@@ -41,7 +42,13 @@ public abstract class TexturedContainerScreen<T extends AbstractContainerMenu> e
 
     protected TexturedContainerScreen(T menu, Inventory playerInventory, Component title, Identifier background,
                                       int width, int height) {
+        //? if >=26.1 {
         super(menu, playerInventory, title, width, height);
+        //?} else {
+        /*super(menu, playerInventory, title);
+        this.imageWidth = width;
+        this.imageHeight = height;
+        *///?}
         this.background = background;
     }
 
@@ -51,6 +58,7 @@ public abstract class TexturedContainerScreen<T extends AbstractContainerMenu> e
      * search, recipient, amount or price field. Escape still closes and Tab still moves between
      * fields; everything else goes to the box and nowhere else.
      */
+    //? if >=1.21.9 {
     @Override
     public boolean keyPressed(KeyEvent event) {
         EditBox typing = getFocused() instanceof EditBox box && box.canConsumeInput() ? box : null;
@@ -66,6 +74,23 @@ public abstract class TexturedContainerScreen<T extends AbstractContainerMenu> e
         }
         return true;
     }
+    //?} else {
+    /*@Override
+    public boolean keyPressed(int key, int scanCode, int modifiers) {
+        EditBox typing = getFocused() instanceof EditBox box && box.canConsumeInput() ? box : null;
+        TextInputKeys.Route route = TextInputKeys.route(key == InputConstants.KEY_ESCAPE, typing != null,
+                key == InputConstants.KEY_TAB);
+        if (route == TextInputKeys.Route.SCREEN || typing == null) {
+            return super.keyPressed(key, scanCode, modifiers);
+        }
+        if (route == TextInputKeys.Route.FOCUS) {
+            moveFocus((modifiers & org.lwjgl.glfw.GLFW.GLFW_MOD_SHIFT) == 0);
+        } else {
+            typing.keyPressed(key, scanCode, modifiers);
+        }
+        return true;
+    }
+    *///?}
 
     /** Tab traversal, as the base screen does it, without the container hotkeys that follow it there. */
     private void moveFocus(boolean forward) {
@@ -80,12 +105,33 @@ public abstract class TexturedContainerScreen<T extends AbstractContainerMenu> e
         }
     }
 
+    //? if >=26.1 {
     @Override
     public void extractContents(GuiGraphicsExtractor extractor, int mouseX, int mouseY, float partialTick) {
         drawPanel(extractor);
         super.extractContents(extractor, mouseX, mouseY, partialTick);
         extractForeground(extractor);
     }
+    //?} else {
+    /*// Before 26.1 vanilla's render() paints the background (renderBg: the panel), the slots and the labels
+    // in one pass and leaves the hovered-slot tooltip to the subclass. extractContents is this class's own
+    // hook there: it runs right after, so readouts and overlays keep their 26.x order above the slots.
+    @Override
+    protected void renderBg(GuiGraphicsExtractor extractor, float partialTick, int mouseX, int mouseY) {
+        drawPanel(extractor);
+    }
+
+    @Override
+    public void render(GuiGraphicsExtractor extractor, int mouseX, int mouseY, float partialTick) {
+        super.render(extractor, mouseX, mouseY, partialTick);
+        extractContents(extractor, mouseX, mouseY, partialTick);
+        this.renderTooltip(extractor, mouseX, mouseY);
+    }
+
+    public void extractContents(GuiGraphicsExtractor extractor, int mouseX, int mouseY, float partialTick) {
+        extractForeground(extractor);
+    }
+    *///?}
 
     /** The sheet to blit. Overridable so one screen class can serve two blocks (terminal vs board). */
     protected Identifier background() {
@@ -94,7 +140,7 @@ public abstract class TexturedContainerScreen<T extends AbstractContainerMenu> e
 
     /** Blits the backing panel: the top-left {@code imageWidth x imageHeight} of a 256x256 sheet. */
     protected void drawPanel(GuiGraphicsExtractor extractor) {
-        extractor.blit(RenderPipelines.GUI_TEXTURED, background(), this.leftPos, this.topPos,
+        GuiCompat.blit(extractor, background(), this.leftPos, this.topPos,
                 0.0F, 0.0F, this.imageWidth, this.imageHeight, 256, 256);
     }
 

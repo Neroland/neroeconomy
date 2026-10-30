@@ -196,7 +196,12 @@ class RecipeReaderTest {
                 assertFalse(readBeforeCheck.contains(file.getKey()), () -> file.getKey() + " (brewing) was read");
         // Otherwise only special crafting, dyeing, transmuting and trims are left out.
         assertTrue(otherSkipped < 120, () -> otherSkipped + " vanilla recipes other than brewing were skipped");
+        // 1.21.1 - 1.21.5 ship about 1290 - 1370 recipes in all; later lines ship more.
+        //? if >=1.21.6 {
         assertTrue(read.recipes().size() > 1300, () -> "only " + read.recipes().size() + " vanilla recipes were read");
+        //?} else {
+        /*assertTrue(read.recipes().size() > 1200, () -> "only " + read.recipes().size() + " vanilla recipes were read");
+        *///?}
         java.util.Set<String> readable = java.util.Set.of("minecraft:crafting_shaped", "minecraft:crafting_shapeless",
                 "minecraft:smelting", "minecraft:blasting", "minecraft:smoking", "minecraft:campfire_cooking",
                 "minecraft:stonecutting", "minecraft:smithing_transform");

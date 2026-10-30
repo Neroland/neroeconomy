@@ -198,13 +198,13 @@ public final class GalleryCaptureHarness {
             return 0;
         }
         if (running) {
-            mc.player.sendSystemMessage(Component.translatable("command.neroeconomy.capture.already_running"));
+            tell(mc, Component.translatable("command.neroeconomy.capture.already_running"));
             return 0;
         }
         QUEUE.clear();
         QUEUE.addAll(galleryQueue(time));
         begin(mc);
-        mc.player.sendSystemMessage(Component.translatable("command.neroeconomy.capture.started", time,
+        tell(mc, Component.translatable("command.neroeconomy.capture.started", time,
                 QUEUE.size()));
         return Command.SINGLE_SUCCESS;
     }
@@ -393,16 +393,30 @@ public final class GalleryCaptureHarness {
         RenderTarget target = mainRenderTarget(mc);
         if (target == null) {
             if (mc.player != null) {
-                mc.player.sendSystemMessage(Component.translatable("command.neroeconomy.capture.no_render_target"));
+                tell(mc, Component.translatable("command.neroeconomy.capture.no_render_target"));
             }
             return;
         }
+        //? if >=1.21.6 {
         Screenshot.grab(mc.gameDirectory, "neroeconomy/" + name + ".png", target, 1,
+        //?} else {
+        /*Screenshot.grab(mc.gameDirectory, "neroeconomy/" + name + ".png", target,
+        *///?}
                 msg -> {
                     if (mc.player != null) {
-                        mc.player.sendSystemMessage(msg);
+                        tell(mc, msg);
                     }
                 });
+    }
+
+    /** A chat line for the local player (26.1 renamed displayClientMessage(.., false) to sendSystemMessage). */
+    private static void tell(Minecraft mc, Component message) {
+        if (mc.player == null) return;
+        //? if >=26.1 {
+        mc.player.sendSystemMessage(message);
+        //?} else {
+        /*mc.player.displayClientMessage(message, false);
+        *///?}
     }
 
     private static void finish(Minecraft mc) {
@@ -416,7 +430,7 @@ public final class GalleryCaptureHarness {
         current = null;
         QUEUE.clear();
         if (mc.player != null) {
-            mc.player.sendSystemMessage(Component.translatable("command.neroeconomy.capture.done"));
+            tell(mc, Component.translatable("command.neroeconomy.capture.done"));
         }
     }
 

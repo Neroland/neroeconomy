@@ -22,7 +22,9 @@ import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
+//? if >=1.21.6 {
 import net.minecraft.world.level.storage.TagValueInput;
+//?}
 import net.minecraft.world.phys.AABB;
 
 import za.co.neroland.neroeconomy.NeroEconomyCommon;
@@ -71,7 +73,11 @@ public final class GalleryBuilder {
     private final int oz;
 
     private GalleryBuilder(ServerPlayer operator, GallerySandbox sandbox) {
+        //? if >=1.21.6 {
         this.level = operator.level();
+        //?} else {
+        /*this.level = operator.serverLevel();
+        *///?}
         this.operator = operator;
         this.sandbox = sandbox;
         BlockPos origin = operator.blockPosition();
@@ -318,7 +324,11 @@ public final class GalleryBuilder {
         ArmorStand stand = new ArmorStand(level, pos.getX() + 0.5, pos.getY(), pos.getZ() + 0.5);
         CompoundTag marker = new CompoundTag();
         marker.putBoolean("Marker", true);
+        //? if >=1.21.6 {
         stand.load(TagValueInput.create(ProblemReporter.DISCARDING, level.registryAccess(), marker));
+        //?} else {
+        /*stand.load(marker);
+        *///?}
         stand.refreshDimensions();
         // load() re-read every field from that tag, so the position and the label state go on afterwards.
         stand.setPos(pos.getX() + 0.5, pos.getY(), pos.getZ() + 0.5);
@@ -401,7 +411,11 @@ public final class GalleryBuilder {
      * before the sandbox left in the market section. Nothing else in the world is touched.
      */
     public static Cleared clear(ServerPlayer operator) {
+        //? if >=1.21.6 {
         ServerLevel level = operator.level();
+        //?} else {
+        /*ServerLevel level = operator.serverLevel();
+        *///?}
         MinecraftServer server = level.getServer();
         GallerySandbox.Cleared record = EconomyStore.get(server).gallery().clear();
         int blocks;
