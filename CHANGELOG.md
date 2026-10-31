@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+## [0.5.1-beta.1] - 2026-10-31
+
+### Changed
+
+- Release uploads now target CurseForge and GitHub Releases only.
+- Removed automatic project description and gallery uploads.
+- Renamed the website overview source to `art/description.md` and refreshed public documentation links.
+
 ## [0.5.0-beta.1] - 2026-10-30
 
 NeroEconomy now runs on Minecraft 1.21 as well as 26.x, and **requires Neroland Core 1.17.0** (was

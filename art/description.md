@@ -63,7 +63,7 @@ Faction and company wallets with role-based spend permissions are **deferred unt
 
 ## Requirements & compatibility
 
-- **Requires [Neroland Core](https://modrinth.com/mod/nerolandcore)** — install it alongside NeroEconomy (it loads first). Core provides the currency API every balance settles through.
+- **Requires [Neroland Core](https://nerolandmc.net/mods/neroland-core/)** — install it alongside NeroEconomy (it loads first). Core provides the currency API every balance settles through.
 - **Modpacks are allowed and encouraged** — any platform, no need to ask. Use the official files and credit *NeroEconomy by Neroland* with links to the [CurseForge page](https://www.curseforge.com/minecraft/mc-mods/neroeconomy) and the [GitHub repository](https://github.com/Neroland/neroeconomy). Full terms: [LICENSE](https://github.com/Neroland/neroeconomy/blob/main/LICENSE).
 
 ## Links

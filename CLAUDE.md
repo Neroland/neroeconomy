@@ -1,5 +1,7 @@
 # Project context for AI coding agents — NeroEconomy
 
+> Modrinth is temporarily being removed from the upload and is no longer being referenced. Avoid making references to modrinth.
+
 > This file and `CLAUDE.md` are byte-identical; always update both together.
 
 ## Status and scope
