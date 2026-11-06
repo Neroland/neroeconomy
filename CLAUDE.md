@@ -70,3 +70,7 @@ and, for the 1.21.x lines, `:<loader>:<mc>:compileJava` for every loader and `<m
 Update the player/contributor documentation in `wiki/` with every feature change; `wiki/` is public
 and must not reference planning, audit or test documents. Runtime smoke testing is owned by the
 developer and follows `SMOKE-TEST.md`.
+
+## Translation workflow
+
+English is the source language for new and changed text. Community translations are intended to be contributed through Weblate; other-language translations are not required when implementing a feature. Preserve existing translations. This supersedes older instructions that require translating every change.
