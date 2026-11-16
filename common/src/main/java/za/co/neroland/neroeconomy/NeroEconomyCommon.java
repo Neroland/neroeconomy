@@ -118,6 +118,7 @@ public final class NeroEconomyCommon {
         ModCreativeTab.init();
         ModBlockEntities.init();
         ModMenuTypes.init();
+        za.co.neroland.neroeconomy.map.ShopMapLayers.register(); // Map layer through Core's map registry.
         // 4. Link is always last and can never prevent the mod from loading.
         try {
             za.co.neroland.neroeconomy.link.NeroEconomyLinkModule.register();

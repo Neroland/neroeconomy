@@ -1571,6 +1571,8 @@
   "link.neroeconomy.vault_line_changed": "That vault line has changed. Refresh the vault and try again.",
   "link.neroeconomy.vault_no_room": "Your vault has no room for that.",
   "link.neroeconomy.withdrew": "Moved %s items into your inventory.",
+  "map.layer.neroeconomy.my_shops": "My shops",
+  "map.neroeconomy.my_shop": "Your shop",
   "message.neroeconomy.auto_trader.applied_buy": "Auto-Trader rule set: buy up to %s × %s a day at up to %s credits each. Its budget of %s credits is now held in escrow; what it buys arrives in the output slots.",
   "message.neroeconomy.auto_trader.applied_sell": "Auto-Trader rule set: sell up to %s × %s a day from the input slots at %s credits each or more, %s in total. Nothing has been spent; each order it places pays the listing fee.",
   "message.neroeconomy.auto_trader.deleted": "Auto-Trader rule deleted. %s credits of its budget are back in your balance; unsold items are back in the input slots.",

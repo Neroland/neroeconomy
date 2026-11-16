@@ -56,3 +56,5 @@ to `0` to turn expiry off.
 When a shop owner's data is erased, the ownership record, the listing and its stock are removed (the stock is destroyed). The
 shop block stays in the world without an owner, and anyone can break it. See
 [Privacy](Privacy-and-Erasure.md).
+
+**On maps.** With a map mod that reads Neroland Core's map registry, your own shops appear on your map as a "My shops" layer. Only you see them; other players' shops are never shown.
