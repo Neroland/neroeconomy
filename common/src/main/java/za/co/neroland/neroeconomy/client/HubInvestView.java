@@ -516,11 +516,50 @@ final class HubInvestView extends HubTabView {
         }
     }
 
+    /**
+     * The price chart's hover: which half is under the pointer, the latest price, the low and high in
+     * view and the change across it, at the same rectangles {@link #drawPick} and {@link #drawAmount}
+     * draw it. Null when the pointer is not over a drawn chart.
+     */
+    private Component chartTooltip(int x, int y) {
+        if (portfolio() || header(InvestPages.PICK_BOND) == 1L) return null;
+        int cx = 8;
+        int cy;
+        int h;
+        if (this.step == Step.PICK) {
+            if (header(InvestPages.PICKED) != 1L) return null;
+            cy = 168;
+            h = 38;
+        } else {
+            cy = 78;
+            h = 34;
+        }
+        int w = 240;
+        if (x < cx || x >= cx + w || y < cy || y >= cy + h) return null;
+        long[] series = this.page.series();
+        if (series.length == 0) return null;
+        int recent = (int) Math.max(0L, Math.min(series.length, header(InvestPages.CHART_RECENT_COUNT)));
+        int recentW = w * 3 / 5 - 2;
+        java.util.List<Component> lines = new java.util.ArrayList<>();
+        if (x < cx + recentW) {
+            GaugeTooltips.priceSeries(lines, false, java.util.Arrays.copyOfRange(series, 0, recent),
+                    header(InvestPages.CHART_HALTED) == 1L, false);
+        } else if (x >= cx + recentW + 4) {
+            GaugeTooltips.priceSeries(lines, true, java.util.Arrays.copyOfRange(series, recent, series.length),
+                    false, header(InvestPages.CHART_SPLIT) >= 0L);
+        } else {
+            return null;
+        }
+        return GaugeTooltips.joined(lines);
+    }
+
     @Override
     Component tooltipAt(int x, int y) {
         if (practice() && y >= 35 && y < 47 && x < 198) return Component.translatable("gui.neroeconomy.hub.invest.practice_banner.tooltip");
         HubPage.Row row = rowAt(x, y);
         if (row == null) {
+            Component chart = chartTooltip(x, y);
+            if (chart != null) return chart;
             if (!portfolio() && this.step == Step.AMOUNT && y >= 160 && y < 190)
                 return Component.translatable("gui.neroeconomy.hub.invest.week.tooltip");
             if (portfolio() && y >= 50 && y < 80) return Component.translatable("gui.neroeconomy.hub.invest.totals.tooltip");

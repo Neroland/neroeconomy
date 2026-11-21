@@ -1,5 +1,7 @@
 package za.co.neroland.neroeconomy.client;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
 import net.minecraft.client.gui.GuiGraphicsExtractor;
@@ -316,6 +318,27 @@ public final class AutoTraderScreen extends TexturedContainerScreen<AutoTraderMe
                 PROGRESS_X, CONFIRM_Y, armed ? WARNING : SUBTLE);
         label(g, trim(Component.translatable(lines + ".2", number(this.total), number(this.perDay)), CONFIRM_W),
                 PROGRESS_X, CONFIRM_Y + LINE_H, armed ? WARNING : SUBTLE);
+    }
+
+    /**
+     * Draws the panel as usual, then the progress well's hover: the rule's status, today's fills against
+     * the daily limit, the total against the budget or quantity, and the rules value against the daily
+     * cap, each with its share used. Only the owner's own rule, already on screen.
+     */
+    @Override
+    public void extractContents(GuiGraphicsExtractor extractor, int mouseX, int mouseY, float partialTick) {
+        super.extractContents(extractor, mouseX, mouseY, partialTick);
+        int mx = mouseX - this.leftPos;
+        int my = mouseY - this.topPos;
+        if (mx < PROGRESS_X || mx >= PROGRESS_X + PROGRESS_W || my < PROGRESS_Y - 1 || my >= PROGRESS_Y + 3 * LINE_H + 7) {
+            return;
+        }
+        List<Component> lines = new ArrayList<>();
+        GaugeTooltips.autoTrader(lines, status(), this.state.hasRule(), this.state.buys(), this.state.filledToday(),
+                this.state.perDay(), this.state.done(), this.state.total(), this.state.valueToday(),
+                this.state.valueCap());
+        GuiCompat.tooltip(extractor, this.font, GaugeTooltips.sequences(this.font, lines,
+                GaugeTooltips.wrapWidth(this.width)), mouseX, mouseY);
     }
 
     /** The inventory sits in the middle of a wide panel and needs no caption of its own. */
