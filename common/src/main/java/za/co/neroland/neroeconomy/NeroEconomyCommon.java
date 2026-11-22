@@ -82,6 +82,8 @@ public final class NeroEconomyCommon {
         //    What the erased player spent through the companion app today.
         PlayerDataErasure.register(za.co.neroland.neroeconomy.link.RemoteSpendSection::eraseFor);
         PlayerDataErasure.register((server, player) -> za.co.neroland.neroeconomy.link.EconomyAlerts.forget(player));
+        //    The read-side twin: the same export document, handed to Core's /neroland data exportme.
+        za.co.neroland.neroeconomy.data.CoreDataExport.register();
         // 2. Configuration and the real Core currency provider.
         EconomyConfig.init();
         NeroEconomyTelemetry.init();

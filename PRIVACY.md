@@ -277,6 +277,11 @@ restricted in the same way, where the file system supports POSIX permissions. On
 any copy or backup of that folder made while it exists, and its name is the player's UUID. Handing
 the file to the player, and deleting copies made elsewhere, is the operator's task.
 
+The same document is also NeroEconomy's section of Neroland Core's player data export
+(`/neroland data exportme`, and `/neroland data export <uuid>` for operators). That path writes no
+file: Core builds the document on request, hands it to the requester in chat and keeps no copy, and
+nothing about the player is logged.
+
 ## Erasure
 
 `/eco erase <player|uuid>` calls Neroland Core's shared `data.PlayerDataErasure` hook, so one
@@ -398,6 +403,9 @@ NeroEconomy embeds the Sentry client for crash reporting. Stated precisely:
   installation rather than to the server.
 - **Scope.** Only failures whose stack trace includes `za.co.neroland.neroeconomy` are considered.
 - **Cap.** At most 10 events per session, and one per distinct failure.
+- **Own client.** NeroEconomy reports through its own Sentry client and never through the shared
+  global one, so other mods' crashes never reach NeroEconomy's project and NeroEconomy's never reach
+  theirs.
 - **What an event contains.** The mod release (`neroeconomy@<version>`), the environment name
   (`development` or `production`), a fixed operation label, the exception class, its message and
   its stack trace, plus whatever runtime information the Sentry client attaches by default.

@@ -6,8 +6,13 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Pattern;
 
-import io.sentry.Sentry;
+import io.sentry.IScopes;
+import io.sentry.Scope;
+import io.sentry.Scopes;
+import io.sentry.SentryClient;
 import io.sentry.SentryEvent;
+import io.sentry.SentryOptions;
+import io.sentry.UncaughtExceptionHandlerIntegration;
 import io.sentry.protocol.Message;
 import io.sentry.protocol.SentryException;
 import io.sentry.protocol.SentryStackFrame;
@@ -16,7 +21,13 @@ import io.sentry.protocol.SentryStackTrace;
 import za.co.neroland.neroeconomy.config.EconomyConfig;
 import za.co.neroland.neroeconomy.platform.Services;
 
-/** Opt-out, PII-free NeroEconomy-only Sentry reporting. */
+/**
+ * Opt-out, PII-free NeroEconomy-only Sentry reporting.
+ *
+ * <p>Uses its own isolated client and scopes and never the static {@code Sentry} API: every Nero mod (and
+ * any other mod) embeds the same un-relocated Sentry jar, so a global {@code Sentry.init} would replace the
+ * previous mod's hub and its package filter would drop everyone else's events.</p>
+ */
 public final class NeroEconomyTelemetry {
     static final String PLACEHOLDER_DSN = "https://REPLACE-ME@sentry.invalid/0";
     private static final String DSN =
@@ -31,6 +42,10 @@ public final class NeroEconomyTelemetry {
     private static final AtomicInteger SENT = new AtomicInteger();
     private static final Set<String> SEEN = ConcurrentHashMap.newKeySet();
     private static volatile boolean active;
+    /** NeroEconomy's own scopes; null until {@link #init()} succeeds. */
+    private static volatile IScopes scopes;
+    /** Process lifetime, never closed (a field so ecj does not flag a resource leak). */
+    private static UncaughtExceptionHandlerIntegration uncaughtHandler;
 
     private NeroEconomyTelemetry() { }
 
@@ -38,23 +53,58 @@ public final class NeroEconomyTelemetry {
         if (active || PLACEHOLDER_DSN.equals(DSN) || !EconomyConfig.TELEMETRY_ENABLED.get()) {
             return;
         }
-        Sentry.init(options -> {
-            options.setDsn(DSN);
-            options.setRelease("neroeconomy@" + Services.PLATFORM.getModVersion());
-            options.setEnvironment(Services.PLATFORM.isDevelopmentEnvironment() ? "development" : "production");
-            options.setSendDefaultPii(false);
-            options.setAttachServerName(false);
-            options.setBeforeSend((event, hint) -> ForeignMixinFailure.matches(event) ? null : filter(event));
-        });
+        SentryOptions options = baseOptions(Services.PLATFORM.getModVersion(),
+                Services.PLATFORM.isDevelopmentEnvironment() ? "development" : "production");
+        options.setBeforeSend((event, hint) -> ForeignMixinFailure.matches(event) ? null : filter(event));
+        IScopes own = isolatedScopes(options, "neroeconomy");
+        scopes = own;
+        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            try {
+                own.flush(2000L);
+            } catch (RuntimeException ignored) {
+                // Shutting down; nothing more to do.
+            }
+        }, "neroeconomy-sentry-shutdown"));
         active = true;
     }
 
+    /** The options every NeroEconomy client starts from; package-private for the isolation test. */
+    static SentryOptions baseOptions(String modVersion, String environment) {
+        SentryOptions options = new SentryOptions();
+        options.setDsn(DSN);
+        options.setRelease("neroeconomy@" + modVersion);
+        options.setEnvironment(environment);
+        options.setSendDefaultPii(false);
+        options.setAttachServerName(false);
+        options.setEnableUncaughtExceptionHandler(true);
+        options.setEnableShutdownHook(false);
+        options.setEnableAutoSessionTracking(false);
+        return options;
+    }
+
+    /**
+     * Activates {@code options} (what {@code Sentry.init} would otherwise do), binds a client to a fresh
+     * set of scopes and chains the uncaught-exception handler to the previous one. Never touches the
+     * global hub.
+     */
+    static IScopes isolatedScopes(SentryOptions options, String creator) {
+        options.activate();
+        Scopes own = new Scopes(new Scope(options), new Scope(options), new Scope(options), creator);
+        own.bindClient(new SentryClient(options));
+        if (options.isEnableUncaughtExceptionHandler()) {
+            uncaughtHandler = new UncaughtExceptionHandlerIntegration();
+            uncaughtHandler.register(own, options);
+        }
+        return own;
+    }
+
     public static void captureHandledException(Throwable failure, String operation) {
-        if (!active || failure == null || !touchesEconomy(failure)) return;
-        Sentry.withScope(scope -> {
+        IScopes s = scopes;
+        if (!active || s == null || failure == null || !touchesEconomy(failure)) return;
+        // Tags set inside withScope never reach the event in Sentry 8.x: use the ScopeCallback overload.
+        s.captureException(failure, scope -> {
             scope.setTag("handled", "true");
             scope.setTag("operation", scrub(operation));
-            Sentry.captureException(failure);
         });
     }
 

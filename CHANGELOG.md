@@ -2,6 +2,19 @@
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-11-22
+
+### Added
+
+- NeroEconomy's data now appears in Neroland Core's player data export (`/neroland data exportme`). It is the
+  same document as `/eco export`, built on request and never written to a file. Needs Neroland Core 1.20.1.
+
+### Fixed
+
+- Crash reports now go through NeroEconomy's own Sentry client instead of the shared global one, so another mod
+  starting Sentry can no longer silence NeroEconomy's reports or have its own dropped. Handled-error reports
+  now carry their `handled` and `operation` tags.
+
 ## [0.5.3] - 2026-11-26
 
 ### Added
