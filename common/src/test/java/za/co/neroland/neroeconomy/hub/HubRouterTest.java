@@ -102,6 +102,7 @@ class HubRouterTest {
         }
         @Override public void shopPrice(RowRef row, long price) { calls.add("shopPrice " + price); }
         @Override public void shopOpen(RowRef row) { calls.add("shopOpen"); }
+        @Override public void shopMapListing(RowRef row, boolean listed) { calls.add("shopMapListing " + listed); }
         @Override public void adminView(HubAction.AdminView view) { calls.add("adminView " + view); }
         @Override public void adminSimStep(int steps) { calls.add("adminSimStep " + steps); }
         @Override public void adminMarketFreeze(boolean closed) { calls.add("adminMarketFreeze " + closed); }
@@ -167,7 +168,7 @@ class HubRouterTest {
     @Test void everyActionIsCoveredByTheRoutingTest() {
         // A new action must get a line in eachActionReachesItsOwnCall, or in HubRouterF1bTest for the F1b tabs,
         // or in HubRouterAdminTest for the Admin tab.
-        assertEquals(61, HubAction.values().length);
+        assertEquals(62, HubAction.values().length);
     }
 
     @Test void anIntentWithoutARequestIdOrActionIsRefused() {

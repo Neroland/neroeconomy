@@ -12,18 +12,20 @@ import za.co.neroland.neroeconomy.hub.ShopPages;
 /**
  * The Shop tab: the player's own Player Shops — where each stands, what it sells, its stock, its
  * price and how long it has been idle — with a new price for a shop whose chunk is loaded, and the
- * shop's own window for one within reach.
+ * shop's own window for one within reach, and the owner's switch to list a shop on other players' maps
+ * (off until the owner turns it on).
  *
  * <pre>
  *   20   how many shops, and after how many idle days one closes (two lines)
  *   44   six rows of 20px | 168: page buttons | price (92, 168, 54) | Set price (150, 168, 98x14)
- *   186  Open shop (150, 186, 98x14)      204: the confirm line
+ *   186  List on maps (8, 186, 138x14) | Open shop (150, 186, 98x14)      204: the confirm line
  * </pre>
  */
 final class HubShopView extends HubTabView {
     private EditBox price;
     private Button setPrice;
     private Button open;
+    private Button mapListing;
 
     HubShopView(EconomyHubScreen screen, HubIntents intents, HubPage page) {
         super(screen, intents, page);
@@ -51,6 +53,12 @@ final class HubShopView extends HubTabView {
                     HubPage.Row row = selectedRow();
                     if (row != null) this.intents.send(HubAction.SHOP_OPEN, row.id(), 0L, 0L, "");
                 });
+        this.mapListing = this.screen.button(Component.empty(), "gui.neroeconomy.hub.shop.map_listing.tooltip", 8, 186,
+                138, 14, () -> {
+                    HubPage.Row row = selectedRow();
+                    if (row != null) this.intents.send(HubAction.SHOP_MAP_LISTING, row.id(),
+                            row.flag(ShopPages.FLAG_LISTED) ? 0L : 1L, 0L, "");
+                });
     }
 
     @Override
@@ -70,6 +78,11 @@ final class HubShopView extends HubTabView {
             label(this.setPrice, "gui.neroeconomy.hub.shop.set_price", !what.isEmpty() && armed(what));
         }
         if (this.open != null) this.open.active = row != null && row.flag(ShopPages.FLAG_IN_REACH);
+        if (this.mapListing != null) {
+            this.mapListing.active = row != null;
+            this.mapListing.setMessage(Component.translatable(row != null && row.flag(ShopPages.FLAG_LISTED)
+                    ? "gui.neroeconomy.hub.shop.map_unlist" : "gui.neroeconomy.hub.shop.map_list"));
+        }
     }
 
     @Override

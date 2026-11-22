@@ -136,6 +136,8 @@ public final class HubRouter {
         void auctionCreate(int quantity, long minimumBid, int minutes, boolean interplanetary);
         void shopPrice(HubPages.RowRef row, long price);
         void shopOpen(HubPages.RowRef row);
+        /** The owner lists ({@code true}) or unlists one of their shops on other players' maps. */
+        void shopMapListing(HubPages.RowRef row, boolean listed);
 
         // --- F3: the Admin tab. Each one checks for a level-3 operator again. ------------------
         void adminView(HubAction.AdminView view);
@@ -293,6 +295,7 @@ public final class HubRouter {
             }
             case SHOP_PRICE -> services.shopPrice(row, a);
             case SHOP_OPEN -> services.shopOpen(row);
+            case SHOP_MAP_LISTING -> services.shopMapListing(row, a == 1L);
             case ADMIN_VIEW -> services.adminView(HubAction.AdminView.byOrdinal(a));
             case ADMIN_SIM_STEP -> services.adminSimStep((int) a);
             case ADMIN_MARKET_FREEZE -> services.adminMarketFreeze(a == 1L);
@@ -324,7 +327,7 @@ public final class HubRouter {
             case OFFER_SEND -> kind == HubPages.RowRef.Kind.VAULT_LINE;
             case JOB_CLAIM, JOB_RELEASE, JOB_FULFIL, JOB_CANCEL -> kind == HubPages.RowRef.Kind.JOB;
             case AUCTION_BID, AUCTION_CANCEL -> kind == HubPages.RowRef.Kind.AUCTION;
-            case SHOP_PRICE, SHOP_OPEN -> kind == HubPages.RowRef.Kind.PLAYER_SHOP;
+            case SHOP_PRICE, SHOP_OPEN, SHOP_MAP_LISTING -> kind == HubPages.RowRef.Kind.PLAYER_SHOP;
             case ADMIN_EXPORT, ADMIN_ERASE, ADMIN_GRANT, ADMIN_TAKE, ADMIN_SET ->
                     kind == HubPages.RowRef.Kind.ADMIN_TARGET;
             default -> false;
@@ -363,7 +366,7 @@ public final class HubRouter {
             case SHOP_PRICE -> between(a, 1L, MAX_SHOP_PRICE);
             case ADMIN_VIEW -> between(a, 0L, HubAction.AdminView.values().length - 1L);
             case ADMIN_SIM_STEP -> between(a, 1L, MAX_ADMIN_STEPS);
-            case ADMIN_MARKET_FREEZE -> flag(a);
+            case ADMIN_MARKET_FREEZE, SHOP_MAP_LISTING -> flag(a);
             case ADMIN_GRANT, ADMIN_TAKE -> credits(a);
             case ADMIN_SET -> between(a, 0L, MAX_CREDITS);
             default -> true;

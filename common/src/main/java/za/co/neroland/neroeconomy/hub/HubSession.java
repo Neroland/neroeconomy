@@ -636,6 +636,8 @@ public final class HubSession implements HubRouter.HubServices {
 
     @Override public void shopOpen(HubPages.RowRef row) { shops.open(row); }
 
+    @Override public void shopMapListing(HubPages.RowRef row, boolean listed) { shops.mapListing(row, listed); }
+
     // --- F3: Admin (each call checks level 3 again, and mutations where it changes the economy) --
 
     @Override public void adminView(HubAction.AdminView view) {

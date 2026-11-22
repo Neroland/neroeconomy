@@ -57,6 +57,40 @@ class ChannelsTest {
         assertTrue(section.isEmpty());
     }
 
+    @Test void earnedCreditsReachTheMilestoneOnceAndStopCounting() {
+        MilestoneSection section = new MilestoneSection();
+        assertFalse(section.countEarned(P, 0L), "nothing earned is nothing counted");
+        assertFalse(section.countEarned(P, -5L));
+        assertFalse(section.countEarned(P, MilestoneSection.EARNED_CREDITS - 1L));
+        assertFalse(section.earned(P, MilestoneSection.Milestone.EARNED_100K));
+        assertTrue(section.countEarned(P, 1L), "the rung is reached");
+        assertTrue(section.earned(P, MilestoneSection.Milestone.EARNED_100K));
+        assertFalse(section.countEarned(P, Long.MAX_VALUE), "once only");
+        assertEquals(MilestoneSection.EARNED_CREDITS, section.creditsEarned(P), "it stops counting");
+        assertEquals(List.of(MilestoneSection.Milestone.EARNED_100K), section.pending(P));
+        assertEquals(Long.MAX_VALUE, MilestoneSection.saleValue(Long.MAX_VALUE, 2L), "saturates");
+        assertEquals(0L, MilestoneSection.saleValue(3L, -1L));
+        assertEquals(30L, MilestoneSection.saleValue(3L, 10L));
+        MilestoneSection restored = MilestoneSection.CODEC.parse(JsonOps.INSTANCE,
+                MilestoneSection.CODEC.encodeStart(JsonOps.INSTANCE, section).getOrThrow()).getOrThrow();
+        assertEquals(MilestoneSection.EARNED_CREDITS, restored.creditsEarned(P));
+        assertTrue(restored.earned(P, MilestoneSection.Milestone.EARNED_100K));
+        assertEquals(MilestoneSection.EARNED_CREDITS, section.exportFor(P).get("credits_earned_counted").getAsLong());
+        section.forgetPlayer(P);
+        assertEquals(0L, section.creditsEarned(P), "erased with the player");
+    }
+
+    @Test void aPartTotalOfEarnedCreditsIsKeptAcrossASave() {
+        MilestoneSection section = new MilestoneSection();
+        section.countEarned(P, 250L);
+        MilestoneSection restored = MilestoneSection.CODEC.parse(JsonOps.INSTANCE,
+                MilestoneSection.CODEC.encodeStart(JsonOps.INSTANCE, section).getOrThrow()).getOrThrow();
+        assertEquals(250L, restored.creditsEarned(P));
+        assertFalse(restored.earned(P, MilestoneSection.Milestone.HANDBOOK_READ));
+        assertTrue(restored.earn(P, MilestoneSection.Milestone.HANDBOOK_READ));
+        assertEquals(250L, restored.creditsEarned(P), "earning a milestone keeps the total");
+    }
+
     @Test void aWatchReportsOnlyAChangeAndNeverTheFirstLook() {
         ThresholdWatch watch = new ThresholdWatch();
         assertNull(watch.observe("world", true));

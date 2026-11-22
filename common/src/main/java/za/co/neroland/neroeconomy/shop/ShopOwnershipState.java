@@ -2,8 +2,10 @@ package za.co.neroland.neroeconomy.shop;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 import com.google.gson.JsonArray;
@@ -25,6 +27,10 @@ import za.co.neroland.neroeconomy.economy.EconomyStore;
 /**
  * Server-wide canonical shop ownership index, so erasure also reaches unloaded shops: the
  * shop-owner section of the economy store.
+ *
+ * <p>Each row may also carry the owner's consent to list that shop on other players' maps
+ * ({@code listed_on_maps}, default off). Only the owner sets it; it is cleared when the row is
+ * replaced or removed and when the owner is erased.
  */
 public final class ShopOwnershipState extends EconomySection {
     /** The id this section was stored under when it was a store of its own; read once, on migration. */
@@ -35,6 +41,8 @@ public final class ShopOwnershipState extends EconomySection {
             SavedDataCompat.type(ID, ShopOwnershipState::new, CODEC);
 
     private final Map<String, UUID> owners = new LinkedHashMap<>();
+    /** Location keys whose owner chose to list the shop on maps. Always a subset of {@link #owners}. */
+    private final Set<String> listed = new LinkedHashSet<>();
 
     public ShopOwnershipState() { }
 
@@ -61,15 +69,38 @@ public final class ShopOwnershipState extends EconomySection {
      * belong to an earlier shop whose removal was never reported, and the new shop is the placer's.
      */
     public void claim(ServerLevel level, BlockPos pos, UUID player) {
-        if (player != null && !player.equals(owners.put(key(level, pos), player))) setDirty();
+        if (player == null) return;
+        String location = key(level, pos);
+        // A replaced row is a different shop: its consent to be listed does not carry over.
+        boolean unlisted = listed.remove(location);
+        if (!player.equals(owners.put(location, player)) || unlisted) setDirty();
     }
     public void remove(ServerLevel level, BlockPos pos) { removeKey(key(level, pos)); }
     /** Drops the row stored under a {@code dimension|packedPosition} key. @return true when one existed */
     public boolean removeKey(String location) {
         if (owners.remove(location) == null) return false;
+        listed.remove(location);
         setDirty();
         return true;
     }
+
+    /**
+     * The owner lists ({@code true}) or unlists ({@code false}) the shop stored under {@code location} on other
+     * players' maps. Refused unless {@code player} owns that row.
+     *
+     * @return true when {@code player} owns the shop (whether or not the setting changed)
+     */
+    public boolean setListedOnMaps(String location, UUID player, boolean list) {
+        if (location == null || player == null || !player.equals(owners.get(location))) return false;
+        if (list ? listed.add(location) : listed.remove(location)) setDirty();
+        return true;
+    }
+
+    /** Whether the shop stored under {@code location} is listed on maps. */
+    public boolean listedOnMaps(String location) { return location != null && listed.contains(location); }
+
+    /** The location keys of every shop its owner listed on maps; no owner is returned with them. */
+    public List<String> listedLocations() { return List.copyOf(listed); }
     /** Every stored location key, for the stranded-shop sweep. */
     public List<String> locations() { return List.copyOf(owners.keySet()); }
     /** The location keys of every shop this player owns, for their own Shop tab; never anyone else's. */
@@ -81,14 +112,23 @@ public final class ShopOwnershipState extends EconomySection {
         return out;
     }
     public void forgetPlayer(UUID player) {
-        if (player != null && owners.entrySet().removeIf(entry -> player.equals(entry.getValue()))) setDirty();
+        if (player == null) return;
+        boolean changed = owners.entrySet().removeIf(entry -> {
+            if (!player.equals(entry.getValue())) return false;
+            listed.remove(entry.getKey());
+            return true;
+        });
+        if (changed) setDirty();
     }
 
     /** Data-subject export: the dimension and block position of every shop this player owns. */
     public JsonArray exportFor(UUID player) {
         JsonArray out = new JsonArray();
         owners.forEach((location, owner) -> {
-            if (owner.equals(player)) out.add(describe(location));
+            if (!owner.equals(player)) return;
+            JsonObject row = describe(location);
+            row.addProperty("listed_on_maps", listed.contains(location));
+            out.add(row);
         });
         return out;
     }
@@ -115,13 +155,17 @@ public final class ShopOwnershipState extends EconomySection {
         return level.dimension().identifier() + "|" + pos.asLong();
     }
 
-    private record Row(String location, String owner) {
+    /** {@code listed_on_maps} is optional and written only when true, so older saves load unchanged. */
+    private record Row(String location, String owner, boolean listedOnMaps) {
         static final Codec<Row> CODEC = RecordCodecBuilder.create(instance -> instance.group(
                 Codec.STRING.fieldOf("location").forGetter(Row::location),
-                Codec.STRING.fieldOf("owner").forGetter(Row::owner)).apply(instance, Row::new));
+                Codec.STRING.fieldOf("owner").forGetter(Row::owner),
+                Codec.BOOL.optionalFieldOf("listed_on_maps", false).forGetter(Row::listedOnMaps))
+                .apply(instance, Row::new));
     }
     private List<Row> rows() {
-        return owners.entrySet().stream().map(entry -> new Row(entry.getKey(), entry.getValue().toString())).toList();
+        return owners.entrySet().stream().map(entry -> new Row(entry.getKey(), entry.getValue().toString(),
+                listed.contains(entry.getKey()))).toList();
     }
     private static Codec<ShopOwnershipState> codec() {
         return Row.CODEC.listOf().optionalFieldOf("shops", List.of()).xmap(ShopOwnershipState::fromRows,
@@ -130,8 +174,10 @@ public final class ShopOwnershipState extends EconomySection {
     private static ShopOwnershipState fromRows(List<Row> rows) {
         ShopOwnershipState state = new ShopOwnershipState();
         for (Row row : new ArrayList<>(rows)) {
-            try { state.owners.put(row.location(), UUID.fromString(row.owner())); }
-            catch (IllegalArgumentException ignored) { }
+            try {
+                state.owners.put(row.location(), UUID.fromString(row.owner()));
+                if (row.listedOnMaps()) state.listed.add(row.location());
+            } catch (IllegalArgumentException ignored) { }
         }
         return state;
     }

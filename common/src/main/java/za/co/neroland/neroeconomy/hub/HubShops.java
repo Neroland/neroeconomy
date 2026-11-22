@@ -77,7 +77,7 @@ final class HubShops {
                     : Math.max(0L, now - listing.lastActivityAt()) / DAY_MILLIS;
             out.add(new ShopPages.ShopLine(location, listing == null ? "" : listing.itemId().toString(), at.dimension(),
                     pos.getX(), pos.getY(), pos.getZ(), listing == null ? 0L : listing.availableQuantity(), price, idle,
-                    inReach, shop != null));
+                    inReach, shop != null, ShopOwnershipState.get(server()).listedOnMaps(location)));
         }
         return out;
     }
@@ -102,6 +102,18 @@ final class HubShops {
         shop.setPrice(price);
         if (shop.listingId() != null) MarketSavedData.get(server()).touchShop(shop.listingId());
         say("gui.neroeconomy.hub.shop.priced", shop.price());
+    }
+
+    /**
+     * Lists or unlists one of the viewer's shops on other players' maps. Only the owner row in the shop index
+     * decides, so it works while the shop's chunk is unloaded and never for someone else's shop.
+     */
+    void mapListing(HubPages.RowRef row, boolean listed) {
+        if (!ShopOwnershipState.get(server()).setListedOnMaps(row.item(), self(), listed)) {
+            say("gui.neroeconomy.hub.shop.not_yours");
+            return;
+        }
+        say(listed ? "gui.neroeconomy.hub.shop.map_listed" : "gui.neroeconomy.hub.shop.map_unlisted");
     }
 
     /** Opens the shop's own window, for a shop of the viewer's within reach. */

@@ -98,6 +98,8 @@ class HubRouterF1bTest {
         assertEquals("auctionCreate 16 10 60 true", call(HubAction.AUCTION_CREATE, null, 16, 10, "60:1"));
         assertEquals("shopPrice 7", call(HubAction.SHOP_PRICE, SHOP, 7, 0, ""));
         assertEquals("shopOpen", call(HubAction.SHOP_OPEN, SHOP, 0, 0, ""));
+        assertEquals("shopMapListing true", call(HubAction.SHOP_MAP_LISTING, SHOP, 1, 0, ""));
+        assertEquals("shopMapListing false", call(HubAction.SHOP_MAP_LISTING, SHOP, 0, 0, ""));
     }
 
     @Test void everyF1bActionBelongsToItsTabAndValueMovesAreMarked() {

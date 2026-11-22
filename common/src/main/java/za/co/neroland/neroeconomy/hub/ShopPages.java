@@ -27,6 +27,7 @@ public final class ShopPages {
     public static final int FLAG_IN_REACH = HubPage.FLAG_A;
     public static final int FLAG_LOADED = HubPage.FLAG_B;
     public static final int FLAG_EMPTY = HubPage.FLAG_C;
+    public static final int FLAG_LISTED = HubPage.FLAG_D;
 
     private ShopPages() { }
 
@@ -39,9 +40,16 @@ public final class ShopPages {
      * @param idleDays  whole days since the owner or a buyer last used it
      * @param inReach   whether the viewer stands close enough to open it
      * @param loaded    whether its chunk is loaded, so its price can be changed now
+     * @param listed    whether the owner listed it on other players' maps
      */
     public record ShopLine(String location, String item, String dimension, long x, long y, long z, long stock,
-            long price, long idleDays, boolean inReach, boolean loaded) { }
+            long price, long idleDays, boolean inReach, boolean loaded, boolean listed) {
+        /** A shop that is not listed on maps. */
+        public ShopLine(String location, String item, String dimension, long x, long y, long z, long stock,
+                long price, long idleDays, boolean inReach, boolean loaded) {
+            this(location, item, dimension, x, y, z, stock, price, idleDays, inReach, loaded, false);
+        }
+    }
 
     /** @param maxIdleDays after how many idle days a shop is closed; 0 for never */
     public record ShopView(List<ShopLine> shops, int maxIdleDays) {
@@ -63,7 +71,8 @@ public final class ShopPages {
         for (ShopLine line : lines.subList(Math.min(lines.size(), from), Math.min(lines.size(), from + SHOP_ROWS))) {
             UUID id = shopId(line.location());
             boolean empty = line.item() == null || line.item().isEmpty();
-            int flags = (line.inReach() ? FLAG_IN_REACH : 0) | (line.loaded() ? FLAG_LOADED : 0) | (empty ? FLAG_EMPTY : 0);
+            int flags = (line.inReach() ? FLAG_IN_REACH : 0) | (line.loaded() ? FLAG_LOADED : 0) | (empty ? FLAG_EMPTY : 0)
+                    | (line.listed() ? FLAG_LISTED : 0);
             rows.add(new HubPage.Row(id, empty ? EMPTY_ICON : line.item(), ROW, List.of(line.dimension()),
                     new long[] { line.x(), line.y(), line.z(), line.stock(), line.price(), line.idleDays() }, flags));
             refs.put(id, new HubPages.RowRef(HubPages.RowRef.Kind.PLAYER_SHOP, null, line.location(), 0));

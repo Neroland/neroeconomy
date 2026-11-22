@@ -202,10 +202,13 @@ records the state. Shock channels fire the moment a shock starts or ends.
 Every crossing is published with `neroeconomy` as its source mod, so a listener on Core 1.15.0's sourced bus
 (`ThresholdEvents.onSourcedCrossing`) can tell NeroEconomy's channels from another mod's.
 
-Nine per-player milestones are Core progression gates, scope `player`: `neroeconomy:first_sale`,
+Eleven per-player milestones are Core progression gates, scope `player`: `neroeconomy:first_sale`,
 `first_purchase`, `first_investment`, `first_bond`, `first_offer_accepted`, `trader_100` (a hundred settled
 sales), `first_auction_win` (an auction settled in the player's favour), `first_delivery` (a contract or
-delivery job fulfilled, a Merchant House's included) and `first_dividend` (a dividend paid on a holding). A
+delivery job fulfilled, a Merchant House's included), `first_dividend` (a dividend paid on a holding),
+`earned_100k` (100,000 credits earned from the economy itself: sales to a Merchant House, House and system job
+payouts, and dividends; transfers, sales to other players, operator grants and the starting balance do not count,
+so it cannot be gifted) and `handbook_read` (the Trader's Handbook was opened). A
 gate opens within a second of the milestone, whether the player is online or not. A quest pack can use them
 with no code through a gate objective. They are records: nothing in NeroEconomy checks them for access.
 

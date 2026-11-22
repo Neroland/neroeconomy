@@ -68,13 +68,13 @@ field at all, and an account with nothing in a section has no row in it.
 | `houses` | House stock, working capital, price pressure, drifted reference prices and the House orders on the book | House id and commodity | Run the Merchant Houses | Life of the world | No (about no player) | Unchanged |
 | `remote_spend` | Economy day, credits spent and goods value sent away through the companion app that day | UUID | Bound what a stolen app token can cost a player in a day | The current economy day only; earlier rows are dropped whenever a row is written | Yes (`remote_spend`) | Removed |
 | `sibling` | Per other mod: credits it paid out today (a count per mod id, no player). Per player, only while `siblingPerPlayerDailyCap` is above 0: the credits other mods paid them today. Applied request keys: a caller-chosen key and the time it lapses | Mod id; UUID for the per-player count; request keys carry no player (a key that reads as a UUID is refused) | Hold each mod to its daily budget, hold one player to the daily cap, and make a repeated call by another mod harmless | Counts: the current economy day only, cleared at the day roll (at most 256 mods and 100,000 players). Request keys: 24 economy-hours, at most 50,000 | Yes, the player's own count and the day (`sibling_payouts`) | The player's count is removed |
-| `milestones` | Per player: the milestones earned (first sale, first purchase, first investment, first Savings Bond, first offer accepted, a hundred sales, first auction win, first delivery, first dividend), the ones whose progression gate is still waiting to open, and the count of settled sales up to 100 | UUID | Open a progression gate once for a player, including a milestone reached while they were offline, so quest packs can use it | Until erasure; at most 100,000 players; a player with nothing earned has no row | Yes (`milestones`) | The player's row is removed |
+| `milestones` | Per player: the milestones earned (first sale, first purchase, first investment, first Savings Bond, first offer accepted, a hundred sales, first auction win, first delivery, first dividend, 100,000 credits earned, Trader's Handbook read), the ones whose progression gate is still waiting to open, the count of settled sales up to 100, and the credits earned from the economy itself up to 100,000 | UUID | Open a progression gate once for a player, including a milestone reached while they were offline, so quest packs can use it | Until erasure; at most 100,000 players; a player with nothing earned has no row | Yes (`milestones`) | The player's row is removed |
 | `perks` | Per player: whether a listing-fee waiver granted by a quest hook is still waiting to be spent (one flag, at most one at a time) | UUID | Waive the player's next listing fee once, as a quest reward | Until the waiver is spent or the player is erased; at most 100,000 players; a player without a waiver has no row | Yes (`perks`) | The player's row is removed |
 | `obligations` | Jobs (contracts, deliveries, bounties): id, type, issuer, claimant, target (an item, tag or entity id, or for a player bounty the target player's UUID), quantity, delivery destination, payout, expiry, state, claim time | UUID | Run the job and hold its payout | Open jobs until they settle; settled jobs for `transactionRetentionDays` after their expiry time | Yes, with the player's role (`obligations.jobs`) | See [Erasure](#erasure) |
 | `obligations` | Auctions: id, seller, the lot's item stack, minimum bid, highest bid, highest bidder, end time, interplanetary flag, state | UUID | Run the auction and hold the lot and the bid | Running auctions until they settle; settled auctions for `transactionRetentionDays` after their end time | Yes, with the player's role (`obligations.auctions`) | See [Erasure](#erasure) |
 | `obligations` | Bounty progress: job id, kill count | UUID | Pay a bounty only at its full quantity | Until the bounty settles, expires or is cancelled | Yes (`obligations.bounty_progress`) | Removed |
 | `obligations` | System-job budget: day number and total posted | Not per player | Enforce `systemJobDailyPayoutCap` | Overwritten daily | No | Unchanged |
-| `shop_owners` | Dimension and block position of each Player Shop, and its owner | UUID | Decide who may stock, price and break a shop | Until the shop block is removed or the owner is erased | Yes (`shops`) | Rows removed; the blocks stay in the world without an owner |
+| `shop_owners` | Dimension and block position of each Player Shop, its owner, and whether the owner chose to list it on other players' maps (off unless the owner turns it on) | UUID | Decide who may stock, price and break a shop; show a listed shop's position (never its owner) on maps | Until the shop block is removed or the owner is erased; the listing until the owner turns it off or the shop is replaced | Yes (`shops`, with `listed_on_maps`) | Rows removed, listing included; the blocks stay in the world without an owner |
 | `admin` | The market-freeze switch and a count per kind of operator action | Not per player | Operators' view of what has been done | Life of the world | No (a count says how often, never whose) | Unchanged |
 | `gallery` | The gallery's sample board rows, and the positions and ids of the blocks and label stands it placed | Not per player | Let `gallery clear` find what to remove after a restart | Until the gallery is cleared | No | Unchanged. It holds no player identifier and never reaches the market, the Reserve, link snapshots or telemetry |
 | `simulation` | Index of the last completed step and its length; the world's secret (32 random bytes); a few named whole numbers kept between steps | Not per player | Catch up after a pause; key the simulation's random streams | Life of the world | No. The secret is never exported, logged or sent to a client or the app | Unchanged |
@@ -246,7 +246,8 @@ that holds anything about the player and is not cut at `historyLimitPerPlayer`. 
 - `trade_escrow`: what the player has on the table of a direct trade that is open right now;
 - `obligations`: the `jobs` and `auctions` the player takes part in, each with the player's role
   (`issuer`, `claimant`, `bounty_target`, `seller` or `bidder`), and their `bounty_progress`;
-- `shops`: the dimension and block position of every shop the player owns;
+- `shops`: the dimension and block position of every shop the player owns, and whether it is listed on maps
+  (`listed_on_maps`);
 - `auto_traders`: where the player's Auto-Trader blocks stand;
 - `vault`: the player's vault, as item id and count;
 - `exchange`: the player's shares and index units (units, cost and time bought per lot), Savings
@@ -258,7 +259,8 @@ that holds anything about the player and is not cut at `historyLimitPerPlayer`. 
 - `sibling_payouts`: the economy day and the credits other mods paid the player in it
   (`credits_from_other_mods_today`); empty when the per-player cap is off or nothing was paid today;
 - `milestones`: the milestones the player has reached, the gates still waiting to open, and the count
-  of their settled sales (`settled_sales_counted`, up to 100);
+  of their settled sales (`settled_sales_counted`, up to 100) and of the credits they earned from the economy
+  itself (`credits_earned_counted`, up to 100,000);
 - `perks`: `fee_waiver_pending` when a listing-fee waiver from a quest hook waits for the player; empty otherwise;
 - `economy_time` and `wall_time`: the economy clock and the calendar clock at the moment of export.
   Every other time in the file is economy time and can be read relative to these two.
@@ -287,7 +289,7 @@ claims exactly as described here, and Core 1.13.0's command asks for no confirma
 Before the steps below, three small sections are cleared first (their erasers are registered ahead of
 all others): the player's daily payout count from other mods (`sibling`), their milestones
 (`milestones`) and their quest-hook perks (`perks`). Nothing else about them is held there. The
-progression gates NeroEconomy opens for a player (the nine milestones, the two quest-hook record gates and
+progression gates NeroEconomy opens for a player (the eleven milestones, the two quest-hook record gates and
 the four Trader's Note gates) are held in Neroland Core's gate store and erased by Core's own eraser.
 
 NeroEconomy's part of an erasure runs in this order. Each step also refreshes Core's recovery

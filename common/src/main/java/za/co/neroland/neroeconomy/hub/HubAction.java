@@ -143,7 +143,11 @@ public enum HubAction {
     /** Take {@code a} credits from the looked-up account (ADMIN_TAKE). */
     ADMIN_TAKE(HubTab.ADMIN, true, Target.ROW, Request.HUB, false),
     /** Set the looked-up account's balance to {@code a} (ADMIN_SET). */
-    ADMIN_SET(HubTab.ADMIN, true, Target.ROW, Request.HUB, false);
+    ADMIN_SET(HubTab.ADMIN, true, Target.ROW, Request.HUB, false),
+
+    // --- appended for the map listing: an owner's consent, not a value move ------------------
+    /** List ({@code a} = 1) or unlist ({@code a} = 0) one of the viewer's Player Shops on other players' maps. */
+    SHOP_MAP_LISTING(HubTab.SHOP, false, Target.ROW, Request.HUB, false);
 
     /** What the Admin tab shows. */
     public enum AdminView {

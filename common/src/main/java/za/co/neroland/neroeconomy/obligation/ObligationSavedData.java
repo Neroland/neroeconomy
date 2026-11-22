@@ -332,6 +332,8 @@ public final class ObligationSavedData extends EconomySection implements EscrowH
                 LinkAlert.Severity.INFO);
         jobs.put(id, job.withState(JobState.FULFILLED)); invalidateSchedule(); setDirty();
         store.milestones().earn(player.getUUID(), MilestoneSection.Milestone.FIRST_DELIVERY);
+        // A system job pays from the economy itself; a player's job is that player's money, so it is not earned.
+        if (system) store.milestones().countEarned(player.getUUID(), job.payout());
         return FulfillResult.SUCCESS;
     }
 
@@ -826,6 +828,7 @@ public final class ObligationSavedData extends EconomySection implements EscrowH
         jobs.put(id, job.withState(JobState.FULFILLED));
         invalidateSchedule(); setDirty();
         store.milestones().earn(worker, MilestoneSection.Milestone.FIRST_DELIVERY);
+        store.milestones().countEarned(worker, job.payout());
         return FulfillResult.SUCCESS;
     }
 

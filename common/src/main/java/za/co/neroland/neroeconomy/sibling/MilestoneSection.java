@@ -20,8 +20,11 @@ import za.co.neroland.neroeconomy.economy.EconomyStore;
  * ({@code neroeconomy:first_sale} and so on) so quest packs can react without code.
  *
  * <p>Per player: which milestones were reached ({@code earned}), which of those still wait for
- * their gate to be opened because the economy was frozen or no check has run yet ({@code pending}), and the count of
- * settled sales toward {@code trader_100} (it stops counting at 100). Personal: erased with the
+ * their gate to be opened because the economy was frozen or no check has run yet ({@code pending}), the count of
+ * settled sales toward {@code trader_100} (it stops counting at 100), and the credits earned toward
+ * {@code earned_100k} (it stops counting at {@link #EARNED_CREDITS}). Earned means paid by the economy itself for
+ * work: a sale to a Merchant House, a House or system job's payout, a dividend. Never a transfer from another
+ * player, a sale to one, an operator's grant or the starting balance, so the gate cannot be gifted. Personal: erased with the
  * player ({@link #forgetPlayer}), exported ({@link #exportFor}), at most {@link #MAX_PLAYERS}
  * rows; when full, a new player's milestone is not recorded (the gate can still be opened by an
  * operator). Every field is optional, so a store saved before this section existed loads it empty.
@@ -31,11 +34,13 @@ public final class MilestoneSection extends EconomySection {
     public static final int MAX_PLAYERS = 100_000;
     /** Settled sales that reach {@link Milestone#TRADER_100}. */
     public static final int TRADER_SALES = 100;
+    /** Credits earned that reach {@link Milestone#EARNED_100K}. */
+    public static final long EARNED_CREDITS = 100_000L;
 
     /** The milestones; the ordinal is the saved bit, so constants are only ever appended. */
     public enum Milestone {
         FIRST_SALE, FIRST_PURCHASE, FIRST_INVESTMENT, FIRST_BOND, TRADER_100, FIRST_OFFER_ACCEPTED, FIRST_AUCTION_WIN,
-        FIRST_DELIVERY, FIRST_DIVIDEND;
+        FIRST_DELIVERY, FIRST_DIVIDEND, EARNED_100K, HANDBOOK_READ;
 
         /** The gate path and data-file name, such as {@code first_sale}. */
         public String id() { return name().toLowerCase(Locale.ROOT); }
@@ -46,7 +51,7 @@ public final class MilestoneSection extends EconomySection {
         long bit() { return 1L << ordinal(); }
     }
 
-    private record Row(long earned, long pending, long sales) { }
+    private record Row(long earned, long pending, long sales, long credits) { }
 
     private final Map<UUID, Row> rows = new LinkedHashMap<>();
 
@@ -57,9 +62,10 @@ public final class MilestoneSection extends EconomySection {
         if (player == null || milestone == null) return false;
         Row row = rows.get(player);
         if (row == null && rows.size() >= MAX_PLAYERS) return false;
-        if (row == null) row = new Row(0L, 0L, 0L);
+        if (row == null) row = new Row(0L, 0L, 0L, 0L);
         if ((row.earned() & milestone.bit()) != 0L) return false;
-        rows.put(player, new Row(row.earned() | milestone.bit(), row.pending() | milestone.bit(), row.sales()));
+        rows.put(player, new Row(row.earned() | milestone.bit(), row.pending() | milestone.bit(), row.sales(),
+                row.credits()));
         setDirty();
         return true;
     }
@@ -71,10 +77,40 @@ public final class MilestoneSection extends EconomySection {
         Row row = rows.get(player);
         if (row == null || row.sales() >= TRADER_SALES) return any;
         long sales = row.sales() + 1L;
-        rows.put(player, new Row(row.earned(), row.pending(), sales));
+        rows.put(player, new Row(row.earned(), row.pending(), sales, row.credits()));
         setDirty();
         if (sales >= TRADER_SALES) any |= earn(player, Milestone.TRADER_100);
         return any;
+    }
+
+    /**
+     * Credits the economy paid {@code player} for work (see the class comment for what counts); {@code earned_100k}
+     * at {@link #EARNED_CREDITS}. Counting stops there. @return whether the milestone was newly earned
+     */
+    public synchronized boolean countEarned(UUID player, long credits) {
+        if (player == null || credits <= 0L) return false;
+        Row row = rows.get(player);
+        if (row != null && row.credits() >= EARNED_CREDITS) return false;
+        if (row == null) {
+            if (rows.size() >= MAX_PLAYERS) return false;
+            row = new Row(0L, 0L, 0L, 0L);
+        }
+        long total = Math.min(EARNED_CREDITS, row.credits() + Math.min(credits, EARNED_CREDITS));
+        rows.put(player, new Row(row.earned(), row.pending(), row.sales(), total));
+        setDirty();
+        return total >= EARNED_CREDITS && earn(player, Milestone.EARNED_100K);
+    }
+
+    /** One player's earned credits counted so far, at most {@link #EARNED_CREDITS}. */
+    public synchronized long creditsEarned(UUID player) {
+        Row row = player == null ? null : rows.get(player);
+        return row == null ? 0L : row.credits();
+    }
+
+    /** The {@code earned_100k} quantity of one settled sale: {@code quantity × unitPrice}, saturating. */
+    public static long saleValue(long quantity, long unitPrice) {
+        if (quantity <= 0L || unitPrice <= 0L) return 0L;
+        return quantity > Long.MAX_VALUE / unitPrice ? Long.MAX_VALUE : quantity * unitPrice;
     }
 
     public synchronized boolean earned(UUID player, Milestone milestone) {
@@ -114,7 +150,7 @@ public final class MilestoneSection extends EconomySection {
         if (player == null || milestone == null) return;
         Row row = rows.get(player);
         if (row == null || (row.pending() & milestone.bit()) == 0L) return;
-        rows.put(player, new Row(row.earned(), row.pending() & ~milestone.bit(), row.sales()));
+        rows.put(player, new Row(row.earned(), row.pending() & ~milestone.bit(), row.sales(), row.credits()));
         setDirty();
     }
 
@@ -147,6 +183,7 @@ public final class MilestoneSection extends EconomySection {
         out.add("reached", earned);
         out.add("gates_waiting", pending);
         out.addProperty("settled_sales_counted", row.sales());
+        out.addProperty("credits_earned_counted", row.credits());
         return out;
     }
 
@@ -154,12 +191,13 @@ public final class MilestoneSection extends EconomySection {
 
     // --- persistence -------------------------------------------------------------------------
 
-    private record Saved(String player, long earned, long pending, long sales) {
+    private record Saved(String player, long earned, long pending, long sales, long credits) {
         static final Codec<Saved> CODEC = RecordCodecBuilder.create(instance -> instance.group(
                 Codec.STRING.fieldOf("player").forGetter(Saved::player),
                 Codec.LONG.optionalFieldOf("earned", 0L).forGetter(Saved::earned),
                 Codec.LONG.optionalFieldOf("pending", 0L).forGetter(Saved::pending),
-                Codec.LONG.optionalFieldOf("sales", 0L).forGetter(Saved::sales)).apply(instance, Saved::new));
+                Codec.LONG.optionalFieldOf("sales", 0L).forGetter(Saved::sales),
+                Codec.LONG.optionalFieldOf("credits_earned", 0L).forGetter(Saved::credits)).apply(instance, Saved::new));
     }
 
     private static Codec<MilestoneSection> codec() {
@@ -170,7 +208,8 @@ public final class MilestoneSection extends EconomySection {
 
     private synchronized List<Saved> saved() {
         List<Saved> out = new ArrayList<>(rows.size());
-        rows.forEach((player, row) -> out.add(new Saved(player.toString(), row.earned(), row.pending(), row.sales())));
+        rows.forEach((player, row) -> out.add(new Saved(player.toString(), row.earned(), row.pending(), row.sales(),
+                row.credits())));
         return out;
     }
 
@@ -181,8 +220,9 @@ public final class MilestoneSection extends EconomySection {
             if (section.rows.size() >= MAX_PLAYERS) break;
             try {
                 long earned = row.earned() & known;
-                if (earned != 0L || row.sales() > 0L) section.rows.put(UUID.fromString(row.player()),
-                        new Row(earned, row.pending() & earned, Math.max(0L, Math.min(TRADER_SALES, row.sales()))));
+                if (earned != 0L || row.sales() > 0L || row.credits() > 0L) section.rows.put(UUID.fromString(row.player()),
+                        new Row(earned, row.pending() & earned, Math.max(0L, Math.min(TRADER_SALES, row.sales())),
+                                Math.max(0L, Math.min(EARNED_CREDITS, row.credits()))));
             } catch (IllegalArgumentException malformed) {
                 // skipped
             }

@@ -436,8 +436,10 @@ public final class ExchangeDesk {
                 Portfolio portfolio = portfolios.get(share.getKey());
                 if (portfolio != null) portfolio.paidDividend(day, share.getValue());
                 env.alerts().raise(share.getKey(), EconomyAlerts.Kind.DIVIDEND_PAID);
-                if (share.getKey() instanceof PlayerAccountId holder)
+                if (share.getKey() instanceof PlayerAccountId holder) {
                     store().milestones().earn(holder.playerId(), MilestoneSection.Milestone.FIRST_DIVIDEND);
+                    store().milestones().countEarned(holder.playerId(), share.getValue());
+                }
                 accounts++;
             }
             section.setDirty();

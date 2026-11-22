@@ -60,7 +60,12 @@ public final class EconomyChannels {
         ThresholdEvents.onCrossing(EconomyChannels::onCrossing);
         EconomyEventBus.SOLD.add(event -> {
             EconomyStore store = liveStore();
-            if (store != null) store.milestones().countSale(event.seller());
+            if (store == null) return;
+            store.milestones().countSale(event.seller());
+            // Only a sale to a Merchant House is earned: a sale to another player could be a gift.
+            if (event.venue() == za.co.neroland.neroeconomy.api.EconomyEvents.Venue.HOUSE)
+                store.milestones().countEarned(event.seller(),
+                        MilestoneSection.saleValue(event.quantity(), event.unitPrice()));
         });
         EconomyEventBus.BOUGHT.add(event -> {
             EconomyStore store = liveStore();

@@ -16,10 +16,13 @@ import net.minecraft.world.item.component.TooltipDisplay;
 import net.minecraft.world.level.Level;
 
 import za.co.neroland.neroeconomy.handbook.HandbookOpener;
+import za.co.neroland.neroeconomy.sibling.EconomyChannels;
+import za.co.neroland.neroeconomy.sibling.MilestoneSection;
 
 /**
- * The Trader's Handbook: used in hand it opens the guide on the client. The book has no server
- * side at all: no menu, no slots, nothing stored per player and nothing sent when it is read.
+ * The Trader's Handbook: used in hand it opens the guide on the client. The book has no menu and
+ * no slots, and nothing about what is read is sent. The server records one thing when the book is
+ * used: the player's {@code neroeconomy:handbook_read} milestone (one bit, erased with the player).
  */
 public final class TradersHandbookItem extends Item {
     public static final String TOOLTIP = "item.neroeconomy.traders_handbook.tooltip";
@@ -30,15 +33,23 @@ public final class TradersHandbookItem extends Item {
     @Override
     public InteractionResult use(Level level, Player player, InteractionHand hand) {
         if (level.isClientSide()) HandbookOpener.open();
+        else read(level, player);
         return InteractionResult.SUCCESS;
     }
     //?} else {
     /*@Override
     public net.minecraft.world.InteractionResultHolder<ItemStack> use(Level level, Player player, InteractionHand hand) {
         if (level.isClientSide()) HandbookOpener.open();
+        else read(level, player);
         return net.minecraft.world.InteractionResultHolder.sidedSuccess(player.getItemInHand(hand), level.isClientSide());
     }
     *///?}
+
+    /** Server side of opening the book: the reader's {@code handbook_read} milestone, nothing else. */
+    private static void read(Level level, Player player) {
+        if (player == null || player.isSpectator()) return;
+        EconomyChannels.earn(level.getServer(), player.getUUID(), MilestoneSection.Milestone.HANDBOOK_READ);
+    }
 
     //? if >=1.21.5 {
     @Override

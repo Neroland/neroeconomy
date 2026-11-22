@@ -2,9 +2,20 @@
 
 ## [Unreleased]
 
+## [0.5.3] - 2026-11-26
+
 ### Added
 
 - Hovering a gauge now shows what it is, how much, and the rate.
+- A shop owner can list a Player Shop on other players' maps from the hub's Shop tab ("List on maps"). It is off
+  until the owner turns it on, and only the owner can change it. Listed shops appear in the new map layer
+  `neroeconomy:listed_shops`, with the shop's position and a plain "Shop" label only, never the owner's name.
+  A listing ends when the owner turns it off, when the shop is removed or replaced, and when the owner's data is
+  erased.
+- Two new player milestones, each a Core progression gate: `neroeconomy:earned_100k`, reached at 100,000 credits
+  earned from the economy itself (sales to a Merchant House, House and system job payouts, dividends; transfers,
+  sales to other players, operator grants and the starting balance do not count, so it cannot be gifted), and
+  `neroeconomy:handbook_read`, reached the first time the Trader's Handbook is opened.
 
 ## [0.5.2] - 2026-11-21
 

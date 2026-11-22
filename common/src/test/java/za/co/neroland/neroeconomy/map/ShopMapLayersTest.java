@@ -97,7 +97,84 @@ class ShopMapLayersTest {
                 .forbiddenText("Trudy", "Sam")
                 .forbiddenIds(THIRD, ERASED)
                 .expectEntitledSees(ShopMapLayers.MY_SHOPS, 2)
+                .expectEmpty(ShopMapLayers.LISTED_SHOPS)
                 .verify();
+    }
+
+    /** The listed set: one of the owner's shops, the third player's, a far one and one on the other world. */
+    static List<String> listed() {
+        return List.of(key(HOME, new BlockPos(3, 64, 4)), key(HOME, new BlockPos(6, 64, 1)),
+                key(HOME, new BlockPos(9_000, 64, 9_000)), key(OTHER, new BlockPos(0, 64, 0)),
+                dim("home_test").identifier() + "|not-a-number");
+    }
+
+    @Test
+    void listedShopsAreTheSameForEveryViewerAndNameNoOwner() {
+        ShopMapLayers.ShopIndex index = index(rows(true));
+        MapLayerConformance.create(new ShopMapLayers(server -> index, server -> ShopMapLayersTest::listed))
+                .viewers(at(OWNER, 0, 0), at(STRANGER, 5, 0))
+                .dimensions(HOME, MOON)
+                .bounds(MapBounds.around(0, 0, 512))
+                .farBounds(MapBounds.around(20_000, 20_000, 256))
+                .forbiddenText("Trudy", "Sam")
+                .forbiddenIds(OWNER, THIRD, ERASED, STRANGER)
+                .expectEntitledSees(ShopMapLayers.MY_SHOPS, 2)
+                .expectEntitledSees(ShopMapLayers.LISTED_SHOPS, 2)
+                .verify();
+    }
+
+    private static Set<String> listedIds(ShopMapLayers provider, UUID viewer) {
+        MapLayerRegistry.register(provider);
+        MapQueryResult r = MapLayerRegistry.query("neroeconomy", MapViewer.forTest(viewer, null, null, null), HOME,
+                MapBounds.around(0, 0, 1024));
+        assertFalse(r.failed());
+        Set<String> out = new HashSet<>();
+        r.markers().forEach(m -> {
+            if (m.layer().equals(ShopMapLayers.LISTED_SHOPS)) out.add(m.id());
+        });
+        return out;
+    }
+
+    /**
+     * Over the real store: only shops their owner listed appear, for anyone; a replaced row loses its listing, a
+     * stranger cannot list a shop, and an erased owner's listing is gone with the row.
+     */
+    @Test
+    void onlyListedShopsOfLiveOwnersAppear() {
+        ShopOwnershipState state;
+        try {
+            JsonArray shops = new JsonArray();
+            rows(false).forEach((location, owner) -> {
+                JsonObject row = new JsonObject();
+                row.addProperty("location", location);
+                row.addProperty("owner", owner.toString());
+                shops.add(row);
+            });
+            JsonObject root = new JsonObject();
+            root.add("shops", shops);
+            state = ShopOwnershipState.CODEC.parse(JsonOps.INSTANCE, root).getOrThrow();
+        } catch (Throwable notBootstrapped) {
+            Assumptions.abort("SavedData needs a bootstrapped game on this Minecraft line");
+            return;
+        }
+        String ownShop = key(HOME, new BlockPos(3, 64, 4));
+        String erasedShop = key(HOME, new BlockPos(9, 64, 9));
+        assertTrue(state.listedLocations().isEmpty(), "nothing is listed until its owner says so");
+        assertFalse(state.setListedOnMaps(ownShop, STRANGER, true), "only the owner lists a shop");
+        assertTrue(state.setListedOnMaps(ownShop, OWNER, true));
+        assertTrue(state.setListedOnMaps(erasedShop, ERASED, true));
+        ShopOwnershipState saved = ShopOwnershipState.CODEC.parse(JsonOps.INSTANCE,
+                ShopOwnershipState.CODEC.encodeStart(JsonOps.INSTANCE, state).getOrThrow()).getOrThrow();
+        assertEquals(Set.of(ownShop, erasedShop), Set.copyOf(saved.listedLocations()), "the consent is saved");
+        state.forgetPlayer(ERASED);
+        assertEquals(List.of(ownShop), state.listedLocations(), "an erased owner's shop is no longer listed");
+        ShopMapLayers provider = new ShopMapLayers(server -> state::locationsOf, server -> state::listedLocations);
+        for (UUID viewer : List.of(OWNER, STRANGER, THIRD, ERASED)) {
+            assertEquals(Set.of("listed_shop/3_64_4"), listedIds(provider, viewer), "viewer " + viewer);
+        }
+        assertTrue(state.setListedOnMaps(ownShop, OWNER, false));
+        assertTrue(listedIds(provider, STRANGER).isEmpty(), "an unlisted shop is never shown");
+        assertTrue(state.exportFor(OWNER).get(0).getAsJsonObject().has("listed_on_maps"));
     }
 
     private static Set<String> mapIds(ShopMapLayers.ShopIndex index, UUID viewer) {
