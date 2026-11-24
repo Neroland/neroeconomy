@@ -55,7 +55,12 @@ public final class GoodsSection extends EconomySection {
     private static final long SWEEP_INTERVAL_MILLIS = 60_000L;
 
     private final Prototypes<ItemStack> table =
+            //? if >=1.20.5 {
             new Prototypes<>(ItemStack::isSameItemSameComponents, ItemStack::hashItemAndComponents);
+            //?} else {
+            /*new Prototypes<>(ItemStack::isSameItemSameTags,
+                    stack -> java.util.Objects.hash(stack.getItem(), stack.getTag()));
+            *///?}
     /** Prototypes that could not be read as item stacks, exactly as they were saved. */
     private final Map<Integer, Dynamic<?>> unreadable = new LinkedHashMap<>();
     private long nextSweepAt;

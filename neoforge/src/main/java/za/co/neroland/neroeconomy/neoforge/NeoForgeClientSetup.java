@@ -2,7 +2,11 @@ package za.co.neroland.neroeconomy.neoforge;
 
 import net.minecraft.client.Minecraft;
 import net.neoforged.bus.api.IEventBus;
+//? if >=1.20.5 {
 import net.neoforged.neoforge.client.event.ClientTickEvent;
+//?} else {
+/*import net.neoforged.neoforge.event.TickEvent;
+*///?}
 import net.neoforged.neoforge.client.event.RegisterClientCommandsEvent;
 import net.neoforged.neoforge.client.event.RegisterMenuScreensEvent;
 import net.neoforged.neoforge.common.NeoForge;
@@ -35,7 +39,13 @@ final class NeoForgeClientSetup {
             return;
         }
         // Screenshot harness state machine — game-bus client tick (counterpart to Fabric's END_CLIENT_TICK).
+        //? if >=1.20.5 {
         NeoForge.EVENT_BUS.addListener((ClientTickEvent.Post event) -> GalleryCaptureHarness.tick());
+        //?} else {
+        /*NeoForge.EVENT_BUS.addListener((TickEvent.ClientTickEvent event) -> {
+            if (event.phase == TickEvent.Phase.END) GalleryCaptureHarness.tick();
+        });
+        *///?}
         // Client-side /necgallery capture command tree (drives the local camera; separate dispatcher
         // from the server-side /neroeconomy gallery builder — a shared root would shadow it).
         NeoForge.EVENT_BUS.addListener((RegisterClientCommandsEvent event) ->

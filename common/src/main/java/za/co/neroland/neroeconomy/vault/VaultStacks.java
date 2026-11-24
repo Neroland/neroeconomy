@@ -205,7 +205,11 @@ public final class VaultStacks {
     /** How many items of {@code stack} the player's main inventory can take right now. */
     private static int deliverable(ServerPlayer player, ItemStack stack) {
         NonNullList<ItemStack> slots = player.getInventory().getNonEquipmentItems();
+        //? if >=1.20.5 {
         int perSlot = player.getInventory().getMaxStackSize(stack);
+        //?} else {
+        /*int perSlot = Math.min(player.getInventory().getMaxStackSize(), stack.getMaxStackSize());
+        *///?}
         // A damaged stack is never merged by the inventory, only dropped whole into an empty slot.
         boolean stackable = stack.isStackable() && !stack.isDamaged();
         int freeSlots = 0;

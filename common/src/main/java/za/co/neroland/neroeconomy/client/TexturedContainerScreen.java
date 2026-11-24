@@ -97,7 +97,12 @@ public abstract class TexturedContainerScreen<T extends AbstractContainerMenu> e
         FocusNavigationEvent.TabNavigation navigation = new FocusNavigationEvent.TabNavigation(forward);
         ComponentPath path = nextFocusPath(navigation);
         if (path == null) {
+            //? if >=1.20.5 {
             clearFocus();
+            //?} else {
+            /*ComponentPath current = getCurrentFocusPath();
+            if (current != null) current.applyFocus(false);
+            *///?}
             path = nextFocusPath(navigation);
         }
         if (path != null) {

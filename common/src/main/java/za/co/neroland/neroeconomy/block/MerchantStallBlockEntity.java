@@ -52,10 +52,14 @@ public final class MerchantStallBlockEntity extends BlockEntity implements MenuP
     //? if >=1.21.6 {
     @Override protected void saveAdditional(ValueOutput output) {
         super.saveAdditional(output);
-    //?} else {
+    //?} elif >=1.20.5 {
     /*@Override protected void saveAdditional(net.minecraft.nbt.CompoundTag tag, net.minecraft.core.HolderLookup.Provider registries) {
         super.saveAdditional(tag, registries);
         ValueOutput output = ValueOutput.of(tag, registries);
+    *///?} else {
+    /*@Override protected void saveAdditional(net.minecraft.nbt.CompoundTag tag) {
+        super.saveAdditional(tag);
+        ValueOutput output = ValueOutput.of(tag, null);
     *///?}
         output.putString("House", house);
     }
@@ -63,10 +67,14 @@ public final class MerchantStallBlockEntity extends BlockEntity implements MenuP
     //? if >=1.21.6 {
     @Override protected void loadAdditional(ValueInput input) {
         super.loadAdditional(input);
-    //?} else {
+    //?} elif >=1.20.5 {
     /*@Override protected void loadAdditional(net.minecraft.nbt.CompoundTag tag, net.minecraft.core.HolderLookup.Provider registries) {
         super.loadAdditional(tag, registries);
         ValueInput input = ValueInput.of(tag, registries);
+    *///?} else {
+    /*@Override public void load(net.minecraft.nbt.CompoundTag tag) {
+        super.load(tag);
+        ValueInput input = ValueInput.of(tag, null);
     *///?}
         String stored = input.getStringOr("House", DEFAULT_HOUSE);
         house = stored.isBlank() || stored.length() > MAX_HOUSE_ID ? DEFAULT_HOUSE : stored;

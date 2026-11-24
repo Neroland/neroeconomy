@@ -161,7 +161,11 @@ public final class MarketSavedData extends EconomySection implements EscrowHolde
      * contents) and no damage. Buy offers and jobs name an item id, so only this form satisfies them.
      */
     public static boolean pristine(ItemStack stack) {
+        //? if >=1.20.5 {
         return stack != null && !stack.isEmpty() && stack.getComponentsPatch().isEmpty() && !stack.isDamaged();
+        //?} else {
+        /*return stack != null && !stack.isEmpty() && !stack.hasTag() && !stack.isDamaged();
+        *///?}
     }
 
     /** Whether this viewer is shown the gallery's demo rows: a creative-mode level-3 operator only. */
@@ -172,11 +176,15 @@ public final class MarketSavedData extends EconomySection implements EscrowHolde
     /** Size of the stack's NBT encoding in bytes; unencodable stacks report the largest size. */
     private static int encodedBytes(ItemStack stack, HolderLookup.Provider registries) {
         try {
+            ByteCounter counter = new ByteCounter();
+            //? if >=1.20.5 {
             Tag tag = ItemStack.CODEC.encodeStart(registries.createSerializationContext(NbtOps.INSTANCE), stack)
                     .result().orElse(null);
             if (tag == null) return Integer.MAX_VALUE;
-            ByteCounter counter = new ByteCounter();
             NbtIo.writeAnyTag(tag, new DataOutputStream(counter));
+            //?} else {
+            /*NbtIo.write(stack.save(new net.minecraft.nbt.CompoundTag()), new DataOutputStream(counter));
+            *///?}
             return counter.count;
         } catch (IOException | RuntimeException unencodable) {
             return Integer.MAX_VALUE;

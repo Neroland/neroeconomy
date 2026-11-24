@@ -9,7 +9,9 @@ import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.components.Tooltip;
+//? if >=1.20.5 {
 import net.minecraft.core.component.DataComponents;
+//?}
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
@@ -210,12 +212,20 @@ public final class DirectTradeScreen extends TexturedContainerScreen<DirectTrade
         if (hovered == null || hovered.index >= DirectTradeMenu.INVENTORY_START || stack.isEmpty()) return lines;
         lines.add(Component.translatable("gui.neroeconomy.direct_trade.tooltip.id",
                 BuiltInRegistries.ITEM.getKey(stack.getItem()).toString()).withStyle(ChatFormatting.AQUA));
+        //? if >=1.20.5 {
         if (stack.has(DataComponents.CUSTOM_NAME))
+        //?} else {
+        /*if (stack.hasCustomHoverName())
+        *///?}
             lines.add(Component.translatable("gui.neroeconomy.direct_trade.tooltip.renamed", stack.getItemName())
                     .withStyle(ChatFormatting.YELLOW));
         lines.add(Component.translatable("gui.neroeconomy.direct_trade.tooltip.count", stack.getCount())
                 .withStyle(ChatFormatting.GRAY));
+        //? if >=1.20.5 {
         int enchantments = stack.getEnchantments().size();
+        //?} else {
+        /*int enchantments = stack.getEnchantmentTags().size();
+        *///?}
         if (enchantments > 0)
             lines.add(Component.translatable("gui.neroeconomy.direct_trade.tooltip.enchantments", enchantments)
                     .withStyle(ChatFormatting.GRAY));

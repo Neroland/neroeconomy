@@ -140,6 +140,15 @@ def generateModMetadata = tasks.register('generateModMetadata', ProcessResources
     inputs.properties(props)
     expand(props)
     from "${branchDir}/src/main/templates"
+    if (stonecutter.eval(mc, '<1.20.5')) {
+        filesMatching('META-INF/neoforge.mods.toml') {
+            name = 'mods.toml'
+            filter { line ->
+                line.replace('type = "required"', 'mandatory = true')
+                        .replace('type = "optional"', 'mandatory = false')
+            }
+        }
+    }
     into layout.buildDirectory.dir('generated/sources/modMetadata')
 }
 sourceSets.main.resources.srcDir generateModMetadata

@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-11-26
+
+### Added
+
+- Minecraft 1.20, 1.20.1, 1.20.2, 1.20.3 and 1.20.4 builds on Fabric and Forge,
+  plus Minecraft 1.20.4 on NeoForge. These builds use Java 17 and require Neroland Core 1.23.0.
+
 ## [0.7.0] - 2026-11-26
 
 ### Added

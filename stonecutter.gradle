@@ -35,6 +35,14 @@ ext.legacyRenames = [
     [below: '1.21.11', from: /\bIdentifier\b/, to: 'ResourceLocation'],
     [below: '1.21.11', from: /\.identifier\(\)/, to: '.location()'],
     [below: '1.21', from: /\b((?:net\.minecraft\.resources\.)?ResourceLocation)\s*\.(?:fromNamespaceAndPath|parse|withDefaultNamespace)\(/, to: 'new $1('],
+    [below: '1.20.5', from: /import net\.minecraft\.network\.RegistryFriendlyByteBuf;/, to: 'import net.minecraft.network.FriendlyByteBuf;'],
+    [below: '1.20.5', from: /\bRegistryFriendlyByteBuf\b/, to: 'FriendlyByteBuf'],
+    [below: '1.20.5', from: /import net\.minecraft\.network\.codec\.StreamCodec;/, to: 'import za.co.neroland.nerolandcore.network.legacy.LegacyStreamCodec;'],
+    [below: '1.20.5', from: /\bStreamCodec\b/, to: 'LegacyStreamCodec'],
+    [below: '1.20.5', from: /import net\.minecraft\.network\.protocol\.common\.custom\.CustomPacketPayload;/, to: 'import za.co.neroland.nerolandcore.network.legacy.LegacyPayload;'],
+    [below: '1.20.5', from: /(?<![.\w])CustomPacketPayload\b/, to: 'LegacyPayload'],
+    [below: '1.20.5', from: /(?<![.\w])Codec\.lazyInitialized\(/, to: 'za.co.neroland.neroeconomy.economy.LegacyCodec.lazy('],
+    [below: '1.20.5', from: /(Type<(\w+Payload)> TYPE = new Type<>\(\s*new ResourceLocation\([^;]+?\))\);/, to: '$1, $2.class);'],
     // 26.1 renamed GuiGraphics -> GuiGraphicsExtractor and its drawString(..) -> text(..). The text()
     // rename is keyed on the receiver names this codebase uses for the graphics object (g / graphics).
     [below: '26.1', from: /\bGuiGraphicsExtractor\b/, to: 'GuiGraphics'],
@@ -94,6 +102,15 @@ ext.legacyRenames = [
     // followed by .map/.orElse/.ifPresent.
     [below: '1.21.2', from: /\b(BuiltInRegistries\.[A-Z_]+)\.get\(TagKey\.create\(/, to: '$1.getTag(TagKey.create('],
     [below: '1.21.2', from: /\b(BuiltInRegistries\.[A-Z_]+)\.get\((\w+)\)\.(map|orElse|ifPresent)\(/, to: '$1.getHolder($2).$3('],
+    [below: '1.20.5', from: /\b(BuiltInRegistries\.ITEM)\.getHolder\((\w+)\)/,
+            to: '$1.getHolder(net.minecraft.resources.ResourceKey.create(net.minecraft.core.registries.Registries.ITEM, $2))'],
+    [below: '1.20.5', from: /\b(player|seller|live)\.registryAccess\(\)/, to: '$1.level().registryAccess()'],
+    [below: '1.20.5', from: /\bItemStack([\.:]+)isSameItemSameComponents\b/, to: 'ItemStack$1isSameItemSameTags'],
+    [below: '1.20.5', from: /\.getDefaultMaxStackSize\(\)/, to: '.getMaxStackSize()'],
+    [below: '1.20.5', from: /\bplayer\.hasInfiniteMaterials\(\)/, to: 'player.getAbilities().instabuild'],
+    [below: '1.20.5', from: /\bMath\.ceilDiv\(/, to: 'za.co.neroland.neroeconomy.economy.LegacyMath.ceilDiv('],
+    [below: '1.20.5', from: /\.getOrThrow\(\)/,
+            to: '.getOrThrow(false, message -> { throw new IllegalStateException(message); })'],
     // ItemStack.getItemName() arrived in 1.21.2; the item's own description is the same base name.
     [below: '1.21.2', from: /\.getItemName\(\)/, to: '.getItem().getDescription()'],
     // Registry.getTags() streamed (TagKey, HolderSet) pairs before 1.21.2; getTagNames() streams the keys.
@@ -111,8 +128,8 @@ ext.commonResources = "${rootProject.projectDir}/common/src/main/resources"
 subprojects {
     apply plugin: 'java'
 
-    // Minecraft 1.20.5 through 1.21.x runs on Java 21. The 26.x cells use Java 25.
-    def javaRelease = project.name.startsWith('1.') ? 21 : 25
+    def java17Versions = ['1.20', '1.20.1', '1.20.2', '1.20.3', '1.20.4']
+    def javaRelease = project.name in java17Versions ? 17 : project.name.startsWith('1.') ? 21 : 25
     ext.javaRelease = javaRelease
 
     java {
@@ -165,7 +182,7 @@ subprojects {
     // process() API for every NON-active node (output under build/generated/stonecutter-common/java).
     // The active node keeps the raw folder, so the IDE still edits the real files. Keep common/ in the
     // vcsVersion state, exactly like the loader src/ trees.
-    if (isNode && project.name.startsWith('1.20.')) {
+    if (isNode && (project.name == '1.20' || project.name.startsWith('1.20.'))) {
         def common = new File(rootProject.ext.commonResources)
         def legacyItemModels = tasks.register('legacyItemModels') {
             def assets = new File(common, 'assets/neroeconomy')
@@ -190,12 +207,29 @@ subprojects {
         }
         sourceSets.main.resources.srcDir(files(layout.buildDirectory.dir('generated/legacy-item-models'))
                 .builtBy(legacyItemModels))
+        def packFormats = [
+                '1.20': [15, 15], '1.20.1': [15, 15], '1.20.2': [18, 18],
+                '1.20.3': [22, 26], '1.20.4': [22, 26], '1.20.5': [32, 41], '1.20.6': [32, 41]
+        ][project.name]
         tasks.named('processResources') {
+            inputs.property('packFormats', packFormats)
+            doLast {
+                new File(destinationDir, 'pack.mcmeta').setText(groovy.json.JsonOutput.toJson([
+                        pack: [description: 'NeroEconomy resources and data', pack_format: packFormats[0],
+                               supported_formats: packFormats]
+                ]), 'UTF-8')
+            }
             eachFile { file ->
                 file.path = file.path.replaceFirst(/^(data\/[^\/]+\/)(advancement|loot_table|recipe)\//, '$1$2s/')
                         .replaceFirst(/^(data\/[^\/]+\/tags\/)(block|entity_type|fluid|item)\//, '$1$2s/')
             }
             includeEmptyDirs = false
+        }
+    }
+    if (isNode && stonecutter.eval(stonecutter.current.version, '<1.20.5')) {
+        sourceSets.test.resources.srcDir(rootProject.file('common/src/test/resources'))
+        tasks.named('test', Test) {
+            systemProperty 'junit.jupiter.extensions.autodetection.enabled', 'true'
         }
     }
     if (isNode) {
@@ -356,10 +390,12 @@ subprojects {
             }
             def base = new File(rootProject.ext.commonResources).canonicalFile
             def outDir = node.file('build/generated/legacy-recipes')
+            def preComponents = sc.eval(sc.current.version, '<1.20.5')
             def legacyRecipes = node.tasks.register('legacyRecipes') {
                 group = 'stonecutter'
                 description = 'Rewrites short-form recipe ingredients to the pre-1.21.2 object form.'
                 inputs.dir(base)
+                inputs.property('preComponents', preComponents)
                 outputs.dir(outDir)
                 doLast {
                     node.delete(outDir)
@@ -373,10 +409,22 @@ subprojects {
                     }
                     base.eachFileRecurse(groovy.io.FileType.FILES) { f ->
                         def rel = base.toPath().relativize(f.toPath()).toString().replace('\\', '/')
-                        if (!(rel ==~ /data\/[^\/]+\/recipe\/.+\.json/)) {
+                        def advancement = preComponents && rel ==~ /data\/[^\/]+\/advancement\/.+\.json/
+                        if (!advancement && !(rel ==~ /data\/[^\/]+\/recipe\/.+\.json/)) {
                             return
                         }
                         def json = slurper.parse(f)
+                        if (advancement) {
+                            json.criteria.values().each { criterion ->
+                                criterion.conditions?.items?.each { predicate ->
+                                    if (predicate.items instanceof String) {
+                                        predicate.items = [predicate.items]
+                                    }
+                                }
+                            }
+                        } else if (preComponents && json.result instanceof Map && json.result.containsKey('id')) {
+                            json.result.item = json.result.remove('id')
+                        }
                         if (json.key instanceof Map) {
                             json.key = json.key.collectEntries { k, v -> [(k): conv(v)] }
                         }

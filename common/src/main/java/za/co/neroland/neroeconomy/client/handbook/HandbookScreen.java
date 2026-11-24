@@ -148,11 +148,14 @@ public final class HandbookScreen extends Screen {
     public void extractRenderState(GuiGraphicsExtractor g, int mouseX, int mouseY, float partialTick) {
         //? if >=1.21.6 {
         drawPage(g);
-        //?}
+        //?} elif <1.20.2 {
+        /*renderBackground(g);
+        drawPage(g);
+        *///?}
         super.extractRenderState(g, mouseX, mouseY, partialTick);
     }
 
-    //? if <1.21.6 {
+    //? if >=1.20.2 && <1.21.6 {
     /*// Before 1.21.6 Screen.render paints the (blurred) background over whatever was drawn before it, so the
     // page goes on top of the background here instead, still under the buttons.
     @Override

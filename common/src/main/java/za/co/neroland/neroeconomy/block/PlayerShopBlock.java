@@ -65,7 +65,7 @@ public final class PlayerShopBlock extends BaseEntityBlock {
         MarketSavedData.get(level.getServer()).releaseShopsAt(ShopOwnershipState.key(level, pos));
     }
     protected MapCodec<PlayerShopBlock> codec() { return CODEC; }
-    @Override protected RenderShape getRenderShape(BlockState state) { return RenderShape.MODEL; }
+    @Override public RenderShape getRenderShape(BlockState state) { return RenderShape.MODEL; }
 
     @Override
     protected void createBlockStateDefinition(StateDefinition.Builder<Block, BlockState> builder) {
@@ -78,12 +78,12 @@ public final class PlayerShopBlock extends BaseEntityBlock {
     }
 
     @Override
-    protected BlockState rotate(BlockState state, Rotation rotation) {
+    public BlockState rotate(BlockState state, Rotation rotation) {
         return state.setValue(FACING, rotation.rotate(state.getValue(FACING)));
     }
 
     @Override
-    protected BlockState mirror(BlockState state, Mirror mirror) {
+    public BlockState mirror(BlockState state, Mirror mirror) {
         return state.rotate(mirror.getRotation(state.getValue(FACING)));
     }
 
@@ -100,9 +100,14 @@ public final class PlayerShopBlock extends BaseEntityBlock {
         }
     }
 
+    //? if >=1.20.5 {
     @Override
     protected InteractionResult useWithoutItem(BlockState state, Level level, BlockPos pos, Player player,
             BlockHitResult hit) {
+    //?} else {
+    /*@Override public InteractionResult use(BlockState state, Level level, BlockPos pos, Player player,
+            net.minecraft.world.InteractionHand hand, BlockHitResult hit) {
+    *///?}
         if (!level.isClientSide() && player instanceof ServerPlayer serverPlayer
                 && level.getBlockEntity(pos) instanceof PlayerShopBlockEntity shop) {
             serverPlayer.openMenu(shop);
@@ -111,7 +116,7 @@ public final class PlayerShopBlock extends BaseEntityBlock {
     }
 
     @Override
-    protected float getDestroyProgress(BlockState state, Player player, BlockGetter level, BlockPos pos) {
+    public float getDestroyProgress(BlockState state, Player player, BlockGetter level, BlockPos pos) {
         if (level instanceof Level actual && !actual.isClientSide()
                 && !canBreak(actual, pos, player)) {
             return 0.0F;
@@ -125,7 +130,7 @@ public final class PlayerShopBlock extends BaseEntityBlock {
      * before {@link #setPlacedBy} claims the new one for its placer.
      */
     @Override
-    protected void onPlace(BlockState state, Level level, BlockPos pos, BlockState oldState, boolean movedByPiston) {
+    public void onPlace(BlockState state, Level level, BlockPos pos, BlockState oldState, boolean movedByPiston) {
         super.onPlace(state, level, pos, oldState, movedByPiston);
         if (level instanceof ServerLevel serverLevel && !oldState.is(state.getBlock())) forgetShop(serverLevel, pos);
     }
@@ -146,7 +151,7 @@ public final class PlayerShopBlock extends BaseEntityBlock {
     /*// Before 1.21.5 one hook covers both steps: the block entity's side effects (it is still there),
     // then the records by position.
     @Override
-    protected void onRemove(BlockState state, Level level, BlockPos pos, BlockState newState, boolean movedByPiston) {
+    public void onRemove(BlockState state, Level level, BlockPos pos, BlockState newState, boolean movedByPiston) {
         if (!state.is(newState.getBlock())) {
             if (level.getBlockEntity(pos) instanceof PlayerShopBlockEntity shop) shop.preRemoveSideEffects(pos, state);
             if (level instanceof ServerLevel serverLevel) forgetShop(serverLevel, pos);

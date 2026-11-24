@@ -58,11 +58,17 @@ public final class TradersHandbookItem extends Item {
         super.appendHoverText(stack, context, display, tooltip, flag);
         tooltip.accept(Component.translatable(TOOLTIP).withStyle(ChatFormatting.GRAY));
     }
-    //?} else {
+    //?} elif >=1.20.5 {
     /*@Override
     public void appendHoverText(ItemStack stack, Item.TooltipContext context, java.util.List<Component> tooltip,
             TooltipFlag flag) {
         super.appendHoverText(stack, context, tooltip, flag);
+        tooltip.add(Component.translatable(TOOLTIP).withStyle(ChatFormatting.GRAY));
+    }
+    *///?} else {
+    /*@Override
+    public void appendHoverText(ItemStack stack, Level level, java.util.List<Component> tooltip, TooltipFlag flag) {
+        super.appendHoverText(stack, level, tooltip, flag);
         tooltip.add(Component.translatable(TOOLTIP).withStyle(ChatFormatting.GRAY));
     }
     *///?}

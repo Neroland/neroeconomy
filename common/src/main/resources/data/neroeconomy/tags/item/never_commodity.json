@@ -5,7 +5,10 @@
     "minecraft:splash_potion",
     "minecraft:lingering_potion",
     "minecraft:tipped_arrow",
-    "minecraft:ominous_bottle",
+    {
+      "id": "minecraft:ominous_bottle",
+      "required": false
+    },
     "minecraft:suspicious_stew",
     "minecraft:enchanted_book",
     "minecraft:written_book",

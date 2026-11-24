@@ -310,10 +310,14 @@ public final class PlayerShopBlockEntity extends BlockEntity implements WorldlyC
     //? if >=1.21.6 {
     @Override protected void saveAdditional(ValueOutput output) {
         super.saveAdditional(output);
-    //?} else {
+    //?} elif >=1.20.5 {
     /*@Override protected void saveAdditional(net.minecraft.nbt.CompoundTag tag, net.minecraft.core.HolderLookup.Provider registries) {
         super.saveAdditional(tag, registries);
         ValueOutput output = ValueOutput.of(tag, registries);
+    *///?} else {
+    /*@Override protected void saveAdditional(net.minecraft.nbt.CompoundTag tag) {
+        super.saveAdditional(tag);
+        ValueOutput output = ValueOutput.of(tag, null);
     *///?}
         output.putString("ListingId", listingId.toString());
         output.putLong("Price", price);
@@ -322,10 +326,14 @@ public final class PlayerShopBlockEntity extends BlockEntity implements WorldlyC
     //? if >=1.21.6 {
     @Override protected void loadAdditional(ValueInput input) {
         super.loadAdditional(input);
-    //?} else {
+    //?} elif >=1.20.5 {
     /*@Override protected void loadAdditional(net.minecraft.nbt.CompoundTag tag, net.minecraft.core.HolderLookup.Provider registries) {
         super.loadAdditional(tag, registries);
         ValueInput input = ValueInput.of(tag, registries);
+    *///?} else {
+    /*@Override public void load(net.minecraft.nbt.CompoundTag tag) {
+        super.load(tag);
+        ValueInput input = ValueInput.of(tag, null);
     *///?}
         try { listingId = UUID.fromString(input.getStringOr("ListingId", listingId.toString())); }
         catch (IllegalArgumentException ignored) { listingId = UUID.randomUUID(); }

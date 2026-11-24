@@ -12,7 +12,12 @@ import za.co.neroland.neroeconomy.platform.Services;
 @Mod(NeroEconomyCommon.MOD_ID)
 public final class NeroEconomyForge {
 
+    //? if >=1.20.5 {
     public NeroEconomyForge(FMLJavaModLoadingContext context) {
+    //?} else {
+    /*public NeroEconomyForge() {
+        FMLJavaModLoadingContext context = FMLJavaModLoadingContext.get();
+    *///?}
         NeroEconomyCommon.LOGGER.info("[NeroEconomy] Forge bootstrap");
         NeroEconomyCommon.init();
         //? if >=1.21.6 {

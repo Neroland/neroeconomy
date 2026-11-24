@@ -138,7 +138,13 @@ public final class ForgePlatformInfo implements PlatformInfo {
         game.addListener((ServerStartedEvent event) -> NeroEconomyCommon.CURRENCY_PROVIDER.bind(event.getServer()));
         game.addListener((ServerStoppedEvent event) -> NeroEconomyCommon.CURRENCY_PROVIDER.unbind(event.getServer()));
         game.addListener((RegisterCommandsEvent event) -> EconomyCommands.register(event.getDispatcher()));
+        //? if >=1.20.4 {
         game.addListener((TickEvent.ServerTickEvent.Post event) -> NeroEconomyCommon.CURRENCY_PROVIDER.tick(event.getServer()));
+        //?} else {
+        game.addListener((TickEvent.ServerTickEvent event) -> {
+            if (event.phase == TickEvent.Phase.END) NeroEconomyCommon.CURRENCY_PROVIDER.tick(event.getServer());
+        });
+        //?}
         game.addListener((OnDatapackSyncEvent event) -> {
             if (event.getPlayer() == null) {
                 StockData.reload(event.getPlayerList().getServer());

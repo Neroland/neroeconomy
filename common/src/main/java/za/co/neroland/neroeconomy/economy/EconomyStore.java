@@ -542,7 +542,7 @@ public final class EconomyStore extends SavedData {
         EconomyMarker marker = SavedDataRecovery.get(level, EconomyMarker.TYPE, EconomyMarker::new,
                 EconomyMarker.ID.toString());
         // A plain read: null when there is no file, and also when the file could not be read.
-        EconomyStore onDisk = peek(storage, TYPE);
+        EconomyStore onDisk = peek(level, TYPE);
         boolean missing = onDisk == null && marker.exists();
         // A store written by a later version holds sections this one would drop on its next save.
         boolean newer = onDisk != null && onDisk.schema > SCHEMA;
@@ -562,7 +562,7 @@ public final class EconomyStore extends SavedData {
         EconomyStore store = SavedDataRecovery.get(level, TYPE, EconomyStore::new, ID.toString());
         // Published before the set-up below, which reaches back in through the section accessors.
         session = opened;
-        if (store.schema < SCHEMA) store.setUp(storage, true);
+        if (store.schema < SCHEMA) store.setUp(level, true);
         else if (store.loadedFromDisk) {
             // The combined store has been read back from disk, so it is the durable copy: only now
             // is the marker written and are the older files emptied.
@@ -621,7 +621,7 @@ public final class EconomyStore extends SavedData {
 
     private static <T extends EconomySection> void eraseLegacy(ServerLevel level, SavedDataStorage storage,
             SavedDataType<T> type, Consumer<T> purge) {
-        T old = peek(storage, type);
+        T old = peek(level, type);
         if (old == null) return;
         if (old.owner() != null) old.rewriteStandaloneFile();
         else if (old.isEmpty()) return;
@@ -646,11 +646,11 @@ public final class EconomyStore extends SavedData {
         ServerLevel level = server.overworld();
         SavedDataStorage storage = level.getDataStorage();
         EconomyStore store = current.frozen;
-        put(storage, TYPE, store);
+        put(level, TYPE, store);
         current.frozen = null;
         EconomyHealth.clear();
         clearLegacy(level, storage);
-        store.setUp(storage, false);
+        store.setUp(level, false);
         SavedDataRecovery.get(level, EconomyMarker.TYPE, EconomyMarker::new, EconomyMarker.ID.toString())
                 .markExists(store.schema);
         NeroEconomyCommon.LOGGER.warn("[NeroEconomy] An operator accepted a fresh start; the economy is running again.");
@@ -665,9 +665,9 @@ public final class EconomyStore extends SavedData {
      * the ledger, and fills the Reserve once. A brand-new world takes the same path with nothing
      * to adopt.
      */
-    private void setUp(SavedDataStorage storage, boolean importLegacy) {
-        if (importLegacy) setUpFrom(peek(storage, EconomySavedData.TYPE), peek(storage, MarketSavedData.TYPE),
-                peek(storage, ObligationSavedData.TYPE), peek(storage, ShopOwnershipState.TYPE));
+    private void setUp(ServerLevel level, boolean importLegacy) {
+        if (importLegacy) setUpFrom(peek(level, EconomySavedData.TYPE), peek(level, MarketSavedData.TYPE),
+                peek(level, ObligationSavedData.TYPE), peek(level, ShopOwnershipState.TYPE));
         else setUpFrom(null, null, null, null);
     }
 
@@ -717,29 +717,30 @@ public final class EconomyStore extends SavedData {
 
     private static <T extends EconomySection> void clearLegacy(ServerLevel level, SavedDataStorage storage,
             SavedDataType<T> type, T empty) {
-        T old = peek(storage, type);
+        T old = peek(level, type);
         if (old == null || old.isEmpty() || old.owner() != null) return;
         // set() marks the empty instance dirty, so the old file is rewritten empty at the next save.
-        put(storage, type, empty);
+        put(level, type, empty);
         SavedDataRecovery.backupNow(level, type, empty, type.id().toString());
     }
 
     /** A plain read of one store: null when it has no file (or the file could not be read); never creates it. */
-    private static <T extends SavedData> T peek(SavedDataStorage storage, SavedDataType<T> type) {
+    private static <T extends SavedData> T peek(ServerLevel level, SavedDataType<T> type) {
+        SavedDataStorage storage = level.getDataStorage();
         //? if >=1.21.5 {
         return storage.get(type);
-        //?} else {
-        /*// Core's legacy factory never reads the level it is handed, so a storage-only read needs none.
-        return storage.get(type.factory(null), type.id());
+        //?} else if >=1.20.5 {
+        /*return storage.get(type.factory(level), type.id());
+        *///?} else if >=1.20.2 {
+        /*return storage.get(new SavedData.Factory<>(() -> type.attach(type.constructor().get(), level.registryAccess()),
+                tag -> type.read(tag, level.registryAccess()), type.dataFixType()), type.id());
+        *///?} else {
+        /*return storage.get(tag -> type.read(tag, level.registryAccess()), type.id());
         *///?}
     }
 
     /** Installs {@code instance} as the store for {@code type} (written at the next save). */
-    private static <T extends SavedData> void put(SavedDataStorage storage, SavedDataType<T> type, T instance) {
-        //? if >=1.21.5 {
-        storage.set(type, instance);
-        //?} else {
-        /*storage.set(type.id(), type.attach(instance));
-        *///?}
+    private static <T extends SavedData> void put(ServerLevel level, SavedDataType<T> type, T instance) {
+        za.co.neroland.nerolandcore.data.SavedDataCompat.set(level, type, instance);
     }
 }

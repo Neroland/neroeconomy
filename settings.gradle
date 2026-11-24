@@ -13,6 +13,7 @@ pluginManagement {
         id 'net.fabricmc.fabric-loom' version '1.18.4' // fabric — 1.17 handles de-obf 26.x (omit mappings)
         id 'net.fabricmc.fabric-loom-remap' version '1.18.4' // fabric on obfuscated 1.21.x (Mojang mappings + remapJar)
         id 'net.minecraftforge.gradle' version '7.0.40'  // forge — FG 7 handles de-obf 26.x
+        id 'net.minecraftforge.renamer' version '1.1.8'
         id 'net.minecraftforge.jarjar' version '0.2.3'   // forge Jar-in-Jar dependencies
         id 'dev.kikugie.stonecutter' version '0.10'     // version axis (per-MC nodes)
     }
@@ -51,7 +52,7 @@ stonecutter {
         // (1.21.8 covers 1.21.7-1.21.8, 1.21.10 covers 1.21.9-1.21.10) - see mc_floor_<v> in gradle.properties.
         def mcVersions = providers.gradleProperty('mc_versions').get().split(',')
         branch('fabric')   { versions(*mcVersions) }
-        branch('neoforge') { versions(*mcVersions.findAll { it != '1.20.5' }) }
+        branch('neoforge') { versions(*mcVersions.findAll { it == '1.20.4' || !it.startsWith('1.20') || it == '1.20.6' }) }
         branch('forge')    { versions(*mcVersions.findAll { it != '1.20.5' }) }
         vcsVersion = '26.2'   // reset point for commits / default checkout
     }

@@ -43,7 +43,11 @@ public final class StoredStacks {
     };
 
     private static <T> DynamicOps<T> withRegistries(DynamicOps<T> ops) {
+        //? if >=1.20.5 {
         HolderLookup.Provider known = registries;
         return ops instanceof RegistryOps || known == null ? ops : known.createSerializationContext(ops);
+        //?} else {
+        /*return ops;
+        *///?}
     }
 }

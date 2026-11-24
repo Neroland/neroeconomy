@@ -53,8 +53,12 @@ final class ForgeClientSetup {
         // Screenshot harness state machine — game-bus client tick (counterpart to Fabric's END_CLIENT_TICK).
         //? if >=1.21.6 {
         TickEvent.ClientTickEvent.Post.BUS.addListener(event -> GalleryCaptureHarness.tick());
-        //?} else {
+        //?} elif >=1.20.4 {
         /*MinecraftForge.EVENT_BUS.addListener((TickEvent.ClientTickEvent.Post event) -> GalleryCaptureHarness.tick());
+        *///?} else {
+        /*MinecraftForge.EVENT_BUS.addListener((TickEvent.ClientTickEvent event) -> {
+            if (event.phase == TickEvent.Phase.END) GalleryCaptureHarness.tick();
+        });
         *///?}
         // Client-side /necgallery capture command tree (drives the local camera; separate dispatcher
         // from the server-side /neroeconomy gallery builder — a shared root would shadow it).
