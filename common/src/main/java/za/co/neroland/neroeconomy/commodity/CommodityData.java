@@ -144,7 +144,11 @@ public final class CommodityData {
     public static final String DIRECTORY = "neroeconomy/commodities";
     /** Where the guard's code-side bonus files are, under {@code data/<namespace>/}. */
     public static final String GUARD_DIRECTORY = "neroeconomy/guard";
+    //? if >=1.21 {
     private static final String RECIPE_DIRECTORY = "recipe";
+    //?} else {
+    /*private static final String RECIPE_DIRECTORY = "recipes";
+    *///?}
     private static final String SUFFIX = ".json";
 
     /** Items whose identity lives in their components: never a commodity, whatever a data file says. */

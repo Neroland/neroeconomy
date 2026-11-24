@@ -56,8 +56,14 @@ public final class GuardTesting {
 
     private static final String MAIN = "common/src/main/resources/";
     private static final String TEST = "common/src/test/resources/";
+    private static final String SOURCE_ITEM_TAGS = "data/minecraft/tags/item/";
+    //? if >=1.21 {
     private static final String RECIPES = "data/minecraft/recipe/";
-    private static final String ITEM_TAGS = "data/minecraft/tags/item/";
+    private static final String ITEM_TAGS = SOURCE_ITEM_TAGS;
+    //?} else {
+    /*private static final String RECIPES = "data/minecraft/recipes/";
+    private static final String ITEM_TAGS = "data/minecraft/tags/items/";
+    *///?}
     /** Vanilla item tags the mod ships additions to (data/minecraft/tags/item/<name>.json). */
     private static final List<String> SHIPPED_VANILLA_TAGS = List.of("eggs");
     private static final String ITEM_MODELS = "assets/minecraft/items/";
@@ -142,7 +148,7 @@ public final class GuardTesting {
             // Read from the source tree: on the classpath the game's own file of the same name would win.
             JsonElement shipped;
             try {
-                shipped = JsonParser.parseString(Files.readString(sourceFile(MAIN + ITEM_TAGS + extra + ".json"),
+                shipped = JsonParser.parseString(Files.readString(sourceFile(MAIN + SOURCE_ITEM_TAGS + extra + ".json"),
                         StandardCharsets.UTF_8));
             } catch (IOException failure) {
                 throw new IllegalStateException("Cannot read the shipped " + extra + " tag", failure);

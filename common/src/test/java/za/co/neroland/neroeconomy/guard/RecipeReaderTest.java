@@ -26,6 +26,16 @@ class RecipeReaderTest {
         return new GuardRecipe.Input(List.of(options), count);
     }
 
+    @Test void legacyStonecuttingReadsTheTopLevelResultCount() {
+        String recipe = """
+                { "type": "minecraft:stonecutting", "ingredient": { "item": "minecraft:stone" },
+                  "result": "minecraft:stone_slab", "count": %d }""";
+        GuardRecipe valid = read(recipe.formatted(2));
+        assertNotNull(valid);
+        assertEquals(2, valid.count());
+        assertNull(read(recipe.formatted(0)));
+    }
+
     @Test void shapedCraftingCountsEachKeyLetterInThePattern() {
         GuardRecipe recipe = read("""
                 { "type": "minecraft:crafting_shaped", "category": "misc",
@@ -199,8 +209,10 @@ class RecipeReaderTest {
         // 1.21.1 - 1.21.5 ship about 1290 - 1370 recipes in all; later lines ship more.
         //? if >=1.21.6 {
         assertTrue(read.recipes().size() > 1300, () -> "only " + read.recipes().size() + " vanilla recipes were read");
-        //?} else {
+        //?} else if >=1.21 {
         /*assertTrue(read.recipes().size() > 1200, () -> "only " + read.recipes().size() + " vanilla recipes were read");
+        *///?} else {
+        /*assertTrue(read.recipes().size() > 1100, () -> "only " + read.recipes().size() + " vanilla recipes were read");
         *///?}
         java.util.Set<String> readable = java.util.Set.of("minecraft:crafting_shaped", "minecraft:crafting_shapeless",
                 "minecraft:smelting", "minecraft:blasting", "minecraft:smoking", "minecraft:campfire_cooking",

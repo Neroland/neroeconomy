@@ -102,7 +102,14 @@ public final class RecipeReader {
             // A result with components is not an unmodified stack: it is never a commodity.
             JsonElement components = resultObject.get("components");
             if (components != null && components.isJsonObject() && components.getAsJsonObject().size() > 0) return null;
-        } else result = string(resultJson);
+        } else {
+            result = string(resultJson);
+            if (type.equals("minecraft:stonecutting") && object.has("count")) {
+                Integer stated = count(object.get("count"));
+                if (stated == null) return null;
+                count = stated;
+            }
+        }
         result = id(result);
         if (result == null) return null;
 

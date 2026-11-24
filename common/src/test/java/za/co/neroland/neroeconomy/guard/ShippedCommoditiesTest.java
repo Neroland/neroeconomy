@@ -254,8 +254,10 @@ class ShippedCommoditiesTest {
         // The check really ran: the vanilla recipes were read and chains were compared.
         //? if >=1.21.6 {
         assertTrue(report.recipesRead() > 1300, () -> "only " + report.recipesRead() + " recipes were read");
-        //?} else {
+        //?} else if >=1.21 {
         /*assertTrue(report.recipesRead() > 1200, () -> "only " + report.recipesRead() + " recipes were read");
+        *///?} else {
+        /*assertTrue(report.recipesRead() > 1100, () -> "only " + report.recipesRead() + " recipes were read");
         *///?}
         assertTrue(report.chainsChecked() >= 10, () -> "only " + report.chainsChecked() + " chains were checked");
         assertEquals(registry.commodities().size(), report.commodities());

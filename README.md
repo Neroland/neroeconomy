@@ -1,6 +1,8 @@
 # NeroEconomy
 
-NeroEconomy is a server-authoritative economy for the Neroland family of Minecraft mods
+NeroEconomy is a server-authoritative economy for the Neroland family of Minecraft mods.
+It requires Neroland Core 1.23.0 or newer (below 2.0). Minecraft 1.20.5 is supported on
+Fabric, and 1.20.6 is supported on Fabric, Forge and NeoForge.
 
 ## Shipped features
 
