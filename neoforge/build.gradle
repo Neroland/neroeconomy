@@ -153,9 +153,9 @@ def generateModMetadata = tasks.register('generateModMetadata', ProcessResources
 }
 sourceSets.main.resources.srcDir generateModMetadata
 
-// NeoForge 20.5's POM predates the ModDevGradle variants. The original userdev jar supplies the
+// These early NeoForge POMs predate the ModDevGradle variants. The original userdev jar supplies the
 // game patches and the original POM supplies dependencies for the compile and test classpaths.
-if (mc == '1.20.5') {
+if (mc in ['1.20.2', '1.20.3', '1.20.5']) {
     dependencies.components.withModule('net.neoforged:neoforge') { details ->
         if (details.id.version == neoVersion) {
             details.withVariant('sources') {

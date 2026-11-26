@@ -4,8 +4,9 @@ NeroEconomy supplies the persistent credits economy for Neroland servers: a ledg
 order book, shops, direct trade and offers, standing auto-trade rules, a private Vault, an exchange
 with companies and Savings Bonds, Merchant Houses that keep the market alive, jobs and auctions,
 and a companion app that can trade for you while you are offline. NeroEconomy requires Neroland Core
-1.23.0 or newer (below 2.0). Fabric supports Minecraft 1.20 through 1.20.6. Forge supports
-1.20 through 1.20.4 through 1.20.6. On NeoForge, 1.20.5 requires loader 20.5.21-beta and Neroland Core 1.24.0 or newer. NeoForge supports 1.20.4 through 1.20.6. Minecraft 1.21.1, 1.21.4,
+1.24.0 or newer (below 2.0). Fabric supports Minecraft 1.20 through 1.20.6. Forge supports
+1.20 through 1.20.4 and 1.20.6. NeoForge supports 1.20.2 through 1.20.6, using 20.3.8-beta
+for Minecraft 1.20.3 and 20.5.21-beta for Minecraft 1.20.5. Minecraft 1.21.1, 1.21.4,
 1.21.5, 1.21.7–1.21.8, 1.21.9–1.21.10, 1.21.11, 26.1.2, 26.2 and 26.3 are supported on
 Fabric, Forge and NeoForge. The changelog
 in the repository lists what each version changed.

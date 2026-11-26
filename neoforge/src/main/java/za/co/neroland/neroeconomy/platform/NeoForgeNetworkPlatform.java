@@ -43,7 +43,7 @@ public final class NeoForgeNetworkPlatform implements NetworkPlatform {
         *///?}
     }
 }
-//?} else {
+//?} else if >=1.20.4 {
 /*import net.minecraft.client.Minecraft;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.resources.ResourceLocation;
@@ -146,6 +146,77 @@ public final class NeoForgeNetworkPlatform implements NetworkPlatform {
         @Override
         public void write(FriendlyByteBuf buffer) {
             codec.encode(buffer, message);
+        }
+    }
+}
+*///?} else {
+/*import net.minecraft.client.Minecraft;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.level.ServerPlayer;
+import net.neoforged.neoforge.network.NetworkRegistry;
+import net.neoforged.neoforge.network.PacketDistributor;
+import net.neoforged.neoforge.network.PlayNetworkDirection;
+import net.neoforged.neoforge.network.simple.SimpleChannel;
+
+import za.co.neroland.neroeconomy.NeroEconomyCommon;
+import za.co.neroland.neroeconomy.network.NeroEconomyNetwork;
+import za.co.neroland.nerolandcore.network.legacy.LegacyPayload;
+
+public final class NeoForgeNetworkPlatform implements NetworkPlatform {
+    private static SimpleChannel channel;
+
+    @Override
+    public void register(Object bus) {
+        var version = NetworkRegistry.acceptMissingOr("1");
+        channel = NetworkRegistry.newSimpleChannel(new ResourceLocation(NeroEconomyCommon.MOD_ID, "main"),
+                () -> "1", version, version);
+        int index = 0;
+        for (NeroEconomyNetwork.Clientbound<?> packet : NeroEconomyNetwork.clientbound()) {
+            registerClientbound(packet, index++);
+        }
+        for (NeroEconomyNetwork.Serverbound<?> packet : NeroEconomyNetwork.serverbound()) {
+            registerServerbound(packet, index++);
+        }
+    }
+
+    private static <T extends LegacyPayload> void registerClientbound(NeroEconomyNetwork.Clientbound<T> packet, int index) {
+        channel.messageBuilder(packet.type().payloadClass(), index, PlayNetworkDirection.PLAY_TO_CLIENT)
+                .encoder((payload, buffer) -> packet.codec().encode(buffer, payload))
+                .decoder(packet.codec()::decode)
+                .consumerMainThread((payload, context) -> packet.handler().accept(payload))
+                .add();
+    }
+
+    private static <T extends LegacyPayload> void registerServerbound(NeroEconomyNetwork.Serverbound<T> packet, int index) {
+        channel.messageBuilder(packet.type().payloadClass(), index, PlayNetworkDirection.PLAY_TO_SERVER)
+                .encoder((payload, buffer) -> packet.codec().encode(buffer, payload))
+                .decoder(packet.codec()::decode)
+                .consumerMainThread((payload, context) -> {
+                    ServerPlayer player = context.getSender();
+                    if (player != null) {
+                        packet.handler().accept(payload, player);
+                    }
+                })
+                .add();
+    }
+
+    @Override
+    public void registerClient() {
+    }
+
+    @Override
+    public void sendToPlayer(ServerPlayer player, LegacyPayload payload) {
+        if (channel == null || !channel.isRemotePresent(player.connection.connection)) {
+            return;
+        }
+        channel.send(PacketDistributor.PLAYER.with(() -> player), payload);
+    }
+
+    @Override
+    public void sendToServer(LegacyPayload payload) {
+        var client = Minecraft.getInstance().getConnection();
+        if (channel != null && client != null && channel.isRemotePresent(client.getConnection())) {
+            channel.sendToServer(payload);
         }
     }
 }

@@ -1,10 +1,11 @@
 # NeroEconomy
 
 NeroEconomy is a server-authoritative economy for the Neroland family of Minecraft mods.
-It requires Neroland Core 1.23.0 or newer (below 2.0). The Minecraft 1.20 line supports
+It requires Neroland Core 1.24.0 or newer (below 2.0). The Minecraft 1.20 line supports
 Fabric from 1.20 through 1.20.6, Forge from 1.20 through 1.20.4 and on 1.20.6, and
-NeoForge on 1.20.4 through 1.20.6. On NeoForge, 1.20.5 requires loader 20.5.21-beta and Neroland Core 1.24.0 or newer. Use Java 17 through Minecraft 1.20.4 and Java 21
-for 1.20.5 and 1.20.6.
+NeoForge on 1.20.2 through 1.20.6. The NeoForge builds for Minecraft 1.20.3 and 1.20.5 use
+20.3.8-beta and 20.5.21-beta respectively. Use Java 17 through Minecraft 1.20.4 and Java 21 for
+1.20.5 and 1.20.6.
 
 ## Shipped features
 

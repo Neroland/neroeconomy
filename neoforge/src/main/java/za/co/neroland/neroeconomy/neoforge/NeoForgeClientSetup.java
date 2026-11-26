@@ -8,7 +8,12 @@ import net.neoforged.neoforge.client.event.ClientTickEvent;
 /*import net.neoforged.neoforge.event.TickEvent;
 *///?}
 import net.neoforged.neoforge.client.event.RegisterClientCommandsEvent;
+//? if >=1.20.4 {
 import net.neoforged.neoforge.client.event.RegisterMenuScreensEvent;
+//?} else {
+/*import net.minecraft.client.gui.screens.MenuScreens;
+import net.neoforged.fml.event.lifecycle.FMLClientSetupEvent;
+*///?}
 import net.neoforged.neoforge.common.NeoForge;
 
 import za.co.neroland.neroeconomy.client.AutoTraderScreen;
@@ -51,6 +56,7 @@ final class NeoForgeClientSetup {
         NeoForge.EVENT_BUS.addListener((RegisterClientCommandsEvent event) ->
                 GalleryCaptureHarness.registerClientCommands(event.getDispatcher()));
     }
+    //? if >=1.20.4 {
     private static void screens(RegisterMenuScreensEvent event) {
         event.register(ModMenuTypes.PLAYER_SHOP.get(), PlayerShopScreen::new);
         event.register(ModMenuTypes.VAULT.get(), VaultScreen::new);
@@ -58,4 +64,15 @@ final class NeoForgeClientSetup {
         event.register(ModMenuTypes.AUTO_TRADER.get(), AutoTraderScreen::new);
         event.register(ModMenuTypes.ECONOMY_HUB.get(), EconomyHubScreen::new);
     }
+    //?} else {
+    /*private static void screens(FMLClientSetupEvent event) {
+        event.enqueueWork(() -> {
+            MenuScreens.register(ModMenuTypes.PLAYER_SHOP.get(), PlayerShopScreen::new);
+            MenuScreens.register(ModMenuTypes.VAULT.get(), VaultScreen::new);
+            MenuScreens.register(ModMenuTypes.DIRECT_TRADE.get(), DirectTradeScreen::new);
+            MenuScreens.register(ModMenuTypes.AUTO_TRADER.get(), AutoTraderScreen::new);
+            MenuScreens.register(ModMenuTypes.ECONOMY_HUB.get(), EconomyHubScreen::new);
+        });
+    }
+    *///?}
 }

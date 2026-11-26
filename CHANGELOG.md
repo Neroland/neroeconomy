@@ -6,7 +6,12 @@
 
 ### Added
 
-- Minecraft 1.20.5 on NeoForge 20.5.21-beta, with Neroland Core 1.24.0 or newer.
+- Native NeoForge builds for Minecraft 1.20.2, 1.20.3 and 1.20.5. Minecraft 1.20.3 and 1.20.5
+  use NeoForge 20.3.8-beta and 20.5.21-beta, respectively.
+
+### Changed
+
+- Requires matching Neroland Core 1.24.0 or newer (below 2.0) on every loader.
 
 ## [0.8.0] - 2026-11-26
 

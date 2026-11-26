@@ -5,8 +5,21 @@ import java.util.List;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.ModList;
 import net.neoforged.fml.loading.FMLEnvironment;
+//? if >=1.20.3 {
 import net.neoforged.neoforge.capabilities.Capabilities;
 import net.neoforged.neoforge.capabilities.RegisterCapabilitiesEvent;
+//?} else {
+/*import java.util.EnumMap;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.level.block.entity.BlockEntity;
+import net.neoforged.neoforge.common.capabilities.Capabilities;
+import net.neoforged.neoforge.common.capabilities.Capability;
+import net.neoforged.neoforge.common.capabilities.ICapabilityProvider;
+import net.neoforged.neoforge.common.util.LazyOptional;
+import net.neoforged.neoforge.event.AttachCapabilitiesEvent;
+import net.neoforged.neoforge.items.IItemHandler;
+import za.co.neroland.neroeconomy.block.AutoTraderBlockEntity;
+*///?}
 import net.neoforged.neoforge.common.NeoForge;
 //? if >=1.21.9 {
 import net.neoforged.neoforge.transfer.item.WorldlyContainerWrapper;
@@ -49,6 +62,33 @@ import za.co.neroland.neroeconomy.handbook.HandbookGift;
 import za.co.neroland.neroeconomy.network.IntentGuard;
 
 public final class NeoForgePlatformInfo implements PlatformInfo {
+    //? if <1.20.3 {
+    /*private static final ResourceLocation TRADER_ITEMS = new ResourceLocation(NeroEconomyCommon.MOD_ID, "auto_trader_items");
+
+    private static final class TraderItems implements ICapabilityProvider {
+        private final AutoTraderBlockEntity trader;
+        private final EnumMap<Direction, LazyOptional<IItemHandler>> sided = new EnumMap<>(Direction.class);
+        private LazyOptional<IItemHandler> unsided;
+
+        TraderItems(AutoTraderBlockEntity trader) { this.trader = trader; }
+
+        @Override public <T> LazyOptional<T> getCapability(Capability<T> capability, Direction side) {
+            if (capability != Capabilities.ITEM_HANDLER) return LazyOptional.empty();
+            if (side == null) {
+                if (unsided == null) unsided = LazyOptional.of(() -> new SidedInvWrapper(trader, Direction.DOWN));
+                return unsided.cast();
+            }
+            return sided.computeIfAbsent(side, face -> LazyOptional.of(() -> new SidedInvWrapper(trader, face))).cast();
+        }
+
+        void invalidate() {
+            sided.values().forEach(LazyOptional::invalidate);
+            sided.clear();
+            if (unsided != null) unsided.invalidate();
+            unsided = null;
+        }
+    }
+    *///?}
     @Override public void register(Object bus) {
         RegistrationProvider.attach((IEventBus) bus);
         // The Auto-Trader's slots on the standard item capability, so any mod's pipes can feed and
@@ -59,10 +99,18 @@ public final class NeoForgePlatformInfo implements PlatformInfo {
         ((IEventBus) bus).addListener((RegisterCapabilitiesEvent event) -> event.registerBlockEntity(
                 Capabilities.Item.BLOCK, ModBlockEntities.AUTO_TRADER.get(), (trader, side) ->
                         new WorldlyContainerWrapper(trader, side != null ? side : Direction.DOWN)));
-        //?} else {
+        //?} else if >=1.20.3 {
         /*((IEventBus) bus).addListener((RegisterCapabilitiesEvent event) -> event.registerBlockEntity(
                 Capabilities.ItemHandler.BLOCK, ModBlockEntities.AUTO_TRADER.get(), (trader, side) ->
                         new SidedInvWrapper(trader, side != null ? side : Direction.DOWN)));
+        *///?} else {
+        /*NeoForge.EVENT_BUS.addGenericListener(BlockEntity.class, (AttachCapabilitiesEvent<BlockEntity> event) -> {
+            if (event.getObject() instanceof AutoTraderBlockEntity trader) {
+                TraderItems items = new TraderItems(trader);
+                event.addCapability(TRADER_ITEMS, items);
+                event.addListener(items::invalidate);
+            }
+        });
         *///?}
         NeoForge.EVENT_BUS.addListener((ServerStartedEvent event) -> NeroEconomyCommon.CURRENCY_PROVIDER.bind(event.getServer()));
         NeoForge.EVENT_BUS.addListener((ServerStoppedEvent event) -> NeroEconomyCommon.CURRENCY_PROVIDER.unbind(event.getServer()));
