@@ -89,6 +89,7 @@ jobs:
             {"loader": "fabric", "mc": "26.2", "games": "26.2", "label": "Fabric", "suffix": ""},
             {"loader": "fabric", "mc": "26.3", "games": "26.3", "label": "Fabric", "suffix": ""},
             {"loader": "neoforge", "mc": "1.20.4", "games": "1.20.4", "label": "NeoForge", "suffix": ""},
+            {"loader": "neoforge", "mc": "1.20.5", "games": "1.20.5", "label": "NeoForge", "suffix": ""},
             {"loader": "neoforge", "mc": "1.20.6", "games": "1.20.6", "label": "NeoForge", "suffix": ""},
             {"loader": "neoforge", "mc": "1.21.1", "games": "1.21.1", "label": "NeoForge", "suffix": ""},
             {"loader": "neoforge", "mc": "1.21.4", "games": "1.21.4", "label": "NeoForge", "suffix": ""},

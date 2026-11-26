@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [0.8.1]
+
+### Added
+
+- Minecraft 1.20.5 on NeoForge 20.5.21-beta, with Neroland Core 1.24.0 or newer.
+
 ## [0.8.0] - 2026-11-26
 
 ### Added
